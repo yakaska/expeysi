@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -64,6 +65,15 @@ class AddTransactionViewModel @Inject constructor(
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
+    val canSave: StateFlow<Boolean> = combine(
+        _amountText,
+        _selectedAccountId,
+        _selectedCategoryId,
+    ) { amount, accountId, categoryId ->
+        val parsed = Money.parseToMinor(amount)
+        parsed != null && parsed > 0 && accountId != null && categoryId != null
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
     fun onTypeChange(value: TxType) {
         _type.value = value
         _selectedCategoryId.value = null
@@ -90,14 +100,8 @@ class AddTransactionViewModel @Inject constructor(
         _note.value = value
     }
 
-    fun canSave(): Boolean {
-        val amount = Money.parseToMinor(_amountText.value)
-        return amount != null && amount > 0 &&
-            _selectedAccountId.value != null && _selectedCategoryId.value != null
-    }
-
     fun save() {
-        if (!canSave()) return
+        if (!canSave.value) return
         val amount = Money.parseToMinor(_amountText.value) ?: return
         val accountId = _selectedAccountId.value ?: return
         val categoryId = _selectedCategoryId.value ?: return
