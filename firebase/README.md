@@ -5,7 +5,8 @@
 
 ## Чек-лист консоли
 
-1. **Authentication** → Sign-in method → включить провайдера **Google**.
+1. **Authentication** → Sign-in method → включить **Anonymous** (анонимный вход,
+   без аккаунтов).
 2. **Firestore Database** → Create database → Production mode → регион
    `europe-west1` (или ближайший).
 3. **Firestore Database** → Rules → вставить содержимое `firestore.rules` → Publish.
@@ -14,8 +15,6 @@
    - nickname: `expeysi-android`
    - скачать `google-services.json` — он понадобится на этапе «Android: данные»,
      кладётся в `android/app/`. **В git не коммитить** (в `.gitignore`).
-5. SHA-1 для Google Sign-In добавим позже, когда появится Android-проект и
-   debug keystore (Project settings → Your apps → Add fingerprint).
 
 ## Файлы
 
