@@ -1,0 +1,121 @@
+package com.expeysi.app.ui.add
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.db.AccountDao
+import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.CategoryDao
+import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.data.db.TransactionDao
+import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.domain.Money
+import com.expeysi.app.domain.Periods
+import com.expeysi.app.domain.TxType
+import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+import javax.inject.Inject
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+@OptIn(ExperimentalCoroutinesApi::class)
+@HiltViewModel
+class AddTransactionViewModel @Inject constructor(
+    accountDao: AccountDao,
+    categoryDao: CategoryDao,
+    private val transactionDao: TransactionDao,
+) : ViewModel() {
+
+    private val zone: ZoneId = ZoneId.systemDefault()
+
+    val accounts: StateFlow<List<AccountEntity>> = accountDao.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _type = MutableStateFlow(TxType.EXPENSE)
+    val type: StateFlow<TxType> = _type.asStateFlow()
+
+    val categories: StateFlow<List<CategoryEntity>> = _type
+        .flatMapLatest { categoryDao.observeActive(it.wire) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    private val _amountText = MutableStateFlow("")
+    val amountText: StateFlow<String> = _amountText.asStateFlow()
+
+    private val _selectedAccountId = MutableStateFlow<String?>(null)
+    val selectedAccountId: StateFlow<String?> = _selectedAccountId.asStateFlow()
+
+    private val _selectedCategoryId = MutableStateFlow<String?>(null)
+    val selectedCategoryId: StateFlow<String?> = _selectedCategoryId.asStateFlow()
+
+    private val _date = MutableStateFlow(LocalDate.now(zone))
+    val date: StateFlow<LocalDate> = _date.asStateFlow()
+
+    private val _note = MutableStateFlow("")
+    val note: StateFlow<String> = _note.asStateFlow()
+
+    private val _saved = MutableStateFlow(false)
+    val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    fun onTypeChange(value: TxType) {
+        _type.value = value
+        _selectedCategoryId.value = null
+    }
+
+    fun onAmountChange(value: String) {
+        _amountText.value = value
+    }
+
+    fun onAccountSelect(id: String) {
+        _selectedAccountId.value = id
+    }
+
+    fun onCategorySelect(id: String) {
+        _selectedCategoryId.value = id
+    }
+
+    /** DatePicker отдаёт миллисекунды полуночи в UTC. */
+    fun onDatePick(utcMidnightMillis: Long) {
+        _date.value = Instant.ofEpochMilli(utcMidnightMillis).atZone(ZoneId.of("UTC")).toLocalDate()
+    }
+
+    fun onNoteChange(value: String) {
+        _note.value = value
+    }
+
+    fun canSave(): Boolean {
+        val amount = Money.parseToMinor(_amountText.value)
+        return amount != null && amount > 0 &&
+            _selectedAccountId.value != null && _selectedCategoryId.value != null
+    }
+
+    fun save() {
+        if (!canSave()) return
+        val amount = Money.parseToMinor(_amountText.value) ?: return
+        val accountId = _selectedAccountId.value ?: return
+        val categoryId = _selectedCategoryId.value ?: return
+        viewModelScope.launch {
+            val now = System.currentTimeMillis()
+            transactionDao.upsert(
+                TransactionEntity(
+                    id = UUID.randomUUID().toString(),
+                    type = _type.value.wire,
+                    amountMinor = amount,
+                    accountId = accountId,
+                    categoryId = categoryId,
+                    date = Periods.day(_date.value, zone).startMillis,
+                    note = _note.value.trim(),
+                    updatedAt = now,
+                ),
+            )
+            _saved.value = true
+        }
+    }
+}
