@@ -42,4 +42,10 @@ Expeysi — Android-приложение совместного учёта до�
 
 ## Команды
 
-Заполняются по мере появления модулей (Gradle wrapper в `android/`).
+Выполняются из каталога `android/` (Windows, Git Bash):
+
+- `./gradlew :app:assembleDebug` — собрать debug APK
+- `./gradlew :app:testDebugUnitTest` — unit-тесты (JVM, без эмулятора)
+- `./gradlew :app:installDebug` — установить на подключённое устройство
+
+SDK находится через `android/local.properties` (`sdk.dir=...`), файл в `.gitignore`.
