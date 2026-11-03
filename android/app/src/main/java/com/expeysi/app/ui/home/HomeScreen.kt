@@ -39,6 +39,7 @@ private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.M
 @Composable
 fun HomeScreen(
     onAddClick: () -> Unit,
+    onItemClick: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -101,7 +102,10 @@ fun HomeScreen(
             }
             items(state.recent, key = { it.transaction.id }) { item ->
                 val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(
+                    onClick = { onItemClick(item.transaction.id) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
