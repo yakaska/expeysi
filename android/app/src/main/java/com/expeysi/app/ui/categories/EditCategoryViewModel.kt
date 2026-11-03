@@ -1,0 +1,98 @@
+package com.expeysi.app.ui.categories
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.db.CategoryDao
+import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.icons.IconCatalog
+import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
+import javax.inject.Inject
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+
+@HiltViewModel
+class EditCategoryViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
+    private val categoryDao: CategoryDao,
+) : ViewModel() {
+
+    private val editId: String? = savedStateHandle["categoryId"]
+    private var original: CategoryEntity? = null
+
+    val isEdit: Boolean = editId != null
+
+    private val _name = MutableStateFlow("")
+    val name: StateFlow<String> = _name.asStateFlow()
+
+    private val _type = MutableStateFlow(TxType.EXPENSE)
+    val type: StateFlow<TxType> = _type.asStateFlow()
+
+    private val _iconKey = MutableStateFlow(IconCatalog.DEFAULT_KEY)
+    val iconKey: StateFlow<String> = _iconKey.asStateFlow()
+
+    private val _saved = MutableStateFlow(false)
+    val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    val availableIconKeys: List<String> = IconCatalog.availableKeys
+
+    val canSave: StateFlow<Boolean> = _name
+        .map { it.isNotBlank() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    init {
+        if (editId != null) {
+            viewModelScope.launch {
+                categoryDao.byId(editId)?.let { category ->
+                    original = category
+                    _name.value = category.name
+                    _type.value = TxType.fromWire(category.type)
+                    _iconKey.value = category.iconKey
+                }
+            }
+        }
+    }
+
+    fun onNameChange(value: String) {
+        _name.value = value
+    }
+
+    fun onTypeChange(value: TxType) {
+        _type.value = value
+    }
+
+    fun onIconSelect(key: String) {
+        _iconKey.value = key
+    }
+
+    fun save() {
+        if (!canSave.value) return
+        viewModelScope.launch {
+            categoryDao.upsert(
+                CategoryEntity(
+                    id = editId ?: UUID.randomUUID().toString(),
+                    name = _name.value.trim(),
+                    iconKey = _iconKey.value,
+                    type = _type.value.wire,
+                    updatedAt = System.currentTimeMillis(),
+                ),
+            )
+            _saved.value = true
+        }
+    }
+
+    fun delete() {
+        val category = original ?: return
+        viewModelScope.launch {
+            categoryDao.upsert(category.copy(deleted = true, updatedAt = System.currentTimeMillis()))
+            _saved.value = true
+        }
+    }
+}

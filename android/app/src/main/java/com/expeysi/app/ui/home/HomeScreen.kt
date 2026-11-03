@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -43,6 +44,7 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
     onAccountsClick: () -> Unit,
+    onCategoriesClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -52,6 +54,12 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text("Expeysi") },
                 actions = {
+                    IconButton(onClick = onCategoriesClick) {
+                        Icon(
+                            Icons.Filled.Category,
+                            contentDescription = "Категории",
+                        )
+                    }
                     IconButton(onClick = onAccountsClick) {
                         Icon(
                             Icons.Filled.AccountBalanceWallet,
