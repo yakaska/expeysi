@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isMember(familyId) {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    match /families/{familyId} {
+      // Создать семью может любой вошедший пользователь (он станет первым членом).
+      allow create: if isSignedIn();
+      allow read, update, delete: if isMember(familyId);
+
+      match /members/{uid} {
+        allow read: if isMember(familyId);
+        // Присоединение по коду: зная familyId, можно создать только СВОЙ документ члена.
+        allow create: if isSignedIn() && request.auth.uid == uid;
+        allow update, delete: if isMember(familyId) && request.auth.uid == uid;
+      }
+
+      match /accounts/{accountId} {
+        allow read, write: if isMember(familyId);
+      }
+
+      match /categories/{categoryId} {
+        allow read, write: if isMember(familyId);
+      }
+
+      match /transactions/{transactionId} {
+        allow read, write: if isMember(familyId);
+      }
+    }
+  }
+}
