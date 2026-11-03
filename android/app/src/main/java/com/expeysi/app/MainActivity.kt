@@ -9,6 +9,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.expeysi.app.ui.accounts.AccountsScreen
+import com.expeysi.app.ui.accounts.EditAccountScreen
 import com.expeysi.app.ui.add.AddTransactionScreen
 import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
@@ -27,6 +29,7 @@ class MainActivity : ComponentActivity() {
                         HomeScreen(
                             onAddClick = { navController.navigate("add") },
                             onItemClick = { id -> navController.navigate("edit/$id") },
+                            onAccountsClick = { navController.navigate("accounts") },
                         )
                     }
                     composable("add") {
@@ -37,6 +40,22 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
                     ) {
                         AddTransactionScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable("accounts") {
+                        AccountsScreen(
+                            onBack = { navController.popBackStack() },
+                            onAddClick = { navController.navigate("accounts/add") },
+                            onItemClick = { id -> navController.navigate("accounts/edit/$id") },
+                        )
+                    }
+                    composable("accounts/add") {
+                        EditAccountScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = "accounts/edit/{accountId}",
+                        arguments = listOf(navArgument("accountId") { type = NavType.StringType }),
+                    ) {
+                        EditAccountScreen(onClose = { navController.popBackStack() })
                     }
                 }
             }

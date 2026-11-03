@@ -45,9 +45,10 @@ class HomeViewModel @Inject constructor(
         accountDao.observeActive(),
         transactionDao.observeActive(),
         categoryDao.observeAll(),
-    ) { accounts, transactions, categories ->
+        accountDao.observeAll(),
+    ) { accounts, transactions, categories, allAccounts ->
         val categoryById = categories.associateBy { it.id }
-        val accountById = accounts.associateBy { it.id }
+        val accountById = allAccounts.associateBy { it.id }
 
         val balances = accounts.map { account ->
             val sums = transactions
