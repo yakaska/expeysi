@@ -1,0 +1,23 @@
+# Gradle
+.gradle/
+build/
+*/build/
+
+# Android
+local.properties
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# Firebase — секреты не коммитим
+google-services.json
+firebase-debug.log
+
+# Kotlin
+.kotlin/
