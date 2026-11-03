@@ -11,7 +11,7 @@ Expeysi — Android-приложение совместного учёта до�
 
 - Только Android, Jetpack Compose, дизайн Material 3
 - Локальное хранилище: Room, DI: Hilt
-- Синхронизация: Firebase Firestore (+ Firebase Authentication для входа)
+- Синхронизация: Firebase Firestore + анонимная Firebase Authentication
 - Виджеты: Jetpack Glance
 - Фоновая работа: WorkManager (при необходимости)
 - Своего сервера нет и не планируется
