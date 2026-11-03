@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -62,6 +63,7 @@ fun AddTransactionScreen(
     val date by viewModel.date.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val canSave by viewModel.canSave.collectAsStateWithLifecycle()
 
     var showDatePicker by remember { mutableStateOf(false) }
 
@@ -99,6 +101,18 @@ fun AddTransactionScreen(
                     }
                 },
             )
+        },
+        bottomBar = {
+            Button(
+                onClick = viewModel::save,
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(16.dp),
+            ) {
+                Text("Сохранить")
+            }
         },
     ) { innerPadding ->
         Column(
@@ -172,14 +186,6 @@ fun AddTransactionScreen(
                 label = { Text("Заметка (необязательно)") },
                 singleLine = true,
             )
-
-            Button(
-                onClick = viewModel::save,
-                enabled = viewModel.canSave(),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text("Сохранить")
-            }
         }
     }
 }
