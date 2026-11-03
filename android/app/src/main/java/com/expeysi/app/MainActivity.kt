@@ -12,6 +12,8 @@ import androidx.navigation.navArgument
 import com.expeysi.app.ui.accounts.AccountsScreen
 import com.expeysi.app.ui.accounts.EditAccountScreen
 import com.expeysi.app.ui.add.AddTransactionScreen
+import com.expeysi.app.ui.categories.CategoriesScreen
+import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
                             onAddClick = { navController.navigate("add") },
                             onItemClick = { id -> navController.navigate("edit/$id") },
                             onAccountsClick = { navController.navigate("accounts") },
+                            onCategoriesClick = { navController.navigate("categories") },
                         )
                     }
                     composable("add") {
@@ -56,6 +59,22 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("accountId") { type = NavType.StringType }),
                     ) {
                         EditAccountScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable("categories") {
+                        CategoriesScreen(
+                            onBack = { navController.popBackStack() },
+                            onAddClick = { navController.navigate("categories/add") },
+                            onItemClick = { id -> navController.navigate("categories/edit/$id") },
+                        )
+                    }
+                    composable("categories/add") {
+                        EditCategoryScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = "categories/edit/{categoryId}",
+                        arguments = listOf(navArgument("categoryId") { type = NavType.StringType }),
+                    ) {
+                        EditCategoryScreen(onClose = { navController.popBackStack() })
                     }
                 }
             }
