@@ -17,6 +17,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE deleted = 0 AND type = :type ORDER BY name")
     fun observeActive(type: String): Flow<List<CategoryEntity>>
 
+    @Query("SELECT * FROM categories")
+    fun observeAll(): Flow<List<CategoryEntity>>
+
     @Query("SELECT * FROM categories WHERE id = :id")
     suspend fun byId(id: String): CategoryEntity?
 }
