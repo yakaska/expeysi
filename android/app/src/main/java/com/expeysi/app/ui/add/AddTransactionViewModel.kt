@@ -1,5 +1,6 @@
 package com.expeysi.app.ui.add
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
@@ -30,10 +31,16 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AddTransactionViewModel @Inject constructor(
+    savedStateHandle: SavedStateHandle,
     accountDao: AccountDao,
     categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
 ) : ViewModel() {
+
+    private val editId: String? = savedStateHandle["transactionId"]
+    private var original: TransactionEntity? = null
+
+    val isEdit: Boolean = editId != null
 
     private val zone: ZoneId = ZoneId.systemDefault()
 
@@ -64,6 +71,22 @@ class AddTransactionViewModel @Inject constructor(
 
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    init {
+        if (editId != null) {
+            viewModelScope.launch {
+                transactionDao.byId(editId)?.let { tx ->
+                    original = tx
+                    _type.value = TxType.fromWire(tx.type)
+                    _amountText.value = Money.format(tx.amountMinor)
+                    _selectedAccountId.value = tx.accountId
+                    _selectedCategoryId.value = tx.categoryId
+                    _date.value = Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate()
+                    _note.value = tx.note
+                }
+            }
+        }
+    }
 
     val canSave: StateFlow<Boolean> = combine(
         _amountText,
@@ -109,7 +132,7 @@ class AddTransactionViewModel @Inject constructor(
             val now = System.currentTimeMillis()
             transactionDao.upsert(
                 TransactionEntity(
-                    id = UUID.randomUUID().toString(),
+                    id = editId ?: UUID.randomUUID().toString(),
                     type = _type.value.wire,
                     amountMinor = amount,
                     accountId = accountId,
@@ -119,6 +142,14 @@ class AddTransactionViewModel @Inject constructor(
                     updatedAt = now,
                 ),
             )
+            _saved.value = true
+        }
+    }
+
+    fun delete() {
+        val tx = original ?: return
+        viewModelScope.launch {
+            transactionDao.upsert(tx.copy(deleted = true, updatedAt = System.currentTimeMillis()))
             _saved.value = true
         }
     }
