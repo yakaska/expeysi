@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.CurrencyDao
+import com.expeysi.app.data.db.CurrencyEntity
+import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.Money
 import com.expeysi.app.ui.icons.IconCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -22,6 +25,7 @@ import kotlinx.coroutines.launch
 class EditAccountViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
+    currencyDao: CurrencyDao,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["accountId"]
@@ -37,6 +41,12 @@ class EditAccountViewModel @Inject constructor(
 
     private val _openingBalanceText = MutableStateFlow("0")
     val openingBalanceText: StateFlow<String> = _openingBalanceText.asStateFlow()
+
+    private val _currencyCode = MutableStateFlow(Currency.DEFAULT)
+    val currencyCode: StateFlow<String> = _currencyCode.asStateFlow()
+
+    val currencies: StateFlow<List<CurrencyEntity>> = currencyDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
@@ -58,6 +68,7 @@ class EditAccountViewModel @Inject constructor(
                     _name.value = account.name
                     _iconKey.value = account.iconKey
                     _openingBalanceText.value = Money.format(account.openingBalanceMinor)
+                    _currencyCode.value = account.currencyCode
                 }
             }
         }
@@ -75,6 +86,10 @@ class EditAccountViewModel @Inject constructor(
         _openingBalanceText.value = value
     }
 
+    fun onCurrencySelect(code: String) {
+        _currencyCode.value = code
+    }
+
     fun save() {
         if (!canSave.value) return
         val opening = Money.parseToMinor(_openingBalanceText.value) ?: return
@@ -85,6 +100,7 @@ class EditAccountViewModel @Inject constructor(
                     name = _name.value.trim(),
                     iconKey = _iconKey.value,
                     openingBalanceMinor = opening,
+                    currencyCode = _currencyCode.value,
                     updatedAt = System.currentTimeMillis(),
                 ),
             )

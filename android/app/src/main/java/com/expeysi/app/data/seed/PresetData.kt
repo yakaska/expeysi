@@ -2,6 +2,7 @@ package com.expeysi.app.data.seed
 
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 
 /**
@@ -47,6 +48,7 @@ object PresetData {
             name = it.name,
             iconKey = it.iconKey,
             openingBalanceMinor = 0L,
+            currencyCode = Currency.DEFAULT,
             updatedAt = nowMillis,
         )
     }

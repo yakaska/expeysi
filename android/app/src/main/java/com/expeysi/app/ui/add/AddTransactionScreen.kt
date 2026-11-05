@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.IconCatalog
 import java.time.format.DateTimeFormatter
@@ -62,6 +63,7 @@ fun AddTransactionScreen(
     val categories by viewModel.categories.collectAsStateWithLifecycle()
     val selectedAccountId by viewModel.selectedAccountId.collectAsStateWithLifecycle()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsStateWithLifecycle()
+    val currencySymbols by viewModel.currencySymbols.collectAsStateWithLifecycle()
     val date by viewModel.date.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
@@ -168,11 +170,15 @@ fun AddTransactionScreen(
                 }
             }
 
+            val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
+            val amountSymbol = selectedAccount?.let {
+                currencySymbols[it.currencyCode] ?: it.currencyCode
+            } ?: Currency.DEFAULT
             OutlinedTextField(
                 value = amountText,
                 onValueChange = viewModel::onAmountChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Сумма, ₽") },
+                label = { Text("Сумма, $amountSymbol") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
             )

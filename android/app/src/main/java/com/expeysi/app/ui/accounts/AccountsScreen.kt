@@ -74,11 +74,15 @@ fun AccountsScreen(
                         },
                         headlineContent = { Text(balance.account.name) },
                         supportingContent = {
-                            Text("Начальный остаток: ${Money.format(balance.account.openingBalanceMinor)} ₽")
+                            Text(
+                                "Начальный остаток: " +
+                                    "${Money.format(balance.account.openingBalanceMinor)} " +
+                                    balance.currencySymbol,
+                            )
                         },
                         trailingContent = {
                             Text(
-                                text = "${Money.format(balance.balanceMinor)} ₽",
+                                text = "${Money.format(balance.balanceMinor)} ${balance.currencySymbol}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (balance.balanceMinor < 0) {
                                     MaterialTheme.colorScheme.error

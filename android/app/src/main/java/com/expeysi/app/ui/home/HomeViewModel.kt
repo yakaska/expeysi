@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.CategoryDao
+import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.BalanceCalculator
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.stateIn
 data class AccountBalance(
     val account: AccountEntity,
     val balanceMinor: Long,
+    val currencySymbol: String,
 )
 
 data class TransactionItem(
@@ -27,6 +29,7 @@ data class TransactionItem(
     val categoryName: String,
     val categoryIconKey: String,
     val accountName: String,
+    val currencySymbol: String,
 )
 
 data class HomeUiState(
@@ -39,6 +42,7 @@ class HomeViewModel @Inject constructor(
     accountDao: AccountDao,
     transactionDao: TransactionDao,
     categoryDao: CategoryDao,
+    currencyDao: CurrencyDao,
 ) : ViewModel() {
 
     val uiState: StateFlow<HomeUiState> = combine(
@@ -46,24 +50,32 @@ class HomeViewModel @Inject constructor(
         transactionDao.observeActive(),
         categoryDao.observeAll(),
         accountDao.observeAll(),
-    ) { accounts, transactions, categories, allAccounts ->
+        currencyDao.observeAll(),
+    ) { accounts, transactions, categories, allAccounts, currencies ->
         val categoryById = categories.associateBy { it.id }
         val accountById = allAccounts.associateBy { it.id }
+        val symbolByCode = currencies.associate { it.code to it.symbol }
 
         val balances = accounts.map { account ->
             val sums = transactions
                 .filter { it.accountId == account.id }
                 .map { TxSum(TxType.fromWire(it.type), it.amountMinor) }
-            AccountBalance(account, BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums))
+            AccountBalance(
+                account = account,
+                balanceMinor = BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums),
+                currencySymbol = symbolByCode[account.currencyCode] ?: account.currencyCode,
+            )
         }
 
         val recent = transactions.take(50).map { tx ->
             val category = categoryById[tx.categoryId]
+            val account = accountById[tx.accountId]
             TransactionItem(
                 transaction = tx,
                 categoryName = category?.name ?: "Без категории",
                 categoryIconKey = category?.iconKey ?: "",
-                accountName = accountById[tx.accountId]?.name ?: "",
+                accountName = account?.name ?: "",
+                currencySymbol = symbolByCode[account?.currencyCode] ?: account?.currencyCode ?: "",
             )
         }
 
