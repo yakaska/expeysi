@@ -21,7 +21,7 @@ object PresetData {
 
     data class PresetBalance(val id: String, val name: String, val currencyCode: String)
 
-    data class PresetAccount(val id: String, val name: String, val iconKey: String)
+    data class PresetAccount(val id: String, val name: String, val iconKey: String, val colorKey: String)
 
     data class PresetCategory(
         val id: String,
@@ -36,8 +36,8 @@ object PresetData {
     )
 
     val accounts: List<PresetAccount> = listOf(
-        PresetAccount(ACCOUNT_CASH_ID, "Наличные", "payments"),
-        PresetAccount(ACCOUNT_CARD_ID, "Карта", "credit_card"),
+        PresetAccount(ACCOUNT_CASH_ID, "Наличные", "payments", "green"),
+        PresetAccount(ACCOUNT_CARD_ID, "Карта", "credit_card", "blue"),
     )
 
     val categories: List<PresetCategory> = listOf(
@@ -69,6 +69,7 @@ object PresetData {
             id = it.id,
             name = it.name,
             iconKey = it.iconKey,
+            colorKey = it.colorKey,
             openingBalanceMinor = 0L,
             currencyCode = Currency.DEFAULT,
             balanceId = BALANCE_MAIN_ID,

@@ -9,6 +9,8 @@ data class AccountEntity(
     @PrimaryKey val id: String,
     val name: String,
     val iconKey: String,
+    /** Ключ цвета обода иконки из общей палитры CategoryPalette. */
+    @ColumnInfo(defaultValue = "default") val colorKey: String = "default",
     val openingBalanceMinor: Long,
     /** Код валюты ISO 4217, см. [com.expeysi.app.domain.Currency]. */
     @ColumnInfo(defaultValue = "RUB") val currencyCode: String = "RUB",

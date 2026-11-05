@@ -89,6 +89,15 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE accounts ADD COLUMN colorKey TEXT NOT NULL DEFAULT 'default'")
+        PresetData.accounts.forEach { a ->
+            db.execSQL("UPDATE accounts SET colorKey = ? WHERE id = ?", arrayOf(a.colorKey, a.id))
+        }
+    }
+}
+
 @Database(
     entities = [
         AccountEntity::class,
@@ -97,7 +106,7 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

@@ -46,7 +46,7 @@ import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.ui.icons.CategoryIcon
-import com.expeysi.app.ui.icons.IconCatalog
+import com.expeysi.app.ui.icons.CategoryPalette
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -143,14 +143,26 @@ fun HomeScreen(
                             title = "Счета",
                             currencyCode = state.selectedBalance?.currencyCode ?: "",
                             accent = MaterialTheme.colorScheme.tertiary,
+                            centerText = "${Money.format(state.totalBalanceMinor)} ${state.currencySymbol}",
+                            centerColor = if (state.totalBalanceMinor < 0) {
+                                CategoryPalette.color("red")
+                            } else {
+                                CategoryPalette.color("green")
+                            },
                         )
-                        state.accounts.forEach { balance ->
+                        state.accounts.forEachIndexed { index, balance ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 16.dp),
+                                    color = MaterialTheme.colorScheme.outlineVariant,
+                                )
+                            }
                             ListItem(
                                 modifier = Modifier.clickable {
                                     onAccountHistoryClick(balance.account.id)
                                 },
                                 leadingContent = {
-                                    Icon(IconCatalog.icon(balance.account.iconKey), contentDescription = null)
+                                    CategoryIcon(balance.account.iconKey, balance.account.colorKey)
                                 },
                                 headlineContent = { Text(balance.account.name) },
                                 trailingContent = {
@@ -260,14 +272,28 @@ private fun SumsCard(title: String, sums: WindowSums, currencyCode: String, acce
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             CardHeader(title = title, currencyCode = currencyCode, accent = accent)
             SumRow("Сегодня", sums.dayMinor)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
             SumRow("7 дней", sums.weekMinor)
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.outlineVariant,
+            )
             SumRow("30 дней", sums.monthMinor)
         }
     }
 }
 
 @Composable
-private fun CardHeader(title: String, currencyCode: String, accent: androidx.compose.ui.graphics.Color) {
+private fun CardHeader(
+    title: String,
+    currencyCode: String,
+    accent: androidx.compose.ui.graphics.Color,
+    centerText: String? = null,
+    centerColor: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface,
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -276,6 +302,10 @@ private fun CardHeader(title: String, currencyCode: String, accent: androidx.com
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = accent)
         Spacer(modifier = Modifier.weight(1f))
+        if (centerText != null) {
+            Text(centerText, style = MaterialTheme.typography.titleMedium, color = centerColor)
+            Spacer(modifier = Modifier.weight(1f))
+        }
         Text(
             currencyCode,
             style = MaterialTheme.typography.titleSmall,

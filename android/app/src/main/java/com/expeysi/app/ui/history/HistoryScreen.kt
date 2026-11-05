@@ -60,7 +60,6 @@ import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
-import com.expeysi.app.ui.icons.IconCatalog
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -377,6 +376,7 @@ private fun AccountsView(
                 total = total,
                 accountName = accountById[total.accountId]?.name ?: "Счёт",
                 accountIconKey = accountById[total.accountId]?.iconKey ?: "",
+                accountColorKey = accountById[total.accountId]?.colorKey ?: "default",
                 currencySymbol = state.currencySymbol,
                 expanded = total.accountId in expandedAccounts,
                 onToggle = {
@@ -412,6 +412,7 @@ private fun AccountCard(
     total: AccountTotal,
     accountName: String,
     accountIconKey: String,
+    accountColorKey: String,
     currencySymbol: String,
     expanded: Boolean,
     onToggle: () -> Unit,
@@ -422,7 +423,7 @@ private fun AccountCard(
         ListItem(
             modifier = Modifier.clickable(onClick = onToggle),
             leadingContent = {
-                Icon(IconCatalog.icon(accountIconKey), contentDescription = null)
+                CategoryIcon(accountIconKey, accountColorKey)
             },
             headlineContent = { Text(accountName) },
             trailingContent = {
