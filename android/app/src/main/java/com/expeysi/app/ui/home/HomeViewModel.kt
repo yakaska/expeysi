@@ -38,6 +38,7 @@ data class TransactionItem(
     val transaction: TransactionEntity,
     val categoryName: String,
     val categoryIconKey: String,
+    val categoryColorKey: String,
     val accountName: String,
     val currencySymbol: String,
 )
@@ -111,6 +112,7 @@ class HomeViewModel @Inject constructor(
                 transaction = tx,
                 categoryName = category?.name ?: "Без категории",
                 categoryIconKey = category?.iconKey ?: "",
+                categoryColorKey = category?.colorKey ?: "default",
                 accountName = accountById[tx.accountId]?.name ?: "",
                 currencySymbol = symbol,
             )

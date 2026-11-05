@@ -179,6 +179,7 @@ class HistoryViewModel @Inject constructor(
                     transaction = tx,
                     categoryName = category?.name ?: "Без категории",
                     categoryIconKey = category?.iconKey ?: "",
+                    categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
                 )

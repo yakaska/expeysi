@@ -5,6 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.expeysi.app.data.seed.CurrencySeed
+import com.expeysi.app.data.seed.PresetData
 import java.util.UUID
 
 val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -57,6 +58,37 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE categories ADD COLUMN colorKey TEXT NOT NULL DEFAULT 'default'")
+        val now = System.currentTimeMillis()
+        PresetData.categories.forEach { c ->
+            // Новые предзаписанные категории доезжают на существующие установки;
+            // уже существующие (в т.ч. переименованные) получают только цвет.
+            db.execSQL(
+                "INSERT OR IGNORE INTO categories (id, name, iconKey, type, colorKey, deleted, updatedAt) " +
+                    "VALUES (?, ?, ?, ?, ?, 0, ?)",
+                arrayOf(c.id, c.name, c.iconKey, c.type.wire, c.colorKey, now),
+            )
+            db.execSQL("UPDATE categories SET colorKey = ? WHERE id = ?", arrayOf(c.colorKey, c.id))
+        }
+        // «Продукты» → «Еда», только если пользователь не переименовывал категорию.
+        db.execSQL(
+            "UPDATE categories SET name = 'Еда', iconKey = 'restaurant' " +
+                "WHERE id = '00000000-0000-4000-8000-000000000101' AND name = 'Продукты'",
+        )
+        // Цвета для старых предзаписанных категорий, которых нет в новом наборе.
+        mapOf(
+            "00000000-0000-4000-8000-000000000104" to "orange", // Кафе
+            "00000000-0000-4000-8000-000000000107" to "default", // Прочее (расход)
+            "00000000-0000-4000-8000-000000000202" to "green", // Подработка
+            "00000000-0000-4000-8000-000000000203" to "default", // Прочее (доход)
+        ).forEach { (id, colorKey) ->
+            db.execSQL("UPDATE categories SET colorKey = ? WHERE id = ?", arrayOf(colorKey, id))
+        }
+    }
+}
+
 @Database(
     entities = [
         AccountEntity::class,
@@ -65,7 +97,7 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

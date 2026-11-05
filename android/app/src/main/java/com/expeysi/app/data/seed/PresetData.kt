@@ -27,6 +27,7 @@ object PresetData {
         val id: String,
         val name: String,
         val iconKey: String,
+        val colorKey: String,
         val type: TxType,
     )
 
@@ -40,16 +41,18 @@ object PresetData {
     )
 
     val categories: List<PresetCategory> = listOf(
-        PresetCategory("00000000-0000-4000-8000-000000000101", "Продукты", "shopping_cart", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000102", "Транспорт", "directions_bus", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000103", "Жильё", "home", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000104", "Кафе", "local_cafe", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000105", "Здоровье", "medical_services", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000106", "Развлечения", "sports_esports", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000107", "Прочее", "more_horiz", TxType.EXPENSE),
-        PresetCategory("00000000-0000-4000-8000-000000000201", "Зарплата", "work", TxType.INCOME),
-        PresetCategory("00000000-0000-4000-8000-000000000202", "Подработка", "attach_money", TxType.INCOME),
-        PresetCategory("00000000-0000-4000-8000-000000000203", "Прочее", "more_horiz", TxType.INCOME),
+        PresetCategory("00000000-0000-4000-8000-000000000101", "Еда", "restaurant", "orange", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000102", "Транспорт", "directions_bus", "blue", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000103", "Жильё", "home", "brown", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000108", "Одежда", "checkroom", "purple", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000109", "Связь", "smartphone", "teal", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000105", "Здоровье", "medical_services", "red", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000110", "Подарки", "card_giftcard", "pink", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000106", "Развлечения", "sports_esports", "deep_purple", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000111", "Косметика", "face", "pink_light", TxType.EXPENSE),
+        PresetCategory("00000000-0000-4000-8000-000000000201", "Зарплата", "work", "green", TxType.INCOME),
+        PresetCategory("00000000-0000-4000-8000-000000000204", "Премия", "star", "amber", TxType.INCOME),
+        PresetCategory("00000000-0000-4000-8000-000000000205", "Подарки", "card_giftcard", "pink", TxType.INCOME),
     )
 
     fun balanceEntities(nowMillis: Long) = balances.map {
@@ -78,6 +81,7 @@ object PresetData {
             id = it.id,
             name = it.name,
             iconKey = it.iconKey,
+            colorKey = it.colorKey,
             type = it.type.wire,
             updatedAt = nowMillis,
         )

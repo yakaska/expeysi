@@ -2,16 +2,22 @@ package com.expeysi.app.ui.icons
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.Checkroom
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material.icons.filled.DirectionsBus
+import androidx.compose.material.icons.filled.Face
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalCafe
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Payments
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SportsEsports
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -35,6 +41,12 @@ object IconCatalog {
         "more_horiz" to Icons.Filled.MoreHoriz,
         "work" to Icons.Filled.Work,
         "attach_money" to Icons.Filled.AttachMoney,
+        "restaurant" to Icons.Filled.Restaurant,
+        "checkroom" to Icons.Filled.Checkroom,
+        "smartphone" to Icons.Filled.Smartphone,
+        "card_giftcard" to Icons.Filled.CardGiftcard,
+        "face" to Icons.Filled.Face,
+        "star" to Icons.Filled.Star,
         "category" to Icons.Filled.Category,
     )
 

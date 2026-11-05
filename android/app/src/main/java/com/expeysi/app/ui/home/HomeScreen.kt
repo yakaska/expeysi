@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
+import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.IconCatalog
 import java.time.Instant
 import java.time.ZoneId
@@ -214,7 +215,7 @@ fun HomeScreen(
                             .padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Icon(IconCatalog.icon(item.categoryIconKey), contentDescription = null)
+                        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
                         Column(
                             modifier = Modifier
                                 .weight(1f)

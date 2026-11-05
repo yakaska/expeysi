@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.data.db.CategoryEntity
-import com.expeysi.app.ui.icons.IconCatalog
+import com.expeysi.app.ui.icons.CategoryIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,7 +89,7 @@ private fun CategoryCard(category: CategoryEntity, onClick: (String) -> Unit) {
     ) {
         ListItem(
             leadingContent = {
-                Icon(IconCatalog.icon(category.iconKey), contentDescription = null)
+                CategoryIcon(category.iconKey, category.colorKey)
             },
             headlineContent = { Text(category.name) },
         )
