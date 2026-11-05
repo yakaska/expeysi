@@ -1,6 +1,7 @@
 package com.expeysi.app.ui.home
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +17,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -58,6 +60,8 @@ fun HomeScreen(
     onAccountsClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAddBalanceClick: () -> Unit,
+    onBalanceHistoryClick: (String) -> Unit,
+    onAccountHistoryClick: (String) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +103,13 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            state.selectedBalance?.let { onBalanceHistoryClick(it.id) }
+                        },
+                    ) {
+                        Icon(Icons.Filled.History, contentDescription = "История операций")
+                    }
                     IconButton(onClick = onCategoriesClick) {
                         Icon(Icons.Filled.Category, contentDescription = "Категории")
                     }
@@ -134,6 +145,9 @@ fun HomeScreen(
                         )
                         state.accounts.forEach { balance ->
                             ListItem(
+                                modifier = Modifier.clickable {
+                                    onAccountHistoryClick(balance.account.id)
+                                },
                                 leadingContent = {
                                     Icon(IconCatalog.icon(balance.account.iconKey), contentDescription = null)
                                 },
