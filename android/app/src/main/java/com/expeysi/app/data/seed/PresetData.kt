@@ -1,6 +1,7 @@
 package com.expeysi.app.data.seed
 
 import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
@@ -12,8 +13,13 @@ import com.expeysi.app.domain.TxType
  */
 object PresetData {
 
+    /** nameUUIDFromBytes("expeysi-balance-RUB") — совпадает с миграцией 3→4. */
+    const val BALANCE_MAIN_ID = "532e3a4a-ff74-3c81-a308-f3ebe3ff8982"
+
     const val ACCOUNT_CASH_ID = "00000000-0000-4000-8000-000000000001"
     const val ACCOUNT_CARD_ID = "00000000-0000-4000-8000-000000000002"
+
+    data class PresetBalance(val id: String, val name: String, val currencyCode: String)
 
     data class PresetAccount(val id: String, val name: String, val iconKey: String)
 
@@ -22,6 +28,10 @@ object PresetData {
         val name: String,
         val iconKey: String,
         val type: TxType,
+    )
+
+    val balances: List<PresetBalance> = listOf(
+        PresetBalance(BALANCE_MAIN_ID, "Основной", Currency.DEFAULT),
     )
 
     val accounts: List<PresetAccount> = listOf(
@@ -42,6 +52,15 @@ object PresetData {
         PresetCategory("00000000-0000-4000-8000-000000000203", "Прочее", "more_horiz", TxType.INCOME),
     )
 
+    fun balanceEntities(nowMillis: Long) = balances.map {
+        BalanceEntity(
+            id = it.id,
+            name = it.name,
+            currencyCode = it.currencyCode,
+            updatedAt = nowMillis,
+        )
+    }
+
     fun accountEntities(nowMillis: Long): List<AccountEntity> = accounts.map {
         AccountEntity(
             id = it.id,
@@ -49,6 +68,7 @@ object PresetData {
             iconKey = it.iconKey,
             openingBalanceMinor = 0L,
             currencyCode = Currency.DEFAULT,
+            balanceId = BALANCE_MAIN_ID,
             updatedAt = nowMillis,
         )
     }

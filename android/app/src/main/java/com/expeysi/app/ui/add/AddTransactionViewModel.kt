@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.BalanceDao
+import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.CurrencyDao
@@ -38,6 +40,7 @@ class AddTransactionViewModel @Inject constructor(
     categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
+    balanceDao: BalanceDao,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
@@ -52,6 +55,10 @@ class AddTransactionViewModel @Inject constructor(
 
     val currencySymbols: StateFlow<Map<String, String>> = currencyDao.observeAll()
         .map { currencies -> currencies.associate { it.code to it.symbol } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val balances: StateFlow<Map<String, BalanceEntity>> = balanceDao.observeAll()
+        .map { balances -> balances.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _type = MutableStateFlow(TxType.EXPENSE)

@@ -1,17 +1,13 @@
 package com.expeysi.app.ui.accounts
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -24,9 +20,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -54,69 +48,15 @@ fun EditAccountScreen(
     val name by viewModel.name.collectAsStateWithLifecycle()
     val iconKey by viewModel.iconKey.collectAsStateWithLifecycle()
     val openingBalanceText by viewModel.openingBalanceText.collectAsStateWithLifecycle()
+    val balanceId by viewModel.balanceId.collectAsStateWithLifecycle()
+    val balances by viewModel.balances.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val canSave by viewModel.canSave.collectAsStateWithLifecycle()
-    val currencyCode by viewModel.currencyCode.collectAsStateWithLifecycle()
-    val currencies by viewModel.currencies.collectAsStateWithLifecycle()
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showCurrencyPicker by remember { mutableStateOf(false) }
-    var currencyQuery by remember { mutableStateOf("") }
 
     LaunchedEffect(saved) {
         if (saved) onClose()
-    }
-
-    if (showCurrencyPicker) {
-        val filtered = currencies.filter {
-            currencyQuery.isBlank() ||
-                it.code.contains(currencyQuery, ignoreCase = true) ||
-                it.name.contains(currencyQuery, ignoreCase = true)
-        }
-        AlertDialog(
-            onDismissRequest = {
-                showCurrencyPicker = false
-                currencyQuery = ""
-            },
-            title = { Text("Выбор валюты") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = currencyQuery,
-                        onValueChange = { currencyQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Поиск") },
-                        singleLine = true,
-                    )
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(360.dp)
-                            .padding(top = 8.dp),
-                    ) {
-                        items(filtered, key = { it.code }) { currency ->
-                            ListItem(
-                                headlineContent = { Text("${currency.code} — ${currency.name}") },
-                                supportingContent = { Text("Символ: ${currency.symbol}") },
-                                modifier = Modifier.clickable {
-                                    viewModel.onCurrencySelect(currency.code)
-                                    showCurrencyPicker = false
-                                    currencyQuery = ""
-                                },
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showCurrencyPicker = false
-                        currencyQuery = ""
-                    },
-                ) { Text("Отмена") }
-            },
-        )
     }
 
     if (showDeleteConfirm) {
@@ -189,6 +129,17 @@ fun EditAccountScreen(
                 singleLine = true,
             )
 
+            Text("Баланс", style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                balances.forEach { balance ->
+                    FilterChip(
+                        selected = balanceId == balance.id,
+                        onClick = { viewModel.onBalanceSelect(balance.id) },
+                        label = { Text(balance.name) },
+                    )
+                }
+            }
+
             OutlinedTextField(
                 value = openingBalanceText,
                 onValueChange = viewModel::onOpeningBalanceChange,
@@ -197,18 +148,6 @@ fun EditAccountScreen(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                 singleLine = true,
             )
-
-            Text("Валюта", style = MaterialTheme.typography.titleSmall)
-            OutlinedButton(
-                onClick = { showCurrencyPicker = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                val current = currencies.firstOrNull { it.code == currencyCode }
-                Text(
-                    if (current != null) "${current.code} — ${current.name}"
-                    else currencyCode,
-                )
-            }
 
             Text("Иконка", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

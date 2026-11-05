@@ -1,8 +1,11 @@
 package com.expeysi.app.ui.home
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -11,19 +14,27 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -31,6 +42,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.ui.icons.IconCatalog
 import java.time.Instant
 import java.time.ZoneId
@@ -45,26 +57,53 @@ fun HomeScreen(
     onItemClick: (String) -> Unit,
     onAccountsClick: () -> Unit,
     onCategoriesClick: () -> Unit,
+    onAddBalanceClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    var balanceMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Expeysi") },
+                title = {
+                    TextButton(onClick = { balanceMenuOpen = true }) {
+                        Text(
+                            state.selectedBalance?.let { "${it.name} (${state.currencySymbol})" }
+                                ?: "Expeysi",
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Выбрать баланс")
+                        DropdownMenu(
+                            expanded = balanceMenuOpen,
+                            onDismissRequest = { balanceMenuOpen = false },
+                        ) {
+                            state.balances.forEach { balance ->
+                                DropdownMenuItem(
+                                    text = { Text(balance.name) },
+                                    onClick = {
+                                        viewModel.selectBalance(balance.id)
+                                        balanceMenuOpen = false
+                                    },
+                                )
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Новый баланс…") },
+                                onClick = {
+                                    balanceMenuOpen = false
+                                    onAddBalanceClick()
+                                },
+                            )
+                        }
+                    }
+                },
                 actions = {
                     IconButton(onClick = onCategoriesClick) {
-                        Icon(
-                            Icons.Filled.Category,
-                            contentDescription = "Категории",
-                        )
+                        Icon(Icons.Filled.Category, contentDescription = "Категории")
                     }
                     IconButton(onClick = onAccountsClick) {
-                        Icon(
-                            Icons.Filled.AccountBalanceWallet,
-                            contentDescription = "Счета",
-                        )
+                        Icon(Icons.Filled.AccountBalanceWallet, contentDescription = "Счета")
                     }
                 },
             )
@@ -79,32 +118,58 @@ fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item {
-                Text("Счета", style = MaterialTheme.typography.titleMedium)
-            }
-            items(state.accounts, key = { it.account.id }) { balance ->
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    ListItem(
-                        leadingContent = {
-                            Icon(IconCatalog.icon(balance.account.iconKey), contentDescription = null)
-                        },
-                        headlineContent = { Text(balance.account.name) },
-                        trailingContent = {
-                            Text(
-                                text = "${Money.format(balance.balanceMinor)} ${balance.currencySymbol}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = if (balance.balanceMinor < 0) {
-                                    MaterialTheme.colorScheme.error
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary),
+                ) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                        CardHeader(
+                            title = "Счета",
+                            currencyCode = state.selectedBalance?.currencyCode ?: "",
+                            accent = MaterialTheme.colorScheme.tertiary,
+                        )
+                        state.accounts.forEach { balance ->
+                            ListItem(
+                                leadingContent = {
+                                    Icon(IconCatalog.icon(balance.account.iconKey), contentDescription = null)
+                                },
+                                headlineContent = { Text(balance.account.name) },
+                                trailingContent = {
+                                    Text(
+                                        Money.format(balance.balanceMinor),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = if (balance.balanceMinor < 0) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                    )
                                 },
                             )
-                        },
-                    )
+                        }
+                    }
                 }
+            }
+
+            item {
+                SumsCard(
+                    title = "Расходы",
+                    sums = state.expense,
+                    currencyCode = state.selectedBalance?.currencyCode ?: "",
+                    accent = MaterialTheme.colorScheme.error,
+                )
+            }
+            item {
+                SumsCard(
+                    title = "Доходы",
+                    sums = state.income,
+                    currencyCode = state.selectedBalance?.currencyCode ?: "",
+                    accent = MaterialTheme.colorScheme.primary,
+                )
             }
 
             item {
@@ -170,4 +235,50 @@ fun HomeScreen(
             }
         }
     }
+}
+
+@Composable
+private fun SumsCard(title: String, sums: WindowSums, currencyCode: String, accent: androidx.compose.ui.graphics.Color) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        border = BorderStroke(1.5.dp, accent),
+    ) {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            CardHeader(title = title, currencyCode = currencyCode, accent = accent)
+            SumRow("Сегодня", sums.dayMinor)
+            SumRow("7 дней", sums.weekMinor)
+            SumRow("30 дней", sums.monthMinor)
+        }
+    }
+}
+
+@Composable
+private fun CardHeader(title: String, currencyCode: String, accent: androidx.compose.ui.graphics.Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(title, style = MaterialTheme.typography.titleMedium, color = accent)
+        Spacer(modifier = Modifier.weight(1f))
+        Text(
+            currencyCode,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SumRow(label: String, amountMinor: Long) {
+    ListItem(
+        headlineContent = { Text(label) },
+        trailingContent = {
+            Text(
+                Money.format(amountMinor),
+                style = MaterialTheme.typography.titleMedium,
+            )
+        },
+    )
 }

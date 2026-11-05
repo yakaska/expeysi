@@ -12,6 +12,7 @@ import androidx.navigation.navArgument
 import com.expeysi.app.ui.accounts.AccountsScreen
 import com.expeysi.app.ui.accounts.EditAccountScreen
 import com.expeysi.app.ui.add.AddTransactionScreen
+import com.expeysi.app.ui.balances.EditBalanceScreen
 import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.home.HomeScreen
@@ -33,6 +34,7 @@ class MainActivity : ComponentActivity() {
                             onItemClick = { id -> navController.navigate("edit/$id") },
                             onAccountsClick = { navController.navigate("accounts") },
                             onCategoriesClick = { navController.navigate("categories") },
+                            onAddBalanceClick = { navController.navigate("balances/add") },
                         )
                     }
                     composable("add") {
@@ -75,6 +77,15 @@ class MainActivity : ComponentActivity() {
                         arguments = listOf(navArgument("categoryId") { type = NavType.StringType }),
                     ) {
                         EditCategoryScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable("balances/add") {
+                        EditBalanceScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = "balances/edit/{balanceId}",
+                        arguments = listOf(navArgument("balanceId") { type = NavType.StringType }),
+                    ) {
+                        EditBalanceScreen(onClose = { navController.popBackStack() })
                     }
                 }
             }

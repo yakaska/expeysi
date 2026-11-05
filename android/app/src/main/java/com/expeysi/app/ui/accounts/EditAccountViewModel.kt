@@ -5,9 +5,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
-import com.expeysi.app.data.db.CurrencyDao
-import com.expeysi.app.data.db.CurrencyEntity
-import com.expeysi.app.domain.Currency
+import com.expeysi.app.data.db.BalanceDao
+import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.domain.Money
 import com.expeysi.app.ui.icons.IconCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -18,6 +17,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -25,13 +25,16 @@ import kotlinx.coroutines.launch
 class EditAccountViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
-    currencyDao: CurrencyDao,
+    balanceDao: BalanceDao,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["accountId"]
     private var original: AccountEntity? = null
 
     val isEdit: Boolean = editId != null
+
+    val balances: StateFlow<List<BalanceEntity>> = balanceDao.observeActive()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name.asStateFlow()
@@ -42,11 +45,8 @@ class EditAccountViewModel @Inject constructor(
     private val _openingBalanceText = MutableStateFlow("0")
     val openingBalanceText: StateFlow<String> = _openingBalanceText.asStateFlow()
 
-    private val _currencyCode = MutableStateFlow(Currency.DEFAULT)
-    val currencyCode: StateFlow<String> = _currencyCode.asStateFlow()
-
-    val currencies: StateFlow<List<CurrencyEntity>> = currencyDao.observeAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    private val _balanceId = MutableStateFlow<String?>(null)
+    val balanceId: StateFlow<String?> = _balanceId.asStateFlow()
 
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
@@ -56,8 +56,9 @@ class EditAccountViewModel @Inject constructor(
     val canSave: StateFlow<Boolean> = combine(
         _name,
         _openingBalanceText,
-    ) { name, opening ->
-        name.isNotBlank() && Money.parseToMinor(opening) != null
+        _balanceId,
+    ) { name, opening, balanceId ->
+        name.isNotBlank() && Money.parseToMinor(opening) != null && balanceId != null
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
@@ -68,8 +69,13 @@ class EditAccountViewModel @Inject constructor(
                     _name.value = account.name
                     _iconKey.value = account.iconKey
                     _openingBalanceText.value = Money.format(account.openingBalanceMinor)
-                    _currencyCode.value = account.currencyCode
+                    _balanceId.value = account.balanceId
                 }
+            }
+        } else {
+            // Новый счёт по умолчанию привязываем к первому балансу.
+            viewModelScope.launch {
+                _balanceId.value = balances.first { it.isNotEmpty() }.first().id
             }
         }
     }
@@ -86,13 +92,14 @@ class EditAccountViewModel @Inject constructor(
         _openingBalanceText.value = value
     }
 
-    fun onCurrencySelect(code: String) {
-        _currencyCode.value = code
+    fun onBalanceSelect(id: String) {
+        _balanceId.value = id
     }
 
     fun save() {
         if (!canSave.value) return
         val opening = Money.parseToMinor(_openingBalanceText.value) ?: return
+        val balanceId = _balanceId.value ?: return
         viewModelScope.launch {
             accountDao.upsert(
                 AccountEntity(
@@ -100,7 +107,7 @@ class EditAccountViewModel @Inject constructor(
                     name = _name.value.trim(),
                     iconKey = _iconKey.value,
                     openingBalanceMinor = opening,
-                    currencyCode = _currencyCode.value,
+                    balanceId = balanceId,
                     updatedAt = System.currentTimeMillis(),
                 ),
             )

@@ -37,11 +37,16 @@ class PresetDataTest {
 
     @Test
     fun `посев создаёт сущности с теми же id и нулевым остатком`() {
+        val balances = PresetData.balanceEntities(nowMillis = 42L)
+        assertEquals(PresetData.balances.size, balances.size)
+        assertEquals(PresetData.BALANCE_MAIN_ID, balances.first().id)
+
         val accounts = PresetData.accountEntities(nowMillis = 42L)
         assertEquals(PresetData.accounts.size, accounts.size)
         assertEquals(PresetData.accounts.map { it.id }, accounts.map { it.id })
         accounts.forEach {
             assertEquals(0L, it.openingBalanceMinor)
+            assertEquals(PresetData.BALANCE_MAIN_ID, it.balanceId)
             assertEquals(42L, it.updatedAt)
             assertTrue(!it.deleted)
         }

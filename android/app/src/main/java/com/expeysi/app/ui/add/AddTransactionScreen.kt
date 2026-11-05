@@ -64,6 +64,7 @@ fun AddTransactionScreen(
     val selectedAccountId by viewModel.selectedAccountId.collectAsStateWithLifecycle()
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsStateWithLifecycle()
     val currencySymbols by viewModel.currencySymbols.collectAsStateWithLifecycle()
+    val balances by viewModel.balances.collectAsStateWithLifecycle()
     val date by viewModel.date.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
@@ -171,9 +172,10 @@ fun AddTransactionScreen(
             }
 
             val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
-            val amountSymbol = selectedAccount?.let {
-                currencySymbols[it.currencyCode] ?: it.currencyCode
-            } ?: Currency.DEFAULT
+            val amountSymbol = selectedAccount
+                ?.let { balances[it.balanceId]?.currencyCode }
+                ?.let { currencySymbols[it] ?: it }
+                ?: Currency.DEFAULT
             OutlinedTextField(
                 value = amountText,
                 onValueChange = viewModel::onAmountChange,
