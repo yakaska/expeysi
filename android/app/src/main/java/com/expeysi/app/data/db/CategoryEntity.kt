@@ -10,6 +10,8 @@ data class CategoryEntity(
     val iconKey: String,
     /** "income" или "expense", см. [com.expeysi.app.domain.TxType]. */
     val type: String,
+    /** Ключ цвета обода иконки из фиксированной палитры CategoryPalette. */
+    val colorKey: String = "default",
     val deleted: Boolean = false,
     val updatedAt: Long,
 )

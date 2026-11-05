@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -38,6 +39,9 @@ class EditCategoryViewModel @Inject constructor(
     private val _iconKey = MutableStateFlow(IconCatalog.DEFAULT_KEY)
     val iconKey: StateFlow<String> = _iconKey.asStateFlow()
 
+    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    val colorKey: StateFlow<String> = _colorKey.asStateFlow()
+
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
@@ -55,6 +59,7 @@ class EditCategoryViewModel @Inject constructor(
                     _name.value = category.name
                     _type.value = TxType.fromWire(category.type)
                     _iconKey.value = category.iconKey
+                    _colorKey.value = category.colorKey
                 }
             }
         }
@@ -72,6 +77,10 @@ class EditCategoryViewModel @Inject constructor(
         _iconKey.value = key
     }
 
+    fun onColorSelect(key: String) {
+        _colorKey.value = key
+    }
+
     fun save() {
         if (!canSave.value) return
         viewModelScope.launch {
@@ -80,6 +89,7 @@ class EditCategoryViewModel @Inject constructor(
                     id = editId ?: UUID.randomUUID().toString(),
                     name = _name.value.trim(),
                     iconKey = _iconKey.value,
+                    colorKey = _colorKey.value,
                     type = _type.value.wire,
                     updatedAt = System.currentTimeMillis(),
                 ),

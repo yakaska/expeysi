@@ -59,6 +59,7 @@ import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.home.TransactionItem
+import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.IconCatalog
 import java.time.Instant
 import java.time.ZoneId
@@ -340,7 +341,7 @@ private fun CategoriesView(
             ) {
                 ListItem(
                     leadingContent = {
-                        Icon(IconCatalog.icon(category?.iconKey ?: ""), contentDescription = null)
+                        CategoryIcon(category?.iconKey ?: "", category?.colorKey ?: "default")
                     },
                     headlineContent = { Text(category?.name ?: "Без категории") },
                     trailingContent = {
@@ -386,10 +387,11 @@ private fun AccountsView(
                     }
                 },
                 categories = total.categories.map { categoryTotal ->
-                    Triple(
-                        categoryTotal,
-                        categoryById[categoryTotal.categoryId]?.name ?: "Без категории",
-                        categoryById[categoryTotal.categoryId]?.iconKey ?: "",
+                    AccountCategoryRow(
+                        total = categoryTotal,
+                        name = categoryById[categoryTotal.categoryId]?.name ?: "Без категории",
+                        iconKey = categoryById[categoryTotal.categoryId]?.iconKey ?: "",
+                        colorKey = categoryById[categoryTotal.categoryId]?.colorKey ?: "default",
                     )
                 },
                 onCategoryClick = onCategoryClick,
@@ -397,6 +399,13 @@ private fun AccountsView(
         }
     }
 }
+
+private data class AccountCategoryRow(
+    val total: CategoryTotal,
+    val name: String,
+    val iconKey: String,
+    val colorKey: String,
+)
 
 @Composable
 private fun AccountCard(
@@ -406,7 +415,7 @@ private fun AccountCard(
     currencySymbol: String,
     expanded: Boolean,
     onToggle: () -> Unit,
-    categories: List<Triple<CategoryTotal, String, String>>,
+    categories: List<AccountCategoryRow>,
     onCategoryClick: (categoryId: String, accountId: String) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -430,20 +439,20 @@ private fun AccountCard(
             },
         )
         if (expanded) {
-            categories.forEach { (categoryTotal, name, iconKey) ->
+            categories.forEach { row ->
                 ListItem(
-                    modifier = Modifier.clickable { onCategoryClick(categoryTotal.categoryId, total.accountId) },
+                    modifier = Modifier.clickable { onCategoryClick(row.total.categoryId, total.accountId) },
                     leadingContent = {
-                        Icon(
-                            IconCatalog.icon(iconKey),
-                            contentDescription = null,
+                        CategoryIcon(
+                            row.iconKey,
+                            row.colorKey,
                             modifier = Modifier.padding(start = 16.dp),
                         )
                     },
-                    headlineContent = { Text(name) },
+                    headlineContent = { Text(row.name) },
                     trailingContent = {
                         Text(
-                            "${Money.format(categoryTotal.expenseMinor)} $currencySymbol",
+                            "${Money.format(row.total.expenseMinor)} $currencySymbol",
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },
@@ -489,7 +498,7 @@ private fun HistoryItemCard(item: TransactionItem, onClick: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(IconCatalog.icon(item.categoryIconKey), contentDescription = null)
+            CategoryIcon(item.categoryIconKey, item.categoryColorKey)
             Column(
                 modifier = Modifier
                     .weight(1f)

@@ -45,6 +45,7 @@ families/{familyId}
   categories/{categoryId}      # UUID
     name: string
     iconKey: string            # ключ из фиксированного набора Material Icons
+    colorKey: string           # ключ цвета обода иконки из фиксированной палитры
     type: "income" | "expense"
     deleted: boolean
     updatedAt: timestamp
