@@ -28,11 +28,17 @@ families/{familyId}
     displayName: string
     joinedAt: timestamp
 
+  balances/{balanceId}         # UUID
+    name: string               # "Основной", свой вариант
+    currencyCode: string       # ISO 4217: "RUB", "USD", ...
+    deleted: boolean
+    updatedAt: timestamp
+
   accounts/{accountId}         # UUID
     name: string               # "Наличные", "Карта", свой вариант
     iconKey: string
-    openingBalanceMinor: long  # начальный остаток в минимальных единицах валюты
-    currencyCode: string       # ISO 4217: "RUB", "USD", ...
+    openingBalanceMinor: long  # начальный остаток в минимальных единицах валюты баланса
+    balanceId: string          # баланс, к которому относится счёт; валюта счёта = валюта баланса
     deleted: boolean
     updatedAt: timestamp
 
@@ -60,6 +66,11 @@ families/{familyId}
 создании БД. В Firestore не синхронизируется: список одинаковый на всех
 устройствах. Упрощение MVP: у всех валют два знака после запятой, даже у
 безразрядных вроде JPY.
+
+Балансы группируют счета и задают им валюту: у баланса есть `currencyCode`,
+счёт ссылается на баланс через `balanceId`. На главном экране показывается
+выбранный баланс (выбор хранится локально на устройстве) и суммы по его счетам
+за скользящие окна: сегодня, последние 7 дней, последние 30 дней.
 
 ## Предзаписанные данные
 

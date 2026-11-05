@@ -5,17 +5,20 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.BalanceDao
+import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.Money
-import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
@@ -38,6 +41,7 @@ class AddTransactionViewModel @Inject constructor(
     categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
+    balanceDao: BalanceDao,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
@@ -52,6 +56,10 @@ class AddTransactionViewModel @Inject constructor(
 
     val currencySymbols: StateFlow<Map<String, String>> = currencyDao.observeAll()
         .map { currencies -> currencies.associate { it.code to it.symbol } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    val balances: StateFlow<Map<String, BalanceEntity>> = balanceDao.observeAll()
+        .map { balances -> balances.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _type = MutableStateFlow(TxType.EXPENSE)
@@ -73,6 +81,9 @@ class AddTransactionViewModel @Inject constructor(
     private val _date = MutableStateFlow(LocalDate.now(zone))
     val date: StateFlow<LocalDate> = _date.asStateFlow()
 
+    private val _time = MutableStateFlow(LocalTime.now(zone).withSecond(0).withNano(0))
+    val time: StateFlow<LocalTime> = _time.asStateFlow()
+
     private val _note = MutableStateFlow("")
     val note: StateFlow<String> = _note.asStateFlow()
 
@@ -88,7 +99,9 @@ class AddTransactionViewModel @Inject constructor(
                     _amountText.value = Money.format(tx.amountMinor)
                     _selectedAccountId.value = tx.accountId
                     _selectedCategoryId.value = tx.categoryId
-                    _date.value = Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate()
+                    val dateTime = Instant.ofEpochMilli(tx.date).atZone(zone)
+                    _date.value = dateTime.toLocalDate()
+                    _time.value = dateTime.toLocalTime().withSecond(0).withNano(0)
                     _note.value = tx.note
                 }
             }
@@ -126,6 +139,10 @@ class AddTransactionViewModel @Inject constructor(
         _date.value = Instant.ofEpochMilli(utcMidnightMillis).atZone(ZoneId.of("UTC")).toLocalDate()
     }
 
+    fun onTimePick(hour: Int, minute: Int) {
+        _time.value = LocalTime.of(hour, minute)
+    }
+
     fun onNoteChange(value: String) {
         _note.value = value
     }
@@ -144,7 +161,10 @@ class AddTransactionViewModel @Inject constructor(
                     amountMinor = amount,
                     accountId = accountId,
                     categoryId = categoryId,
-                    date = Periods.day(_date.value, zone).startMillis,
+                    date = LocalDateTime.of(_date.value, _time.value)
+                        .atZone(zone)
+                        .toInstant()
+                        .toEpochMilli(),
                     note = _note.value.trim(),
                     updatedAt = now,
                 ),

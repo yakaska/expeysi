@@ -1,16 +1,19 @@
 package com.expeysi.app.di
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AppDatabase
+import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
 import com.expeysi.app.data.db.MIGRATION_1_2
 import com.expeysi.app.data.db.MIGRATION_2_3
+import com.expeysi.app.data.db.MIGRATION_3_4
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
@@ -38,7 +41,7 @@ object DataModule {
     ): AppDatabase {
         val seedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         return Room.databaseBuilder(context, AppDatabase::class.java, "expeysi.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     // Посев предзаписанных данных — только при создании БД,
@@ -46,6 +49,7 @@ object DataModule {
                     seedScope.launch {
                         val now = System.currentTimeMillis()
                         val database = dbProvider.get()
+                        database.balanceDao().upsertAll(PresetData.balanceEntities(now))
                         database.accountDao().upsertAll(PresetData.accountEntities(now))
                         database.categoryDao().upsertAll(PresetData.categoryEntities(now))
                         database.currencyDao().insertAll(
@@ -68,4 +72,12 @@ object DataModule {
 
     @Provides
     fun provideCurrencyDao(db: AppDatabase): CurrencyDao = db.currencyDao()
+
+    @Provides
+    fun provideBalanceDao(db: AppDatabase): BalanceDao = db.balanceDao()
+
+    @Provides
+    @Singleton
+    fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences =
+        context.getSharedPreferences("expeysi_prefs", Context.MODE_PRIVATE)
 }

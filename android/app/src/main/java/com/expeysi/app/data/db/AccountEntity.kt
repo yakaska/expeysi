@@ -12,6 +12,8 @@ data class AccountEntity(
     val openingBalanceMinor: Long,
     /** Код валюты ISO 4217, см. [com.expeysi.app.domain.Currency]. */
     @ColumnInfo(defaultValue = "RUB") val currencyCode: String = "RUB",
+    /** Баланс, к которому относится счёт. Валюта счёта — валюта баланса. */
+    @ColumnInfo(defaultValue = "") val balanceId: String = "",
     val deleted: Boolean = false,
     val updatedAt: Long,
 )

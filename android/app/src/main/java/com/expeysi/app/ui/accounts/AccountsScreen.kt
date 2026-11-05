@@ -63,7 +63,8 @@ fun AccountsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(accounts, key = { it.account.id }) { balance ->
+            items(accounts, key = { it.balance.account.id }) { row ->
+                val balance = row.balance
                 Card(
                     onClick = { onItemClick(balance.account.id) },
                     modifier = Modifier.fillMaxWidth(),
@@ -75,7 +76,7 @@ fun AccountsScreen(
                         headlineContent = { Text(balance.account.name) },
                         supportingContent = {
                             Text(
-                                "Начальный остаток: " +
+                                "${row.balanceName} · начальный остаток: " +
                                     "${Money.format(balance.account.openingBalanceMinor)} " +
                                     balance.currencySymbol,
                             )
