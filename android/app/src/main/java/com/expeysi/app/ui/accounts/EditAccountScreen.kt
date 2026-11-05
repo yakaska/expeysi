@@ -1,6 +1,10 @@
 package com.expeysi.app.ui.accounts
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -8,7 +12,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,10 +39,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.ui.icons.CategoryIcon
+import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -47,6 +56,7 @@ fun EditAccountScreen(
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val iconKey by viewModel.iconKey.collectAsStateWithLifecycle()
+    val colorKey by viewModel.colorKey.collectAsStateWithLifecycle()
     val openingBalanceText by viewModel.openingBalanceText.collectAsStateWithLifecycle()
     val balanceId by viewModel.balanceId.collectAsStateWithLifecycle()
     val balances by viewModel.balances.collectAsStateWithLifecycle()
@@ -149,6 +159,8 @@ fun EditAccountScreen(
                 singleLine = true,
             )
 
+            CategoryIcon(iconKey, colorKey)
+
             Text("Иконка", style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 viewModel.availableIconKeys.forEach { key ->
@@ -156,6 +168,29 @@ fun EditAccountScreen(
                         selected = iconKey == key,
                         onClick = { viewModel.onIconSelect(key) },
                         label = { Icon(IconCatalog.icon(key), contentDescription = key) },
+                    )
+                }
+            }
+
+            Text("Цвет", style = MaterialTheme.typography.titleSmall)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CategoryPalette.availableKeys.forEach { key ->
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(CategoryPalette.color(key))
+                            .clickable { viewModel.onColorSelect(key) }
+                            .then(
+                                if (colorKey == key) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                } else {
+                                    Modifier
+                                },
+                            ),
                     )
                 }
             }

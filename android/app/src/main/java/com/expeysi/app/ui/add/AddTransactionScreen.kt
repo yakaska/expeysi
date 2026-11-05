@@ -60,7 +60,6 @@ import com.expeysi.app.domain.Calculator
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryIcon
-import com.expeysi.app.ui.icons.IconCatalog
 import java.time.format.DateTimeFormatter
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
@@ -184,7 +183,7 @@ fun AddTransactionScreen(
                 items(accounts, key = { it.id }) { account ->
                     ListItem(
                         leadingContent = {
-                            Icon(IconCatalog.icon(account.iconKey), contentDescription = null)
+                            CategoryIcon(account.iconKey, account.colorKey)
                         },
                         headlineContent = { Text(account.name) },
                         supportingContent = {
@@ -343,7 +342,7 @@ fun AddTransactionScreen(
                         },
                         leadingContent = {
                             selectedAccount?.let {
-                                Icon(IconCatalog.icon(it.iconKey), contentDescription = null)
+                                CategoryIcon(it.iconKey, it.colorKey)
                             }
                         },
                         trailingContent = {

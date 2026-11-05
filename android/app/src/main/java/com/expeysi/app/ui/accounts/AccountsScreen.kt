@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.Money
-import com.expeysi.app.ui.icons.IconCatalog
+import com.expeysi.app.ui.icons.CategoryIcon
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +71,7 @@ fun AccountsScreen(
                 ) {
                     ListItem(
                         leadingContent = {
-                            Icon(IconCatalog.icon(balance.account.iconKey), contentDescription = null)
+                            CategoryIcon(balance.account.iconKey, balance.account.colorKey)
                         },
                         headlineContent = { Text(balance.account.name) },
                         supportingContent = {

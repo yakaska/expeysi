@@ -37,6 +37,7 @@ families/{familyId}
   accounts/{accountId}         # UUID
     name: string               # "Наличные", "Карта", свой вариант
     iconKey: string
+    colorKey: string           # ключ цвета обода иконки из общей палитры
     openingBalanceMinor: long  # начальный остаток в минимальных единицах валюты баланса
     balanceId: string          # баланс, к которому относится счёт; валюта счёта = валюта баланса
     deleted: boolean

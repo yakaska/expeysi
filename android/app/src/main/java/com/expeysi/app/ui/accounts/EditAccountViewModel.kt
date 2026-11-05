@@ -8,6 +8,7 @@ import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.domain.Money
+import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -42,6 +43,9 @@ class EditAccountViewModel @Inject constructor(
     private val _iconKey = MutableStateFlow("payments")
     val iconKey: StateFlow<String> = _iconKey.asStateFlow()
 
+    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    val colorKey: StateFlow<String> = _colorKey.asStateFlow()
+
     private val _openingBalanceText = MutableStateFlow("0")
     val openingBalanceText: StateFlow<String> = _openingBalanceText.asStateFlow()
 
@@ -68,6 +72,7 @@ class EditAccountViewModel @Inject constructor(
                     original = account
                     _name.value = account.name
                     _iconKey.value = account.iconKey
+                    _colorKey.value = account.colorKey
                     _openingBalanceText.value = Money.format(account.openingBalanceMinor)
                     _balanceId.value = account.balanceId
                 }
@@ -88,6 +93,10 @@ class EditAccountViewModel @Inject constructor(
         _iconKey.value = key
     }
 
+    fun onColorSelect(key: String) {
+        _colorKey.value = key
+    }
+
     fun onOpeningBalanceChange(value: String) {
         _openingBalanceText.value = value
     }
@@ -106,6 +115,7 @@ class EditAccountViewModel @Inject constructor(
                     id = editId ?: UUID.randomUUID().toString(),
                     name = _name.value.trim(),
                     iconKey = _iconKey.value,
+                    colorKey = _colorKey.value,
                     openingBalanceMinor = opening,
                     balanceId = balanceId,
                     updatedAt = System.currentTimeMillis(),
