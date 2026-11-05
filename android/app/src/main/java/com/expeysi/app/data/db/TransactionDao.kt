@@ -28,4 +28,10 @@ interface TransactionDao {
 
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun byId(id: String): TransactionEntity?
+
+    @Query("SELECT * FROM transactions")
+    fun observeAll(): Flow<List<TransactionEntity>>
+
+    @Query("DELETE FROM transactions")
+    suspend fun clear()
 }

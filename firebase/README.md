@@ -5,8 +5,8 @@
 
 ## Чек-лист консоли
 
-1. **Authentication** → Sign-in method → включить **Anonymous** (анонимный вход,
-   без аккаунтов).
+1. **Authentication** → Sign-in method → включить **Google**, указать имя проекта
+   и email поддержки. Для Android-приложения добавить SHA-1 debug/release ключей.
 2. **Firestore Database** → Create database → Production mode → регион
    `europe-west1` (или ближайший).
 3. **Firestore Database** → Rules → вставить содержимое `firestore.rules` → Publish.

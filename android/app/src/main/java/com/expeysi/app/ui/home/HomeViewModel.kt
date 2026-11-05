@@ -2,6 +2,7 @@ package com.expeysi.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.SelectedBalanceStore
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
@@ -52,6 +53,7 @@ data class HomeUiState(
     val expense: WindowSums = WindowSums(0, 0, 0),
     val income: WindowSums = WindowSums(0, 0, 0),
     val recent: List<TransactionItem> = emptyList(),
+    val familyId: String? = null,
 )
 
 @HiltViewModel
@@ -62,6 +64,7 @@ class HomeViewModel @Inject constructor(
     categoryDao: CategoryDao,
     currencyDao: CurrencyDao,
     private val selectedBalanceStore: SelectedBalanceStore,
+    private val familyStore: FamilyStore,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
@@ -128,6 +131,7 @@ class HomeViewModel @Inject constructor(
             expense = windowSums(TxType.EXPENSE),
             income = windowSums(TxType.INCOME),
             recent = recent,
+            familyId = familyStore.familyId.value,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 

@@ -1,5 +1,6 @@
 package com.expeysi.app.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -63,9 +67,12 @@ fun HomeScreen(
     onAddBalanceClick: () -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
+    onSummaryClick: (String, TxType, Int) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var balanceMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -100,6 +107,17 @@ fun HomeScreen(
                                     onAddBalanceClick()
                                 },
                             )
+                            state.familyId?.let {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Код семьи: $it") },
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(it))
+                                        balanceMenuOpen = false
+                                        Toast.makeText(context, "Код семьи скопирован", Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -188,6 +206,9 @@ fun HomeScreen(
                     sums = state.expense,
                     currencyCode = state.selectedBalance?.currencyCode ?: "",
                     accent = MaterialTheme.colorScheme.error,
+                    onPeriodClick = { days ->
+                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.EXPENSE, days) }
+                    },
                 )
             }
             item {
@@ -196,6 +217,9 @@ fun HomeScreen(
                     sums = state.income,
                     currencyCode = state.selectedBalance?.currencyCode ?: "",
                     accent = MaterialTheme.colorScheme.primary,
+                    onPeriodClick = { days ->
+                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.INCOME, days) }
+                    },
                 )
             }
 
@@ -264,24 +288,30 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SumsCard(title: String, sums: WindowSums, currencyCode: String, accent: androidx.compose.ui.graphics.Color) {
+private fun SumsCard(
+    title: String,
+    sums: WindowSums,
+    currencyCode: String,
+    accent: androidx.compose.ui.graphics.Color,
+    onPeriodClick: (Int) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.5.dp, accent),
     ) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             CardHeader(title = title, currencyCode = currencyCode, accent = accent)
-            SumRow("Сегодня", sums.dayMinor)
+            SumRow("Сегодня", sums.dayMinor) { onPeriodClick(1) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("7 дней", sums.weekMinor)
+            SumRow("7 дней", sums.weekMinor) { onPeriodClick(7) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("30 дней", sums.monthMinor)
+            SumRow("30 дней", sums.monthMinor) { onPeriodClick(30) }
         }
     }
 }
@@ -315,8 +345,9 @@ private fun CardHeader(
 }
 
 @Composable
-private fun SumRow(label: String, amountMinor: Long) {
+private fun SumRow(label: String, amountMinor: Long, onClick: () -> Unit) {
     ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(label) },
         trailingContent = {
             Text(

@@ -12,6 +12,7 @@ import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -42,6 +43,7 @@ class AddTransactionViewModel @Inject constructor(
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
     balanceDao: BalanceDao,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
@@ -154,21 +156,21 @@ class AddTransactionViewModel @Inject constructor(
         val categoryId = _selectedCategoryId.value ?: return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            transactionDao.upsert(
-                TransactionEntity(
-                    id = editId ?: UUID.randomUUID().toString(),
-                    type = _type.value.wire,
-                    amountMinor = amount,
-                    accountId = accountId,
-                    categoryId = categoryId,
-                    date = LocalDateTime.of(_date.value, _time.value)
-                        .atZone(zone)
-                        .toInstant()
-                        .toEpochMilli(),
-                    note = _note.value.trim(),
-                    updatedAt = now,
-                ),
+            val transaction = TransactionEntity(
+                id = editId ?: UUID.randomUUID().toString(),
+                type = _type.value.wire,
+                amountMinor = amount,
+                accountId = accountId,
+                categoryId = categoryId,
+                date = LocalDateTime.of(_date.value, _time.value)
+                    .atZone(zone)
+                    .toInstant()
+                    .toEpochMilli(),
+                note = _note.value.trim(),
+                updatedAt = now,
             )
+            transactionDao.upsert(transaction)
+            syncEngine.uploadTransaction(transaction)
             _saved.value = true
         }
     }
@@ -176,7 +178,9 @@ class AddTransactionViewModel @Inject constructor(
     fun delete() {
         val tx = original ?: return
         viewModelScope.launch {
-            transactionDao.upsert(tx.copy(deleted = true, updatedAt = System.currentTimeMillis()))
+            val deleted = tx.copy(deleted = true, updatedAt = System.currentTimeMillis())
+            transactionDao.upsert(deleted)
+            syncEngine.uploadTransaction(deleted)
             _saved.value = true
         }
     }

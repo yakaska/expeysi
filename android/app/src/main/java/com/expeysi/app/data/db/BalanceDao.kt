@@ -22,4 +22,7 @@ interface BalanceDao {
 
     @Query("SELECT * FROM balances WHERE id = :id")
     suspend fun byId(id: String): BalanceEntity?
+
+    @Query("DELETE FROM balances")
+    suspend fun clear()
 }
