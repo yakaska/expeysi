@@ -48,7 +48,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM")
+private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -212,7 +212,6 @@ fun HomeScreen(
                                     item.accountName.ifBlank { null },
                                     Instant.ofEpochMilli(item.transaction.date)
                                         .atZone(ZoneId.systemDefault())
-                                        .toLocalDate()
                                         .format(dateFormatter),
                                     item.transaction.note.ifBlank { null },
                                 ).joinToString(" · "),

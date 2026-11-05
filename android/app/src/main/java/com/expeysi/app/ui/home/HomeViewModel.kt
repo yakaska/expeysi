@@ -19,6 +19,7 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -95,7 +96,10 @@ class HomeViewModel @Inject constructor(
         fun windowSums(type: TxType) = Windows.sums(
             balanceTxs
                 .filter { TxType.fromWire(it.type) == type }
-                .map { TxDayAmount(it.amountMinor, it.date) },
+                .map {
+                    val txDay = Instant.ofEpochMilli(it.date).atZone(zone).toLocalDate()
+                    TxDayAmount(it.amountMinor, Periods.day(txDay, zone).startMillis)
+                },
             todayStart,
         )
 
