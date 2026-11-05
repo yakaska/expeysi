@@ -15,6 +15,7 @@ import com.expeysi.app.ui.add.AddTransactionScreen
 import com.expeysi.app.ui.balances.EditBalanceScreen
 import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
+import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,6 +36,8 @@ class MainActivity : ComponentActivity() {
                             onAccountsClick = { navController.navigate("accounts") },
                             onCategoriesClick = { navController.navigate("categories") },
                             onAddBalanceClick = { navController.navigate("balances/add") },
+                            onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
+                            onAccountHistoryClick = { id -> navController.navigate("history/account/$id") },
                         )
                     }
                     composable("add") {
@@ -80,6 +83,24 @@ class MainActivity : ComponentActivity() {
                     }
                     composable("balances/add") {
                         EditBalanceScreen(onClose = { navController.popBackStack() })
+                    }
+                    composable(
+                        route = "history/balance/{balanceId}",
+                        arguments = listOf(navArgument("balanceId") { type = NavType.StringType }),
+                    ) {
+                        HistoryScreen(
+                            onBack = { navController.popBackStack() },
+                            onItemClick = { id -> navController.navigate("edit/$id") },
+                        )
+                    }
+                    composable(
+                        route = "history/account/{accountId}",
+                        arguments = listOf(navArgument("accountId") { type = NavType.StringType }),
+                    ) {
+                        HistoryScreen(
+                            onBack = { navController.popBackStack() },
+                            onItemClick = { id -> navController.navigate("edit/$id") },
+                        )
                     }
                     composable(
                         route = "balances/edit/{balanceId}",
