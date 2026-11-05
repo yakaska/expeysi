@@ -38,6 +38,9 @@ class MainActivity : ComponentActivity() {
                             onAddBalanceClick = { navController.navigate("balances/add") },
                             onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
                             onAccountHistoryClick = { id -> navController.navigate("history/account/$id") },
+                            onSummaryClick = { id, type, days ->
+                                navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
+                            },
                         )
                     }
                     composable("add") {
@@ -85,8 +88,18 @@ class MainActivity : ComponentActivity() {
                         EditBalanceScreen(onClose = { navController.popBackStack() })
                     }
                     composable(
-                        route = "history/balance/{balanceId}",
-                        arguments = listOf(navArgument("balanceId") { type = NavType.StringType }),
+                        route = "history/balance/{balanceId}?type={type}&days={days}",
+                        arguments = listOf(
+                            navArgument("balanceId") { type = NavType.StringType },
+                            navArgument("type") {
+                                type = NavType.StringType
+                                nullable = true
+                            },
+                            navArgument("days") {
+                                type = NavType.IntType
+                                defaultValue = 0
+                            },
+                        ),
                     ) {
                         HistoryScreen(
                             onBack = { navController.popBackStack() },

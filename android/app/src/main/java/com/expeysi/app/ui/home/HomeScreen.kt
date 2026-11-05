@@ -63,6 +63,7 @@ fun HomeScreen(
     onAddBalanceClick: () -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
+    onSummaryClick: (String, TxType, Int) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -188,6 +189,9 @@ fun HomeScreen(
                     sums = state.expense,
                     currencyCode = state.selectedBalance?.currencyCode ?: "",
                     accent = MaterialTheme.colorScheme.error,
+                    onPeriodClick = { days ->
+                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.EXPENSE, days) }
+                    },
                 )
             }
             item {
@@ -196,6 +200,9 @@ fun HomeScreen(
                     sums = state.income,
                     currencyCode = state.selectedBalance?.currencyCode ?: "",
                     accent = MaterialTheme.colorScheme.primary,
+                    onPeriodClick = { days ->
+                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.INCOME, days) }
+                    },
                 )
             }
 
@@ -264,24 +271,30 @@ fun HomeScreen(
 }
 
 @Composable
-private fun SumsCard(title: String, sums: WindowSums, currencyCode: String, accent: androidx.compose.ui.graphics.Color) {
+private fun SumsCard(
+    title: String,
+    sums: WindowSums,
+    currencyCode: String,
+    accent: androidx.compose.ui.graphics.Color,
+    onPeriodClick: (Int) -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         border = BorderStroke(1.5.dp, accent),
     ) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             CardHeader(title = title, currencyCode = currencyCode, accent = accent)
-            SumRow("Сегодня", sums.dayMinor)
+            SumRow("Сегодня", sums.dayMinor) { onPeriodClick(1) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("7 дней", sums.weekMinor)
+            SumRow("7 дней", sums.weekMinor) { onPeriodClick(7) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("30 дней", sums.monthMinor)
+            SumRow("30 дней", sums.monthMinor) { onPeriodClick(30) }
         }
     }
 }
@@ -315,8 +328,9 @@ private fun CardHeader(
 }
 
 @Composable
-private fun SumRow(label: String, amountMinor: Long) {
+private fun SumRow(label: String, amountMinor: Long, onClick: () -> Unit) {
     ListItem(
+        modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(label) },
         trailingContent = {
             Text(

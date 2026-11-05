@@ -88,10 +88,17 @@ class HistoryViewModel @Inject constructor(
     private val _period = MutableStateFlow(HistoryPeriod.MONTH)
     val period: StateFlow<HistoryPeriod> = _period.asStateFlow()
 
-    private val _customRange = MutableStateFlow<DateRangeFilter?>(null)
+    private val _customRange = MutableStateFlow(
+        savedStateHandle.get<Int>("days")?.takeIf { it > 0 }?.let { days ->
+            val today = LocalDate.now(zone)
+            DateRangeFilter.ofDays(today.minusDays(days - 1L), today, zone)
+        },
+    )
     val customRange: StateFlow<DateRangeFilter?> = _customRange.asStateFlow()
 
-    private val _selectedTypes = MutableStateFlow(TxType.entries.toSet())
+    private val _selectedTypes = MutableStateFlow(
+        savedStateHandle.get<String>("type")?.let { setOf(TxType.fromWire(it)) } ?: TxType.entries.toSet(),
+    )
     val selectedTypes: StateFlow<Set<TxType>> = _selectedTypes.asStateFlow()
 
     /** null = выбраны все. */
@@ -163,7 +170,7 @@ class HistoryViewModel @Inject constructor(
                 }
             }
             .filter { TxType.fromWire(it.type) in f.types }
-            .filter { f.accountIds == null || it.accountId in f.accountIds }
+            .filter { mode == HistoryViewMode.ACCOUNTS || f.accountIds == null || it.accountId in f.accountIds }
             .filter { f.categoryIds == null || it.categoryId in f.categoryIds }
 
         val entries = filtered.map {

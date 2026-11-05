@@ -248,7 +248,7 @@ fun HistoryScreen(
                     Icon(Icons.Filled.ArrowDropDown, contentDescription = "Выбрать период")
                 }
             }
-            if (!state.isAccountMode && state.accounts.size > 1 && state.mode != HistoryViewMode.ACCOUNTS) {
+            if (!state.isAccountMode && state.accounts.size > 1 && state.mode == HistoryViewMode.LIST) {
                 ChipRow {
                     state.accounts.forEach { account ->
                         FilterChip(
