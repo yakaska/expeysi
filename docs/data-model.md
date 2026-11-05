@@ -31,7 +31,8 @@ families/{familyId}
   accounts/{accountId}         # UUID
     name: string               # "Наличные", "Карта", свой вариант
     iconKey: string
-    openingBalanceMinor: long  # начальный остаток в копейках
+    openingBalanceMinor: long  # начальный остаток в минимальных единицах валюты
+    currencyCode: string       # ISO 4217: "RUB", "USD", ...
     deleted: boolean
     updatedAt: timestamp
 
@@ -44,7 +45,7 @@ families/{familyId}
 
   transactions/{transactionId} # UUID
     type: "income" | "expense"
-    amountMinor: long          # сумма в копейках
+    amountMinor: long          # сумма в минимальных единицах валюты счёта
     accountId: string
     categoryId: string
     date: timestamp            # день операции (локальная дата автора)
@@ -53,6 +54,12 @@ families/{familyId}
     updatedAt: timestamp
     updatedBy: uid
 ```
+
+Справочник валют (ISO 4217, ~230 записей: код, английское название, символ)
+живёт только локально в Room (`currencies`), загружается миграцией и посевом при
+создании БД. В Firestore не синхронизируется: список одинаковый на всех
+устройствах. Упрощение MVP: у всех валют два знака после запятой, даже у
+безразрядных вроде JPY.
 
 ## Предзаписанные данные
 

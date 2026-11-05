@@ -94,7 +94,7 @@ fun HomeScreen(
                         headlineContent = { Text(balance.account.name) },
                         trailingContent = {
                             Text(
-                                text = "${Money.format(balance.balanceMinor)} ₽",
+                                text = "${Money.format(balance.balanceMinor)} ${balance.currencySymbol}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (balance.balanceMinor < 0) {
                                     MaterialTheme.colorScheme.error
@@ -156,7 +156,8 @@ fun HomeScreen(
                             )
                         }
                         Text(
-                            text = (if (isIncome) "+" else "−") + "${Money.format(item.transaction.amountMinor)} ₽",
+                            text = (if (isIncome) "+" else "−") +
+                                "${Money.format(item.transaction.amountMinor)} ${item.currencySymbol}",
                             style = MaterialTheme.typography.titleMedium,
                             color = if (isIncome) {
                                 MaterialTheme.colorScheme.primary

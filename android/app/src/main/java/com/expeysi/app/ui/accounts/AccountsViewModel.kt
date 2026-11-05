@@ -3,7 +3,7 @@ package com.expeysi.app.ui.accounts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.AccountDao
-import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.TxSum
@@ -20,17 +20,24 @@ import kotlinx.coroutines.flow.stateIn
 class AccountsViewModel @Inject constructor(
     accountDao: AccountDao,
     transactionDao: TransactionDao,
+    currencyDao: CurrencyDao,
 ) : ViewModel() {
 
     val accounts: StateFlow<List<AccountBalance>> = combine(
         accountDao.observeActive(),
         transactionDao.observeActive(),
-    ) { accounts, transactions ->
+        currencyDao.observeAll(),
+    ) { accounts, transactions, currencies ->
+        val symbolByCode = currencies.associate { it.code to it.symbol }
         accounts.map { account ->
             val sums = transactions
                 .filter { it.accountId == account.id }
                 .map { TxSum(TxType.fromWire(it.type), it.amountMinor) }
-            AccountBalance(account, BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums))
+            AccountBalance(
+                account = account,
+                balanceMinor = BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums),
+                currencySymbol = symbolByCode[account.currencyCode] ?: account.currencyCode,
+            )
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }

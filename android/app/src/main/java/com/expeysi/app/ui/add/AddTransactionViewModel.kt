@@ -7,6 +7,7 @@ import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.Money
@@ -25,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -35,6 +37,7 @@ class AddTransactionViewModel @Inject constructor(
     accountDao: AccountDao,
     categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
+    currencyDao: CurrencyDao,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
@@ -46,6 +49,10 @@ class AddTransactionViewModel @Inject constructor(
 
     val accounts: StateFlow<List<AccountEntity>> = accountDao.observeActive()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    val currencySymbols: StateFlow<Map<String, String>> = currencyDao.observeAll()
+        .map { currencies -> currencies.associate { it.code to it.symbol } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val _type = MutableStateFlow(TxType.EXPENSE)
     val type: StateFlow<TxType> = _type.asStateFlow()
