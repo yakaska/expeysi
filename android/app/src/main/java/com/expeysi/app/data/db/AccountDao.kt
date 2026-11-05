@@ -22,4 +22,7 @@ interface AccountDao {
 
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun byId(id: String): AccountEntity?
+
+    @Query("DELETE FROM accounts")
+    suspend fun clear()
 }

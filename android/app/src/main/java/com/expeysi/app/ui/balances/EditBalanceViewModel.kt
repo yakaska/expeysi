@@ -7,6 +7,7 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Currency
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -24,6 +25,7 @@ class EditBalanceViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val balanceDao: BalanceDao,
     currencyDao: CurrencyDao,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["balanceId"]
@@ -70,14 +72,14 @@ class EditBalanceViewModel @Inject constructor(
     fun save() {
         if (!canSave.value) return
         viewModelScope.launch {
-            balanceDao.upsert(
-                BalanceEntity(
-                    id = editId ?: UUID.randomUUID().toString(),
-                    name = _name.value.trim(),
-                    currencyCode = _currencyCode.value,
-                    updatedAt = System.currentTimeMillis(),
-                ),
+            val balance = BalanceEntity(
+                id = editId ?: UUID.randomUUID().toString(),
+                name = _name.value.trim(),
+                currencyCode = _currencyCode.value,
+                updatedAt = System.currentTimeMillis(),
             )
+            balanceDao.upsert(balance)
+            syncEngine.uploadBalance(balance)
             _saved.value = true
         }
     }
@@ -85,7 +87,9 @@ class EditBalanceViewModel @Inject constructor(
     fun delete() {
         val balance = original ?: return
         viewModelScope.launch {
-            balanceDao.upsert(balance.copy(deleted = true, updatedAt = System.currentTimeMillis()))
+            val deleted = balance.copy(deleted = true, updatedAt = System.currentTimeMillis())
+            balanceDao.upsert(deleted)
+            syncEngine.uploadBalance(deleted)
             _saved.value = true
         }
     }

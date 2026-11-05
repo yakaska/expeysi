@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 class EditCategoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val categoryDao: CategoryDao,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["categoryId"]
@@ -84,16 +86,16 @@ class EditCategoryViewModel @Inject constructor(
     fun save() {
         if (!canSave.value) return
         viewModelScope.launch {
-            categoryDao.upsert(
-                CategoryEntity(
-                    id = editId ?: UUID.randomUUID().toString(),
-                    name = _name.value.trim(),
-                    iconKey = _iconKey.value,
-                    colorKey = _colorKey.value,
-                    type = _type.value.wire,
-                    updatedAt = System.currentTimeMillis(),
-                ),
+            val category = CategoryEntity(
+                id = editId ?: UUID.randomUUID().toString(),
+                name = _name.value.trim(),
+                iconKey = _iconKey.value,
+                colorKey = _colorKey.value,
+                type = _type.value.wire,
+                updatedAt = System.currentTimeMillis(),
             )
+            categoryDao.upsert(category)
+            syncEngine.uploadCategory(category)
             _saved.value = true
         }
     }
@@ -101,7 +103,9 @@ class EditCategoryViewModel @Inject constructor(
     fun delete() {
         val category = original ?: return
         viewModelScope.launch {
-            categoryDao.upsert(category.copy(deleted = true, updatedAt = System.currentTimeMillis()))
+            val deleted = category.copy(deleted = true, updatedAt = System.currentTimeMillis())
+            categoryDao.upsert(deleted)
+            syncEngine.uploadCategory(deleted)
             _saved.value = true
         }
     }

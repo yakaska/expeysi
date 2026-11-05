@@ -1,5 +1,6 @@
 package com.expeysi.app.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +40,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,6 +71,8 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
     var balanceMenuOpen by remember { mutableStateOf(false) }
 
     Scaffold(
@@ -101,6 +107,17 @@ fun HomeScreen(
                                     onAddBalanceClick()
                                 },
                             )
+                            state.familyId?.let {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Код семьи: $it") },
+                                    onClick = {
+                                        clipboard.setText(AnnotatedString(it))
+                                        balanceMenuOpen = false
+                                        Toast.makeText(context, "Код семьи скопирован", Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
                         }
                     }
                 },

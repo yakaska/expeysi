@@ -7,6 +7,7 @@ import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Money
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -27,6 +28,7 @@ class EditAccountViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
     balanceDao: BalanceDao,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["accountId"]
@@ -110,17 +112,17 @@ class EditAccountViewModel @Inject constructor(
         val opening = Money.parseToMinor(_openingBalanceText.value) ?: return
         val balanceId = _balanceId.value ?: return
         viewModelScope.launch {
-            accountDao.upsert(
-                AccountEntity(
-                    id = editId ?: UUID.randomUUID().toString(),
-                    name = _name.value.trim(),
-                    iconKey = _iconKey.value,
-                    colorKey = _colorKey.value,
-                    openingBalanceMinor = opening,
-                    balanceId = balanceId,
-                    updatedAt = System.currentTimeMillis(),
-                ),
+            val account = AccountEntity(
+                id = editId ?: UUID.randomUUID().toString(),
+                name = _name.value.trim(),
+                iconKey = _iconKey.value,
+                colorKey = _colorKey.value,
+                openingBalanceMinor = opening,
+                balanceId = balanceId,
+                updatedAt = System.currentTimeMillis(),
             )
+            accountDao.upsert(account)
+            syncEngine.uploadAccount(account)
             _saved.value = true
         }
     }
@@ -128,7 +130,9 @@ class EditAccountViewModel @Inject constructor(
     fun delete() {
         val account = original ?: return
         viewModelScope.launch {
-            accountDao.upsert(account.copy(deleted = true, updatedAt = System.currentTimeMillis()))
+            val deleted = account.copy(deleted = true, updatedAt = System.currentTimeMillis())
+            accountDao.upsert(deleted)
+            syncEngine.uploadAccount(deleted)
             _saved.value = true
         }
     }

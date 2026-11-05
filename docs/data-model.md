@@ -6,9 +6,8 @@
 
 ## Идентификация и онбординг
 
-- Вход — анонимная Firebase Authentication (без аккаунтов и паролей). uid
-  привязан к установке приложения: при переустановке пользователь заново
-  присоединяется к семье по коду.
+- Вход — через Google Sign-In и Firebase Authentication. UID привязан к Google-
+  аккаунту, поэтому сохраняется после переустановки и при смене устройства.
 - «Семья» — это документ `families/{familyId}`. `familyId` — автогенерированный
   20-символьный ID Firestore, он же код приглашения: передаёшь код второму
   пользователю любым способом (мессенджер, из уст в уста).
@@ -32,7 +31,7 @@ families/{familyId}
     name: string               # "Основной", свой вариант
     currencyCode: string       # ISO 4217: "RUB", "USD", ...
     deleted: boolean
-    updatedAt: timestamp
+    updatedAt: long                # epoch millis для LWW
 
   accounts/{accountId}         # UUID
     name: string               # "Наличные", "Карта", свой вариант
@@ -41,7 +40,7 @@ families/{familyId}
     openingBalanceMinor: long  # начальный остаток в минимальных единицах валюты баланса
     balanceId: string          # баланс, к которому относится счёт; валюта счёта = валюта баланса
     deleted: boolean
-    updatedAt: timestamp
+    updatedAt: long                # epoch millis для LWW
 
   categories/{categoryId}      # UUID
     name: string
@@ -49,17 +48,17 @@ families/{familyId}
     colorKey: string           # ключ цвета обода иконки из фиксированной палитры
     type: "income" | "expense"
     deleted: boolean
-    updatedAt: timestamp
+    updatedAt: long                # epoch millis для LWW
 
   transactions/{transactionId} # UUID
     type: "income" | "expense"
     amountMinor: long          # сумма в минимальных единицах валюты счёта
     accountId: string
     categoryId: string
-    date: timestamp            # день операции (локальная дата автора)
+    date: long                 # epoch millis (локальная дата автора)
     note: string               # может быть пустой
     deleted: boolean
-    updatedAt: timestamp
+    updatedAt: long                # epoch millis для LWW
     updatedBy: uid
 ```
 
