@@ -135,8 +135,8 @@ class CalculatorTest {
     @Test
     fun `группировка разрядов`() {
         assertEquals("1 234 567", Calculator.groupDigits("1234567"))
-        assertEquals("1 234 567.89", Calculator.groupDigits("1234567.89"))
-        assertEquals("10 000.", Calculator.groupDigits("10000."))
+        assertEquals("1 234 567,89", Calculator.groupDigits("1234567.89"))
+        assertEquals("10 000,", Calculator.groupDigits("10000."))
         assertEquals("999", Calculator.groupDigits("999"))
         assertEquals("-1 234", Calculator.groupDigits("-1234"))
         assertEquals("0", Calculator.groupDigits("0"))
