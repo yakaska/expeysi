@@ -17,6 +17,23 @@ object Money {
         return if (negative) -minor else minor
     }
 
+    /** Группирует разряды и заменяет десятичную точку запятой, не завершая ввод за пользователя. */
+    fun formatInput(text: String): String {
+        val compact = text.replace(" ", "")
+        val normalized = compact.replace('.', ',')
+        val separator = normalized.indexOf(',')
+        if (separator != normalized.lastIndexOf(',')) return text
+
+        val integer = if (separator == -1) normalized else normalized.substring(0, separator)
+        val fraction = if (separator == -1) "" else normalized.substring(separator)
+        val digits = integer.removePrefix("-")
+        if (digits.any { !it.isDigit() }) return text
+
+        val grouped = digits.reversed().chunked(3).joinToString(" ").reversed()
+        val sign = if (integer.startsWith("-")) "-" else ""
+        return sign + grouped + fraction
+    }
+
     /** 123456 → "1 234,56". */
     fun format(minor: Long): String {
         val negative = minor < 0

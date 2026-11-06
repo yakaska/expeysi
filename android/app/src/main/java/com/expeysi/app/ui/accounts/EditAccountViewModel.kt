@@ -100,7 +100,7 @@ class EditAccountViewModel @Inject constructor(
     }
 
     fun onOpeningBalanceChange(value: String) {
-        _openingBalanceText.value = value
+        _openingBalanceText.value = Money.formatInput(value)
     }
 
     fun onBalanceSelect(id: String) {

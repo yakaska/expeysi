@@ -107,16 +107,6 @@ class Calculator {
     companion object {
         private const val ERROR = "Ошибка"
 
-        /** "1234567.89" → "1 234 567.89"; дробная часть и точка сохраняются как введены. */
-        fun groupDigits(raw: String): String {
-            val dot = raw.indexOf('.')
-            val intPart = if (dot == -1) raw else raw.substring(0, dot)
-            val fracPart = if (dot == -1) "" else raw.substring(dot)
-            val digits = intPart.removePrefix("-")
-            if (digits.isEmpty() || digits.any { !it.isDigit() }) return raw
-            val sign = if (intPart.startsWith("-")) "-" else ""
-            val grouped = digits.reversed().chunked(3).joinToString(" ").reversed()
-            return sign + grouped + fracPart
-        }
+        fun groupDigits(raw: String): String = Money.formatInput(raw)
     }
 }

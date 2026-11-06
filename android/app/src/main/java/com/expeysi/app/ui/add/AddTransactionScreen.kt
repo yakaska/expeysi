@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -52,13 +51,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.Calculator
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.MoneyTextField
 import com.expeysi.app.ui.icons.CategoryIcon
 import java.time.format.DateTimeFormatter
 
@@ -101,7 +100,7 @@ fun AddTransactionScreen(
             initialValue = amountText,
             onDismiss = { showCalculator = false },
             onApply = { result ->
-                viewModel.onAmountChange(Calculator.groupDigits(result))
+                viewModel.onAmountChange(result)
                 showCalculator = false
             },
         )
@@ -378,13 +377,11 @@ fun AddTransactionScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    OutlinedTextField(
+                    MoneyTextField(
                         value = amountText,
                         onValueChange = viewModel::onAmountChange,
                         modifier = Modifier.fillMaxWidth(),
                         label = { Text("Сумма, $amountSymbol") },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
                         trailingIcon = {
                             IconButton(onClick = { showCalculator = true }) {
                                 Icon(Icons.Filled.Calculate, contentDescription = "Калькулятор")

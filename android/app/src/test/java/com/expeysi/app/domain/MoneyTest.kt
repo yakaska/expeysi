@@ -34,6 +34,21 @@ class MoneyTest {
     }
 
     @Test
+    fun `ввод форматируется с группировкой и запятой`() {
+        assertEquals("1 234 567,89", Money.formatInput("1234567.89"))
+        assertEquals("1 234 567,89", Money.formatInput("1 234 567,89"))
+        assertEquals("10 000,", Money.formatInput("10000."))
+        assertEquals("-1 234,5", Money.formatInput("-1234,5"))
+        assertEquals("", Money.formatInput(""))
+    }
+
+    @Test
+    fun `некорректный ввод не перезаписывается форматированием`() {
+        assertEquals("1.2.3", Money.formatInput("1.2.3"))
+        assertEquals("abc", Money.formatInput("abc"))
+    }
+
+    @Test
     fun `парсинг и форматирование согласованы`() {
         assertEquals(123_456L, Money.parseToMinor(Money.format(123_456)))
     }

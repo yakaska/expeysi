@@ -59,7 +59,7 @@ fun CalculatorDialog(
                     listOf("7", "8", "9", "÷"),
                     listOf("4", "5", "6", "×"),
                     listOf("1", "2", "3", "−"),
-                    listOf(".", "0", "C", "+"),
+                    listOf(",", "0", "C", "+"),
                 )
                 rows.forEach { row ->
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -70,7 +70,7 @@ fun CalculatorDialog(
                             }
                             val onClick: () -> Unit = {
                                 when (key) {
-                                    "." -> update { inputDot() }
+                                    "," -> update { inputDot() }
                                     "C" -> update { clear() }
                                     "÷" -> update { inputOp('/') }
                                     "×" -> update { inputOp('*') }

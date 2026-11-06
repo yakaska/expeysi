@@ -137,7 +137,7 @@ class AddTransactionViewModel @Inject constructor(
     }
 
     fun onAmountChange(value: String) {
-        _amountText.value = value
+        _amountText.value = Money.formatInput(value)
     }
 
     fun onAccountSelect(id: String) {
