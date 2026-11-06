@@ -11,11 +11,11 @@ import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.home.AccountBalance
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import javax.inject.Inject
 
 data class AccountRow(
     val balance: AccountBalance,

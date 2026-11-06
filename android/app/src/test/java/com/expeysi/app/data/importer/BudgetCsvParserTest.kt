@@ -1,10 +1,10 @@
 package com.expeysi.app.data.importer
 
 import com.expeysi.app.domain.TxType
-import java.io.ByteArrayInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.io.ByteArrayInputStream
 
 class BudgetCsvParserTest {
 

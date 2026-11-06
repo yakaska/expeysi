@@ -72,12 +72,12 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.ExpeysiTheme
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import kotlinx.coroutines.launch
 
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))
@@ -143,8 +143,11 @@ fun HomeContent(
         snapshotFlow { listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset }
             .collect { position ->
                 showScrollToTop = listState.canScrollBackward &&
-                    (position.first < previousPosition.first ||
-                        position.first == previousPosition.first && position.second < previousPosition.second)
+                    (
+                        position.first < previousPosition.first ||
+                            position.first == previousPosition.first &&
+                            position.second < previousPosition.second
+                        )
                 previousPosition = position
             }
     }
@@ -552,7 +555,6 @@ private fun SumRow(label: String, amountMinor: Long, onClick: () -> Unit) {
         },
     )
 }
-
 
 private val previewHomeActions = HomeActions(
     onMenuClick = {},

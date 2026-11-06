@@ -6,7 +6,14 @@ import java.time.ZonedDateTime
 
 /** Скользящие периоды истории: граница считается от текущего момента назад. */
 enum class HistoryPeriod {
-    DAY, WEEK, MONTH, QUARTER, HALF_YEAR, YEAR, ALL;
+    DAY,
+    WEEK,
+    MONTH,
+    QUARTER,
+    HALF_YEAR,
+    YEAR,
+    ALL,
+    ;
 
     /** Нижняя граница включительно; null — без ограничения (всё время). */
     fun startMillis(now: ZonedDateTime): Long? = when (this) {
@@ -23,10 +30,9 @@ enum class HistoryPeriod {
 /** Произвольный диапазон дат: от начала первого дня до конца последнего. */
 data class DateRangeFilter(val startMillis: Long, val endMillisExclusive: Long) {
     companion object {
-        fun ofDays(start: LocalDate, endInclusive: LocalDate, zone: ZoneId): DateRangeFilter =
-            DateRangeFilter(
-                startMillis = Periods.day(start, zone).startMillis,
-                endMillisExclusive = Periods.day(endInclusive, zone).endMillisExclusive,
-            )
+        fun ofDays(start: LocalDate, endInclusive: LocalDate, zone: ZoneId): DateRangeFilter = DateRangeFilter(
+            startMillis = Periods.day(start, zone).startMillis,
+            endMillisExclusive = Periods.day(endInclusive, zone).endMillisExclusive,
+        )
     }
 }

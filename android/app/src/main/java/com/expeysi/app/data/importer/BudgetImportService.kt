@@ -11,10 +11,10 @@ import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
+import kotlinx.coroutines.flow.first
 import java.io.InputStream
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.flow.first
 
 data class BudgetImportResult(
     val transactionCount: Int,
@@ -99,5 +99,4 @@ class BudgetImportService @Inject constructor(
     private data class CategoryKey(val name: String, val type: TxType)
 }
 
-internal fun normalizeBudgetCategoryName(name: String): String =
-    name.trim().lowercase().replace('ё', 'е')
+internal fun normalizeBudgetCategoryName(name: String): String = name.trim().lowercase().replace('ё', 'е')

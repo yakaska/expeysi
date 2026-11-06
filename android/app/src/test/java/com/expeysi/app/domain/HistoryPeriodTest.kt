@@ -1,11 +1,11 @@
 package com.expeysi.app.domain
 
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
 
 class HistoryPeriodTest {
 
