@@ -321,12 +321,12 @@ private fun CategoriesView(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "Всего потрачено",
+                        if (state.isIncomeOnly) "Всего получено" else "Всего потрачено",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "${Money.format(state.totalExpenseMinor)} ${state.currencySymbol}",
+                        "${Money.format(if (state.isIncomeOnly) state.totalIncomeMinor else state.totalExpenseMinor)} ${state.currencySymbol}",
                         style = MaterialTheme.typography.headlineSmall,
                     )
                 }
@@ -345,7 +345,7 @@ private fun CategoriesView(
                     headlineContent = { Text(category?.name ?: "Без категории") },
                     trailingContent = {
                         Text(
-                            "${Money.format(total.expenseMinor)} ${state.currencySymbol}",
+                            "${Money.format(if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
                             style = MaterialTheme.typography.titleMedium,
                         )
                     },
@@ -429,7 +429,7 @@ private fun AccountCard(
             trailingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${Money.format(total.expenseMinor)} $currencySymbol",
+                        "${Money.format(if (total.expenseMinor == 0L) total.incomeMinor else total.expenseMinor)} $currencySymbol",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Icon(
@@ -453,7 +453,7 @@ private fun AccountCard(
                     headlineContent = { Text(row.name) },
                     trailingContent = {
                         Text(
-                            "${Money.format(row.total.expenseMinor)} $currencySymbol",
+                            "${Money.format(if (row.total.expenseMinor == 0L) row.total.incomeMinor else row.total.expenseMinor)} $currencySymbol",
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },

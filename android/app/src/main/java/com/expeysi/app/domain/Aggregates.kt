@@ -16,6 +16,7 @@ data class CategoryTotal(
 data class AccountTotal(
     val accountId: String,
     val expenseMinor: Long,
+    val incomeMinor: Long,
     val categories: List<CategoryTotal>,
 )
 
@@ -34,7 +35,8 @@ object Aggregates {
                 AccountTotal(
                     accountId = accountId,
                     expenseMinor = group.filter { it.type == TxType.EXPENSE }.sumOf { it.amountMinor },
-                    categories = byCategory(group).filter { it.expenseMinor > 0 },
+                    incomeMinor = group.filter { it.type == TxType.INCOME }.sumOf { it.amountMinor },
+                    categories = byCategory(group).filter { it.expenseMinor > 0 || it.incomeMinor > 0 },
                 )
             }
             .sortedByDescending { it.expenseMinor }
