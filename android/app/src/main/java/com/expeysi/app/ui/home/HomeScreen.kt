@@ -1,8 +1,6 @@
 package com.expeysi.app.ui.home
 
 import android.widget.Toast
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,14 +14,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Category
-import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Card
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +33,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,10 +59,9 @@ private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.M
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
+    onMenuClick: () -> Unit,
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
-    onAccountsClick: () -> Unit,
-    onCategoriesClick: () -> Unit,
     onAddBalanceClick: () -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
@@ -76,23 +69,12 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val importState by viewModel.importState.collectAsStateWithLifecycle()
     val clipboard = LocalClipboardManager.current
     val context = LocalContext.current
     var balanceMenuOpen by remember { mutableStateOf(false) }
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        viewModel.importBudget(uri?.let(context.contentResolver::openInputStream))
-    }
-
-    LaunchedEffect(importState.message) {
-        importState.message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.consumeImportMessage()
-        }
-    }
 
     Scaffold(
-        topBar = {
+            topBar = {
             TopAppBar(
                 title = {
                     TextButton(onClick = { balanceMenuOpen = true }) {
@@ -137,6 +119,11 @@ fun HomeScreen(
                         }
                     }
                 },
+                navigationIcon = {
+                    IconButton(onClick = onMenuClick) {
+                        Icon(Icons.Filled.Menu, contentDescription = "Открыть меню")
+                    }
+                },
                 actions = {
                     IconButton(
                         onClick = {
@@ -144,26 +131,6 @@ fun HomeScreen(
                         },
                     ) {
                         Icon(Icons.Filled.History, contentDescription = "История операций")
-                    }
-                    IconButton(onClick = onCategoriesClick) {
-                        Icon(Icons.Filled.Category, contentDescription = "Категории")
-                    }
-                    IconButton(onClick = onAccountsClick) {
-                        Icon(Icons.Filled.AccountBalanceWallet, contentDescription = "Счета")
-                    }
-                    IconButton(
-                        onClick = {
-                            importLauncher.launch(
-                                arrayOf("text/*", "text/comma-separated-values", "application/octet-stream"),
-                            )
-                        },
-                        enabled = !importState.inProgress,
-                    ) {
-                        if (importState.inProgress) {
-                            CircularProgressIndicator()
-                        } else {
-                            Icon(Icons.Filled.FileUpload, contentDescription = "Импорт из Бюджета")
-                        }
                     }
                 },
             )
