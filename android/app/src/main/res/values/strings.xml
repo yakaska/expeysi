@@ -34,4 +34,8 @@
     <string name="home_seven_days">7 days</string>
     <string name="home_thirty_days">30 days</string>
     <string name="home_empty_title">Nothing here yet</string>
+    <string name="family_leave_action">Leave family</string>
+    <string name="family_leave_confirmation">Leave this family? Shared data will remain available to other members. You can rejoin later with an invitation code.</string>
+    <string name="family_leave_error">Couldn’t leave the family. Check your connection and try again.</string>
+    <string name="action_cancel">Cancel</string>
 </resources>

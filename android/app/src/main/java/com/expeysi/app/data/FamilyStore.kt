@@ -19,6 +19,11 @@ class FamilyStore @Inject constructor(
         _familyId.value = id
     }
 
+    fun clear() {
+        prefs.edit().remove(KEY).apply()
+        _familyId.value = null
+    }
+
     private companion object {
         const val KEY = "family_id"
     }

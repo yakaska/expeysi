@@ -49,6 +49,14 @@ class MoneyTest {
     }
 
     @Test
+    fun `вставленная сумма поддерживает разные пробелы`() {
+        assertEquals(123_456L, Money.parseToMinor("1\u00A0234,56"))
+        assertEquals(123_456L, Money.parseToMinor("\n1\u202F234,56 "))
+        assertEquals("1 234,56", Money.formatInput("1\u00A0234,56"))
+        assertEquals("1 234,56", Money.formatInput("1\u202F234,56"))
+    }
+
+    @Test
     fun `парсинг и форматирование согласованы`() {
         assertEquals(123_456L, Money.parseToMinor(Money.format(123_456)))
     }

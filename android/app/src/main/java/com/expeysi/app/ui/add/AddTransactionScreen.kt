@@ -40,6 +40,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -221,9 +222,11 @@ fun AddTransactionScreen(
     }
 
     if (showCategorySheet) {
+        val categorySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(
             onDismissRequest = { viewModel.setCategorySheetVisible(false) },
-            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+            sheetState = categorySheetState,
+            sheetGesturesEnabled = categorySheetState.currentValue == SheetValue.Expanded,
         ) {
             Text(
                 if (type == TxType.EXPENSE) "Категория расхода" else "Категория дохода",

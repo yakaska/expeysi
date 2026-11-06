@@ -6,7 +6,7 @@ object Money {
 
     /** "123,45" или "123.45" → 12345. Мусор → null. */
     fun parseToMinor(text: String): Long? {
-        val cleaned = text.trim().replace(" ", "").replace(',', '.')
+        val cleaned = compact(text).replace(',', '.')
         if (!Regex("""^-?\d+(\.\d{1,2})?$""").matches(cleaned)) return null
         val negative = cleaned.startsWith("-")
         val absText = cleaned.removePrefix("-")
@@ -19,8 +19,7 @@ object Money {
 
     /** Группирует разряды и заменяет десятичную точку запятой, не завершая ввод за пользователя. */
     fun formatInput(text: String): String {
-        val compact = text.replace(" ", "")
-        val normalized = compact.replace('.', ',')
+        val normalized = compact(text).replace('.', ',')
         val separator = normalized.indexOf(',')
         if (separator != normalized.lastIndexOf(',')) return text
 
@@ -43,5 +42,9 @@ object Money {
         val grouped = rubles.toString().reversed().chunked(3).joinToString(" ").reversed()
         val sign = if (negative) "-" else ""
         return "$sign$grouped,${kopecks.toString().padStart(2, '0')}"
+    }
+
+    private fun compact(text: String): String = text.filterNot {
+        it.isWhitespace() || Character.isSpaceChar(it)
     }
 }

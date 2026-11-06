@@ -38,7 +38,9 @@ fun MoneyTextField(
             val formatted = Money.formatInput(newValue.text)
 
             fun mapPosition(position: Int): Int {
-                var charactersLeft = newValue.text.take(position).count { it != ' ' }
+                var charactersLeft = newValue.text.take(position).count {
+                    !it.isWhitespace() && !Character.isSpaceChar(it)
+                }
                 if (charactersLeft == 0) return 0
                 formatted.forEachIndexed { index, character ->
                     if (character != ' ') {

@@ -20,6 +20,11 @@ class SelectedBalanceStore @Inject constructor(
         _selectedId.value = id
     }
 
+    fun clear() {
+        prefs.edit().remove(KEY).apply()
+        _selectedId.value = null
+    }
+
     private companion object {
         const val KEY = "selected_balance_id"
     }

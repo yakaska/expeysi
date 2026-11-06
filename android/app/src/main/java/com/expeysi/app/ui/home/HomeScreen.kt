@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -91,6 +92,7 @@ data class HomeActions(
     val onAccountHistoryClick: (String) -> Unit,
     val onSummaryClick: (String, TxType, Int) -> Unit,
     val onBalanceSelected: (String) -> Unit,
+    val onLoadMoreTransactions: () -> Unit,
 )
 
 @Composable
@@ -118,6 +120,7 @@ fun HomeScreen(
             onAccountHistoryClick = onAccountHistoryClick,
             onSummaryClick = onSummaryClick,
             onBalanceSelected = viewModel::selectBalance,
+            onLoadMoreTransactions = viewModel::loadMoreTransactions,
         ),
     )
 }
@@ -144,6 +147,16 @@ fun HomeContent(
                         position.first == previousPosition.first && position.second < previousPosition.second)
                 previousPosition = position
             }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            val layout = listState.layoutInfo
+            val lastVisible = layout.visibleItemsInfo.lastOrNull()?.index ?: return@snapshotFlow false
+            lastVisible >= layout.totalItemsCount - 5
+        }.collect { nearEnd ->
+            if (nearEnd) actions.onLoadMoreTransactions()
+        }
     }
 
     Scaffold(
@@ -360,7 +373,7 @@ fun HomeContent(
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
-                if (state.recent.isEmpty()) {
+                if (state.transactions.isEmpty()) {
                     item {
                         Column(
                             modifier = Modifier
@@ -388,7 +401,7 @@ fun HomeContent(
                 }
                 val zone = ZoneId.systemDefault()
                 val today = LocalDate.now(zone)
-                state.recent.groupBy { item ->
+                state.transactions.groupBy { item ->
                     Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
                 }.forEach { (date, transactions) ->
                     stickyHeader(key = "date-$date") {
@@ -451,6 +464,16 @@ fun HomeContent(
                                     )
                                 }
                             }
+                        }
+                    }
+                }
+                if (state.hasMoreTransactions) {
+                    item(key = "transactions-loading") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(8.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
                         }
                     }
                 }
@@ -541,6 +564,7 @@ private val previewHomeActions = HomeActions(
     onAccountHistoryClick = {},
     onSummaryClick = { _, _, _ -> },
     onBalanceSelected = {},
+    onLoadMoreTransactions = {},
 )
 
 @Preview(name = "Light", showBackground = true)
@@ -586,7 +610,7 @@ private fun previewHomeState(): HomeUiState {
         totalBalanceMinor = 48_750,
         expense = WindowSums(dayMinor = 1_250, weekMinor = 8_400, monthMinor = 32_000),
         income = WindowSums(dayMinor = 0, weekMinor = 25_000, monthMinor = 75_000),
-        recent = listOf(
+        transactions = listOf(
             TransactionItem(
                 transaction = TransactionEntity(
                     id = "transaction",

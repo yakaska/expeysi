@@ -34,4 +34,8 @@
     <string name="home_seven_days">7 дней</string>
     <string name="home_thirty_days">30 дней</string>
     <string name="home_empty_title">Пока пусто</string>
+    <string name="family_leave_action">Выйти из семьи</string>
+    <string name="family_leave_confirmation">Выйти из семьи? Общие данные останутся у остальных участников. Присоединиться снова можно по коду приглашения.</string>
+    <string name="family_leave_error">Не удалось выйти из семьи. Проверьте подключение и попробуйте ещё раз.</string>
+    <string name="action_cancel">Отмена</string>
 </resources>
