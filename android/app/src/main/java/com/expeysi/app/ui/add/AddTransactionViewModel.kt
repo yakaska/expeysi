@@ -72,9 +72,12 @@ class AddTransactionViewModel @Inject constructor(
     private val _type = MutableStateFlow(TxType.EXPENSE)
     val type: StateFlow<TxType> = _type.asStateFlow()
 
-    val categories: StateFlow<List<CategoryEntity>> = _type
-        .flatMapLatest { categoryDao.observeActive(it.wire) }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val categories: StateFlow<List<CategoryEntity>> = combine(
+        _type.flatMapLatest { categoryDao.observeActive(it.wire) },
+        transactionDao.observeActive(),
+    ) { categories, transactions ->
+        categories.sortedByUsage(transactions)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     private val _amountText = MutableStateFlow("")
     val amountText: StateFlow<String> = _amountText.asStateFlow()
