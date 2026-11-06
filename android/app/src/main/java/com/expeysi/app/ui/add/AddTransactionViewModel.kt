@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class AddTransactionViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
@@ -94,8 +94,31 @@ class AddTransactionViewModel @Inject constructor(
     private val _note = MutableStateFlow("")
     val note: StateFlow<String> = _note.asStateFlow()
 
+    val noteSuggestions: StateFlow<List<String>> = combine(
+        _note,
+        transactionDao.observeActive(),
+    ) { note, transactions ->
+        val query = note.trim()
+        if (query.isEmpty()) {
+            emptyList()
+        } else {
+            transactions.asSequence()
+                .map { it.note.trim() }
+                .filter { it.length > query.length && it.startsWith(query, ignoreCase = true) }
+                .distinctBy { it.lowercase() }
+                .take(5)
+                .toList()
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    val showCategorySheet = savedStateHandle.getStateFlow("showCategorySheet", false)
+
+    fun setCategorySheetVisible(visible: Boolean) {
+        savedStateHandle["showCategorySheet"] = visible
+    }
 
     init {
         viewModelScope.launch {

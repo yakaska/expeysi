@@ -3,7 +3,9 @@ package com.expeysi.app.ui.add
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
@@ -24,6 +27,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,11 +53,15 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.Calculator
@@ -69,6 +78,7 @@ private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:m
 @Composable
 fun AddTransactionScreen(
     onClose: () -> Unit,
+    onAddCategoryClick: (TxType) -> Unit,
     viewModel: AddTransactionViewModel = hiltViewModel(),
 ) {
     val type by viewModel.type.collectAsStateWithLifecycle()
@@ -82,15 +92,26 @@ fun AddTransactionScreen(
     val date by viewModel.date.collectAsStateWithLifecycle()
     val time by viewModel.time.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
+    val noteSuggestions by viewModel.noteSuggestions.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val canSave by viewModel.canSave.collectAsStateWithLifecycle()
 
+    var noteFieldValue by remember {
+        mutableStateOf(TextFieldValue(note, selection = TextRange(note.length)))
+    }
+    var showNoteSuggestions by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
-    var showCategorySheet by remember { mutableStateOf(false) }
+    val showCategorySheet by viewModel.showCategorySheet.collectAsStateWithLifecycle()
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var showCalculator by remember { mutableStateOf(false) }
+    var showCalculator by rememberSaveable { mutableStateOf(false) }
+
+    LaunchedEffect(note) {
+        if (noteFieldValue.text != note) {
+            noteFieldValue = TextFieldValue(note, selection = TextRange(note.length))
+        }
+    }
 
     LaunchedEffect(saved) {
         if (saved) onClose()
@@ -201,15 +222,18 @@ fun AddTransactionScreen(
 
     if (showCategorySheet) {
         ModalBottomSheet(
-            onDismissRequest = { showCategorySheet = false },
-            sheetState = rememberModalBottomSheetState(),
+            onDismissRequest = { viewModel.setCategorySheetVisible(false) },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         ) {
             Text(
                 if (type == TxType.EXPENSE) "Категория расхода" else "Категория дохода",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
-            LazyColumn {
+            LazyColumn(
+                modifier = Modifier.weight(1f, fill = false),
+                contentPadding = PaddingValues(bottom = 16.dp),
+            ) {
                 items(categories, key = { it.id }) { category ->
                     ListItem(
                         leadingContent = {
@@ -218,8 +242,17 @@ fun AddTransactionScreen(
                         headlineContent = { Text(category.name) },
                         modifier = Modifier.clickable {
                             viewModel.onCategorySelect(category.id)
-                            showCategorySheet = false
+                            viewModel.setCategorySheetVisible(false)
                         },
+                    )
+                }
+                item(key = "add") {
+                    ListItem(
+                        leadingContent = {
+                            Icon(Icons.Filled.Add, contentDescription = null)
+                        },
+                        headlineContent = { Text("Добавить новую категорию") },
+                        modifier = Modifier.clickable { onAddCategoryClick(type) },
                     )
                 }
             }
@@ -365,7 +398,7 @@ fun AddTransactionScreen(
                         trailingContent = {
                             Icon(Icons.Filled.ChevronRight, contentDescription = null)
                         },
-                        modifier = Modifier.clickable { showCategorySheet = true },
+                        modifier = Modifier.clickable { viewModel.setCategorySheetVisible(true) },
                     )
                 }
             }
@@ -390,13 +423,34 @@ fun AddTransactionScreen(
                             }
                         },
                     )
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = viewModel::onNoteChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Комментарий (необязательно)") },
-                        singleLine = true,
-                    )
+                    Box {
+                        OutlinedTextField(
+                            value = noteFieldValue,
+                            onValueChange = {
+                                noteFieldValue = it
+                                viewModel.onNoteChange(it.text)
+                                showNoteSuggestions = true
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Комментарий (необязательно)") },
+                            singleLine = true,
+                        )
+                        DropdownMenu(
+                            expanded = showNoteSuggestions && noteSuggestions.isNotEmpty(),
+                            onDismissRequest = { showNoteSuggestions = false },
+                            properties = PopupProperties(focusable = false),
+                        ) {
+                            noteSuggestions.forEach { suggestion ->
+                                DropdownMenuItem(
+                                    text = { Text(suggestion) },
+                                    onClick = {
+                                        viewModel.onNoteChange(suggestion)
+                                        showNoteSuggestions = false
+                                    },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }

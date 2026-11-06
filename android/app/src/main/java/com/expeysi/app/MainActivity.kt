@@ -127,6 +127,7 @@ private fun AppNavigation() {
                     onAddClick = { navController.navigate("add") },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                     onAddBalanceClick = { navController.navigate("balances/add") },
+                    onEditBalanceClick = { id -> navController.navigate("balances/edit/$id") },
                     onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
                     onAccountHistoryClick = { id -> navController.navigate("history/account/$id") },
                     onSummaryClick = { id, type, days ->
@@ -136,13 +137,19 @@ private fun AppNavigation() {
                 )
             }
             composable("add") {
-                AddTransactionScreen(onClose = { navigateBack() })
+                AddTransactionScreen(
+                    onClose = { navigateBack() },
+                    onAddCategoryClick = { type -> navController.navigate("categories/add?type=${type.wire}") },
+                )
             }
             composable(
                 route = "edit/{transactionId}",
                 arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
             ) {
-                AddTransactionScreen(onClose = { navigateBack() })
+                AddTransactionScreen(
+                    onClose = { navigateBack() },
+                    onAddCategoryClick = { type -> navController.navigate("categories/add?type=${type.wire}") },
+                )
             }
             composable("accounts") {
                 AccountsScreen(
@@ -167,7 +174,13 @@ private fun AppNavigation() {
                     onItemClick = { id -> navController.navigate("categories/edit/$id") },
                 )
             }
-            composable("categories/add") {
+            composable(
+                route = "categories/add?type={type}",
+                arguments = listOf(navArgument("type") {
+                    type = NavType.StringType
+                    defaultValue = "expense"
+                }),
+            ) {
                 EditCategoryScreen(onClose = { navigateBack() })
             }
             composable(
