@@ -289,7 +289,9 @@ fun HomeScreen(
                 val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
                 Card(
                     onClick = { onItemClick(item.transaction.id) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateItem(),
                 ) {
                     Row(
                         modifier = Modifier
