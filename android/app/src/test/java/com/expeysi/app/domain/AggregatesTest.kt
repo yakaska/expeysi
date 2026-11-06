@@ -54,8 +54,25 @@ class AggregatesTest {
         )
         assertEquals(listOf("card", "cash"), totals.map { it.accountId })
         assertEquals(900, totals[0].expenseMinor)
-        assertEquals(listOf("food"), totals[0].categories.map { it.categoryId })
+        assertEquals(listOf("food", "salary"), totals[0].categories.map { it.categoryId })
         assertEquals(150, totals[1].expenseMinor)
         assertEquals(listOf("food", "bus"), totals[1].categories.map { it.categoryId })
+    }
+
+    @Test
+    fun `доходные операции попадают в суммы и категории счетов`() {
+        val totals = Aggregates.byAccount(
+            listOf(
+                income("salary", "card", 5000),
+                income("gift", "card", 1000),
+                income("cashback", "cash", 200),
+            ),
+        )
+
+        assertEquals(6000, totals[0].incomeMinor)
+        assertEquals(listOf("salary", "gift"), totals[0].categories.map { it.categoryId })
+        assertEquals(listOf(5000L, 1000L), totals[0].categories.map { it.incomeMinor })
+        assertEquals(200, totals[1].incomeMinor)
+        assertEquals(listOf("cashback"), totals[1].categories.map { it.categoryId })
     }
 }
