@@ -101,8 +101,7 @@ class Calculator {
         return true
     }
 
-    private fun format(value: Double): String =
-        BigDecimal(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    private fun format(value: Double): String = BigDecimal(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
     companion object {
         private const val ERROR = "Ошибка"

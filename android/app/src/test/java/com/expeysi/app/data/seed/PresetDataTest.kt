@@ -1,10 +1,10 @@
 package com.expeysi.app.data.seed
 
 import com.expeysi.app.domain.TxType
-import java.util.UUID
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.UUID
 
 class PresetDataTest {
 

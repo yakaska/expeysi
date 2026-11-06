@@ -185,10 +185,12 @@ private fun AppNavigation() {
             }
             composable(
                 route = "categories/add?type={type}",
-                arguments = listOf(navArgument("type") {
-                    type = NavType.StringType
-                    defaultValue = "expense"
-                }),
+                arguments = listOf(
+                    navArgument("type") {
+                        type = NavType.StringType
+                        defaultValue = "expense"
+                    },
+                ),
             ) {
                 EditCategoryScreen(onClose = { navigateBack() })
             }

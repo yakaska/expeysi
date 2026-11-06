@@ -21,10 +21,6 @@ import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.home.TransactionItem
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.LocalDate
-import java.time.ZoneId
-import java.time.ZonedDateTime
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -33,6 +29,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZonedDateTime
+import javax.inject.Inject
 
 enum class HistoryViewMode { LIST, CATEGORIES, ACCOUNTS }
 
@@ -132,13 +132,21 @@ class HistoryViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     private val filters = combine(
-        _period, _customRange, _selectedTypes, _selectedAccountIds, _selectedCategoryIds,
+        _period,
+        _customRange,
+        _selectedTypes,
+        _selectedAccountIds,
+        _selectedCategoryIds,
     ) { period, range, types, accountIds, categoryIds ->
         Filters(period, range, types, accountIds, categoryIds)
     }
 
     val uiState: StateFlow<HistoryUiState> = combine(
-        base, currencies, filters, _mode, _detail,
+        base,
+        currencies,
+        filters,
+        _mode,
+        _detail,
     ) { data, symbols, f, mode, detail ->
         val scopeAccounts = if (isAccountMode) {
             data.accounts.filter { it.id == accountId }

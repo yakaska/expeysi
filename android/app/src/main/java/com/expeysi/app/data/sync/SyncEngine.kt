@@ -15,8 +15,6 @@ import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +29,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @Singleton
 class SyncEngine @Inject constructor(
@@ -330,7 +330,6 @@ private data class RemoteVersions(
     val transactions: MutableMap<String, Long> = mutableMapOf(),
 )
 
-internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean =
-    remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
+internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
 
 internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(500)

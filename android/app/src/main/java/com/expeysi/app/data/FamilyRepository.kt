@@ -4,9 +4,9 @@ import androidx.room.withTransaction
 import com.expeysi.app.data.db.AppDatabase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.tasks.await
 
 @Singleton
 class FamilyRepository @Inject constructor(

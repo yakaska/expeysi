@@ -6,5 +6,4 @@ import com.expeysi.app.domain.TxType
 
 internal fun AccountEntity.selectableId(): String? = id.takeUnless { deleted }
 
-internal fun CategoryEntity.selectableId(type: TxType): String? =
-    id.takeUnless { deleted || this.type != type.wire }
+internal fun CategoryEntity.selectableId(type: TxType): String? = id.takeUnless { deleted || this.type != type.wire }

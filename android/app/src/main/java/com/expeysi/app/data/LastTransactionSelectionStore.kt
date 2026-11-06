@@ -12,8 +12,7 @@ class LastTransactionSelectionStore @Inject constructor(
 ) {
     fun accountId(userId: String): String? = prefs.getString(accountKey(userId), null)
 
-    fun categoryId(userId: String, type: TxType): String? =
-        prefs.getString(categoryKey(userId, type), null)
+    fun categoryId(userId: String, type: TxType): String? = prefs.getString(categoryKey(userId, type), null)
 
     fun selectAccount(userId: String, id: String) {
         prefs.edit().putString(accountKey(userId), id).apply()
@@ -25,6 +24,5 @@ class LastTransactionSelectionStore @Inject constructor(
 
     private fun accountKey(userId: String) = "last_transaction_account:$userId"
 
-    private fun categoryKey(userId: String, type: TxType) =
-        "last_transaction_category:$userId:${type.wire}"
+    private fun categoryKey(userId: String, type: TxType) = "last_transaction_category:$userId:${type.wire}"
 }

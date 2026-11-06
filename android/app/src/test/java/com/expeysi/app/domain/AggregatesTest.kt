@@ -5,11 +5,9 @@ import org.junit.Test
 
 class AggregatesTest {
 
-    private fun expense(category: String, account: String, amount: Long) =
-        AggEntry(category, account, TxType.EXPENSE, amount)
+    private fun expense(category: String, account: String, amount: Long) = AggEntry(category, account, TxType.EXPENSE, amount)
 
-    private fun income(category: String, account: String, amount: Long) =
-        AggEntry(category, account, TxType.INCOME, amount)
+    private fun income(category: String, account: String, amount: Long) = AggEntry(category, account, TxType.INCOME, amount)
 
     @Test
     fun `суммы по категориям с разделением доходов и расходов`() {
