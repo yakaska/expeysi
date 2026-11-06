@@ -21,3 +21,6 @@ firebase-debug.log
 
 # Kotlin
 .kotlin/
+
+# Локальные тестовые выгрузки
+docs/*.csv

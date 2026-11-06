@@ -12,8 +12,8 @@ import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.google.firebase.firestore.CollectionReference
+import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 @Singleton
 class SyncEngine @Inject constructor(
@@ -51,39 +52,53 @@ class SyncEngine @Inject constructor(
             familyStore.familyId.collectLatest { familyId ->
                 Log.d("ExpeysiSync", "family=$familyId user=${authRepository.userId}")
                 if (familyId != null && authRepository.userId != null) {
-                    val uid = authRepository.userId!!
-                    firestore.collection("families").document(familyId)
-                        .collection("members").document(uid)
-                        .set(
-                            mapOf(
-                                "displayName" to authRepository.displayName,
-                                "joinedAt" to FieldValue.serverTimestamp(),
-                            ),
-                        )
                     coroutineScope {
                         val initialized = List(4) { CompletableDeferred<Unit>() }
-                        launch { listen(familyId, "balances", initialized[0], ::mergeBalance) }
-                        launch { listen(familyId, "accounts", initialized[1], ::mergeAccount) }
-                        launch { listen(familyId, "categories", initialized[2], ::mergeCategory) }
-                        launch { listen(familyId, "transactions", initialized[3], ::mergeTransaction) }
+                        val remote = RemoteVersions()
+                        launch { listen(familyId, "balances", initialized[0], remote.balances, ::mergeBalance) }
+                        launch { listen(familyId, "accounts", initialized[1], remote.accounts, ::mergeAccount) }
+                        launch { listen(familyId, "categories", initialized[2], remote.categories, ::mergeCategory) }
+                        launch { listen(familyId, "transactions", initialized[3], remote.transactions, ::mergeTransaction) }
                         initialized.awaitAll()
-                        uploadAllLocal()
+                        uploadMissingLocal(remote)
                     }
                 }
             }
         }
     }
 
-    suspend fun uploadAllLocal() {
+    private suspend fun uploadMissingLocal(remote: RemoteVersions) {
         val balances = balanceDao.observeAll().first { it.isNotEmpty() }
         val accounts = accountDao.observeAll().first { it.isNotEmpty() }
         val categories = categoryDao.observeAll().first { it.isNotEmpty() }
         val transactions = transactionDao.observeAll().first()
-        Log.d("ExpeysiSync", "upload balances=${balances.size} accounts=${accounts.size} categories=${categories.size} transactions=${transactions.size}")
-        balances.forEach(::uploadBalance)
-        accounts.forEach(::uploadAccount)
-        categories.forEach(::uploadCategory)
-        transactions.forEach(::uploadTransaction)
+        var uploaded = 0
+        balances.forEach {
+            if (needsUpload(it.updatedAt, remote.balances[it.id])) {
+                uploadBalance(it)
+                uploaded++
+            }
+        }
+        accounts.forEach {
+            if (needsUpload(it.updatedAt, remote.accounts[it.id])) {
+                uploadAccount(it)
+                uploaded++
+            }
+        }
+        categories.forEach {
+            if (needsUpload(it.updatedAt, remote.categories[it.id])) {
+                uploadCategory(it)
+                uploaded++
+            }
+        }
+        transactions.forEach {
+            if (needsUpload(it.updatedAt, remote.transactions[it.id])) {
+                uploadTransaction(it)
+                uploaded++
+            }
+        }
+        val total = balances.size + accounts.size + categories.size + transactions.size
+        Log.d("ExpeysiSync", "startup upload uploaded=$uploaded skipped=${total - uploaded}")
     }
 
     fun uploadBalance(value: BalanceEntity) {
@@ -140,6 +155,65 @@ class SyncEngine @Inject constructor(
         )
     }
 
+    suspend fun uploadImportedData(
+        balances: List<BalanceEntity>,
+        accounts: List<AccountEntity>,
+        categories: List<CategoryEntity>,
+        transactions: List<TransactionEntity>,
+    ) {
+        val familyId = familyStore.familyId.value ?: return
+        val family = firestore.collection("families").document(familyId)
+        val writes = mutableListOf<Pair<DocumentReference, Map<String, Any>>>()
+        balances.forEach { value ->
+            writes += family.collection("balances").document(value.id) to mapOf(
+                "name" to value.name,
+                "currencyCode" to value.currencyCode,
+                "deleted" to value.deleted,
+                "updatedAt" to value.updatedAt,
+            )
+        }
+        accounts.forEach { value ->
+            writes += family.collection("accounts").document(value.id) to mapOf(
+                "name" to value.name,
+                "iconKey" to value.iconKey,
+                "colorKey" to value.colorKey,
+                "openingBalanceMinor" to value.openingBalanceMinor,
+                "balanceId" to value.balanceId,
+                "deleted" to value.deleted,
+                "updatedAt" to value.updatedAt,
+            )
+        }
+        categories.forEach { value ->
+            writes += family.collection("categories").document(value.id) to mapOf(
+                "name" to value.name,
+                "iconKey" to value.iconKey,
+                "colorKey" to value.colorKey,
+                "type" to value.type,
+                "deleted" to value.deleted,
+                "updatedAt" to value.updatedAt,
+            )
+        }
+        transactions.forEach { value ->
+            writes += family.collection("transactions").document(value.id) to mapOf(
+                "type" to value.type,
+                "amountMinor" to value.amountMinor,
+                "accountId" to value.accountId,
+                "categoryId" to value.categoryId,
+                "date" to value.date,
+                "note" to value.note,
+                "deleted" to value.deleted,
+                "updatedAt" to value.updatedAt,
+                "updatedBy" to (authRepository.userId ?: value.updatedBy),
+            )
+        }
+        firestoreBatches(writes).forEach { chunk ->
+            val batch = firestore.batch()
+            chunk.forEach { (document, data) -> batch.set(document, data) }
+            batch.commit().await()
+        }
+        Log.d("ExpeysiSync", "import upload documents=${writes.size}")
+    }
+
     private fun collection(name: String): CollectionReference? = familyStore.familyId.value?.let {
         firestore.collection("families").document(it).collection(name)
     }
@@ -148,11 +222,16 @@ class SyncEngine @Inject constructor(
         familyId: String,
         name: String,
         initialized: CompletableDeferred<Unit>,
+        remoteVersions: MutableMap<String, Long>,
         merge: suspend (DocumentSnapshot) -> Unit,
     ) {
         changes(familyId, name).collect { documents ->
             Log.d("ExpeysiSync", "snapshot $name=${documents.size}")
-            documents.forEach { merge(it) }
+            remoteVersions.clear()
+            documents.forEach { document ->
+                remoteVersions[document.id] = document.getLong("updatedAt") ?: 0
+                merge(document)
+            }
             initialized.complete(Unit)
         }
     }
@@ -243,3 +322,15 @@ class SyncEngine @Inject constructor(
         }
     }
 }
+
+private data class RemoteVersions(
+    val balances: MutableMap<String, Long> = mutableMapOf(),
+    val accounts: MutableMap<String, Long> = mutableMapOf(),
+    val categories: MutableMap<String, Long> = mutableMapOf(),
+    val transactions: MutableMap<String, Long> = mutableMapOf(),
+)
+
+internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean =
+    remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
+
+internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(500)

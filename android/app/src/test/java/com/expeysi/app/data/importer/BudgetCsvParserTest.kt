@@ -2,8 +2,6 @@ package com.expeysi.app.data.importer
 
 import com.expeysi.app.domain.TxType
 import java.io.ByteArrayInputStream
-import java.nio.file.Files
-import java.nio.file.Path
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -13,18 +11,22 @@ class BudgetCsvParserTest {
     private val parser = BudgetCsvParser()
 
     @Test
-    fun `реальный экспорт Бюджета читается полностью`() {
-        val path = Path.of("..", "..", "docs", "Export-01.01.2026-31.12.2026.csv")
-        val transactions = Files.newInputStream(path).use(parser::parse)
+    fun `экспорт Бюджета читается с суммами и типами операций`() {
+        val transactions = parse(
+            HEADER +
+                "2026-01-02;03:04;Карта;Жилье;-8000000;VND;Квартира\n" +
+                "2026-01-02;03:05;Карта;Зарплата;10000000;VND;\n" +
+                "2026-01-02;03:06;Наличные;Еда;-33333.30;VND;\n",
+        )
 
-        assertEquals(80, transactions.size)
+        assertEquals(3, transactions.size)
         assertEquals(800_000_000L, transactions.first().amountMinor)
         assertEquals(TxType.EXPENSE, transactions.first().type)
         assertEquals("Жилье", transactions.first().categoryName)
         assertEquals("Квартира", transactions.first().note)
         assertEquals("VND", transactions.first().currencyCode)
         assertEquals(1_000_000_000L, transactions.first { it.type == TxType.INCOME }.amountMinor)
-        assertEquals(3_333_330L, transactions.last { it.amountMinor == 3_333_330L }.amountMinor)
+        assertEquals(3_333_330L, transactions.last().amountMinor)
     }
 
     @Test

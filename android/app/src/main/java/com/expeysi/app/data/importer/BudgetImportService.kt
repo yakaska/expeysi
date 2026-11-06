@@ -91,10 +91,7 @@ class BudgetImportService @Inject constructor(
             database.transactionDao().upsertAll(transactions)
         }
 
-        balances.forEach(syncEngine::uploadBalance)
-        accounts.forEach(syncEngine::uploadAccount)
-        newCategories.forEach(syncEngine::uploadCategory)
-        transactions.forEach(syncEngine::uploadTransaction)
+        syncEngine.uploadImportedData(balances, accounts, newCategories, transactions)
         selectedBalanceStore.select(balances.first().id)
         return BudgetImportResult(transactions.size, balances.first().id)
     }
