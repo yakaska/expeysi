@@ -3,6 +3,8 @@ package com.expeysi.app.ui.add
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.AuthRepository
+import com.expeysi.app.data.LastTransactionSelectionStore
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
@@ -38,15 +40,18 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class AddTransactionViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    accountDao: AccountDao,
-    categoryDao: CategoryDao,
+    private val accountDao: AccountDao,
+    private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
     balanceDao: BalanceDao,
+    authRepository: AuthRepository,
+    private val selectionStore: LastTransactionSelectionStore,
     private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
+    private val userId: String = authRepository.userId ?: "local"
     private var original: TransactionEntity? = null
 
     val isEdit: Boolean = editId != null
@@ -93,8 +98,8 @@ class AddTransactionViewModel @Inject constructor(
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
     init {
-        if (editId != null) {
-            viewModelScope.launch {
+        viewModelScope.launch {
+            if (editId != null) {
                 transactionDao.byId(editId)?.let { tx ->
                     original = tx
                     _type.value = TxType.fromWire(tx.type)
@@ -106,6 +111,11 @@ class AddTransactionViewModel @Inject constructor(
                     _time.value = dateTime.toLocalTime().withSecond(0).withNano(0)
                     _note.value = tx.note
                 }
+            } else {
+                _selectedAccountId.value = selectionStore.accountId(userId)
+                    ?.let { accountDao.byId(it) }
+                    ?.selectableId()
+                restoreLastCategory(TxType.EXPENSE)
             }
         }
     }
@@ -120,8 +130,10 @@ class AddTransactionViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun onTypeChange(value: TxType) {
+        if (_type.value == value) return
         _type.value = value
         _selectedCategoryId.value = null
+        viewModelScope.launch { restoreLastCategory(value) }
     }
 
     fun onAmountChange(value: String) {
@@ -130,10 +142,19 @@ class AddTransactionViewModel @Inject constructor(
 
     fun onAccountSelect(id: String) {
         _selectedAccountId.value = id
+        selectionStore.selectAccount(userId, id)
     }
 
     fun onCategorySelect(id: String) {
         _selectedCategoryId.value = id
+        selectionStore.selectCategory(userId, _type.value, id)
+    }
+
+    private suspend fun restoreLastCategory(type: TxType) {
+        val id = selectionStore.categoryId(userId, type)
+            ?.let { categoryDao.byId(it) }
+            ?.selectableId(type)
+        if (_type.value == type) _selectedCategoryId.value = id
     }
 
     /** DatePicker отдаёт миллисекунды полуночи в UTC. */
