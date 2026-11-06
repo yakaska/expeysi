@@ -5,9 +5,12 @@ import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -15,8 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -24,6 +28,8 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -51,22 +57,42 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
+import com.expeysi.app.data.db.AccountEntity
+import com.expeysi.app.data.db.BalanceEntity
+import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.ui.icons.CategoryIcon
-import com.expeysi.app.ui.icons.CategoryPalette
+import com.expeysi.app.ui.theme.ExpeysiTheme
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.launch
 
-private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
+private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))
 
-@OptIn(ExperimentalMaterial3Api::class)
+data class HomeActions(
+    val onMenuClick: () -> Unit,
+    val onAddClick: () -> Unit,
+    val onItemClick: (String) -> Unit,
+    val onAddBalanceClick: () -> Unit,
+    val onEditBalanceClick: (String) -> Unit,
+    val onBalanceHistoryClick: (String) -> Unit,
+    val onAccountHistoryClick: (String) -> Unit,
+    val onSummaryClick: (String, TxType, Int) -> Unit,
+    val onBalanceSelected: (String) -> Unit,
+)
+
 @Composable
 fun HomeScreen(
     onMenuClick: () -> Unit,
@@ -80,6 +106,28 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    HomeContent(
+        state = state,
+        actions = HomeActions(
+            onMenuClick = onMenuClick,
+            onAddClick = onAddClick,
+            onItemClick = onItemClick,
+            onAddBalanceClick = onAddBalanceClick,
+            onEditBalanceClick = onEditBalanceClick,
+            onBalanceHistoryClick = onBalanceHistoryClick,
+            onAccountHistoryClick = onAccountHistoryClick,
+            onSummaryClick = onSummaryClick,
+            onBalanceSelected = viewModel::selectBalance,
+        ),
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+fun HomeContent(
+    state: HomeUiState,
+    actions: HomeActions,
+) {
     val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val listState = rememberLazyListState()
@@ -99,16 +147,19 @@ fun HomeScreen(
     }
 
     Scaffold(
-            topBar = {
+        topBar = {
             TopAppBar(
                 title = {
                     TextButton(onClick = { balanceMenuOpen = true }) {
                         Text(
                             state.selectedBalance?.let { "${it.name} (${state.currencySymbol})" }
-                                ?: "Expeysi",
+                                ?: stringResource(R.string.app_name),
                             style = MaterialTheme.typography.titleLarge,
                         )
-                        Icon(Icons.Filled.ArrowDropDown, contentDescription = "Выбрать баланс")
+                        Icon(
+                            Icons.Filled.ArrowDropDown,
+                            contentDescription = stringResource(R.string.home_select_balance),
+                        )
                         DropdownMenu(
                             expanded = balanceMenuOpen,
                             onDismissRequest = { balanceMenuOpen = false },
@@ -117,7 +168,7 @@ fun HomeScreen(
                                 DropdownMenuItem(
                                     text = { Text(balance.name) },
                                     onClick = {
-                                        viewModel.selectBalance(balance.id)
+                                        actions.onBalanceSelected(balance.id)
                                         balanceMenuOpen = false
                                     },
                                 )
@@ -125,24 +176,24 @@ fun HomeScreen(
                             HorizontalDivider()
                             state.selectedBalance?.let { balance ->
                                 DropdownMenuItem(
-                                    text = { Text("Изменить баланс…") },
+                                    text = { Text(stringResource(R.string.home_edit_balance)) },
                                     onClick = {
                                         balanceMenuOpen = false
-                                        onEditBalanceClick(balance.id)
+                                        actions.onEditBalanceClick(balance.id)
                                     },
                                 )
                             }
                             DropdownMenuItem(
-                                text = { Text("Новый баланс…") },
+                                text = { Text(stringResource(R.string.home_new_balance)) },
                                 onClick = {
                                     balanceMenuOpen = false
-                                    onAddBalanceClick()
+                                    actions.onAddBalanceClick()
                                 },
                             )
                             state.familyId?.let {
                                 HorizontalDivider()
                                 DropdownMenuItem(
-                                    text = { Text("Код семьи: $it") },
+                                    text = { Text(stringResource(R.string.home_family_code, it)) },
                                     onClick = {
                                         coroutineScope.launch {
                                             clipboard.setClipEntry(
@@ -151,7 +202,7 @@ fun HomeScreen(
                                             balanceMenuOpen = false
                                             Toast.makeText(
                                                 context,
-                                                "Код семьи скопирован",
+                                                R.string.home_family_code_copied,
                                                 Toast.LENGTH_SHORT,
                                             ).show()
                                         }
@@ -162,17 +213,23 @@ fun HomeScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onMenuClick) {
-                        Icon(Icons.Filled.Menu, contentDescription = "Открыть меню")
+                    IconButton(onClick = actions.onMenuClick) {
+                        Icon(
+                            Icons.Filled.Menu,
+                            contentDescription = stringResource(R.string.home_open_menu),
+                        )
                     }
                 },
                 actions = {
                     IconButton(
                         onClick = {
-                            state.selectedBalance?.let { onBalanceHistoryClick(it.id) }
+                            state.selectedBalance?.let { actions.onBalanceHistoryClick(it.id) }
                         },
                     ) {
-                        Icon(Icons.Filled.History, contentDescription = "История операций")
+                        Icon(
+                            Icons.Filled.History,
+                            contentDescription = stringResource(R.string.home_transaction_history),
+                        )
                     }
                 },
             )
@@ -197,156 +254,204 @@ fun HomeScreen(
                             }
                         }
                     } else {
-                        onAddClick()
+                        actions.onAddClick()
                     }
                 },
             ) {
                 Icon(
                     if (showScrollToTop) Icons.Filled.KeyboardArrowUp else Icons.Filled.Add,
-                    contentDescription = if (showScrollToTop) "Прокрутить наверх" else "Добавить операцию",
+                    contentDescription = stringResource(
+                        if (showScrollToTop) R.string.home_scroll_to_top else R.string.home_add_transaction,
+                    ),
                 )
             }
         },
     ) { innerPadding ->
-        LazyColumn(
-            state = listState,
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentAlignment = Alignment.TopCenter,
         ) {
-            item {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary),
-                ) {
-                    Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                        CardHeader(
-                            title = "Счета",
-                            currencyCode = state.selectedBalance?.currencyCode ?: "",
-                            accent = MaterialTheme.colorScheme.tertiary,
-                            centerText = "${Money.format(state.totalBalanceMinor)} ${state.currencySymbol}",
-                            centerColor = if (state.totalBalanceMinor < 0) {
-                                CategoryPalette.color("red")
-                            } else {
-                                CategoryPalette.color("green")
-                            },
-                        )
-                        state.accounts.forEachIndexed { index, balance ->
-                            if (index > 0) {
-                                HorizontalDivider(
-                                    modifier = Modifier.padding(horizontal = 16.dp),
-                                    color = MaterialTheme.colorScheme.outlineVariant,
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .widthIn(max = 600.dp)
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.tertiary),
+                    ) {
+                        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+                            CardHeader(
+                                title = stringResource(R.string.home_accounts),
+                                currencyCode = state.selectedBalance?.currencyCode ?: "",
+                                accent = MaterialTheme.colorScheme.tertiary,
+                                centerText = "${Money.format(state.totalBalanceMinor)} ${state.currencySymbol}",
+                                centerColor = if (state.totalBalanceMinor < 0) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                },
+                            )
+                            state.accounts.forEachIndexed { index, balance ->
+                                if (index > 0) {
+                                    HorizontalDivider(
+                                        modifier = Modifier.padding(horizontal = 16.dp),
+                                        color = MaterialTheme.colorScheme.outlineVariant,
+                                    )
+                                }
+                                ListItem(
+                                    modifier = Modifier.clickable {
+                                        actions.onAccountHistoryClick(balance.account.id)
+                                    },
+                                    leadingContent = {
+                                        CategoryIcon(balance.account.iconKey, balance.account.colorKey)
+                                    },
+                                    headlineContent = { Text(balance.account.name) },
+                                    trailingContent = {
+                                        Text(
+                                            Money.format(balance.balanceMinor),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = if (balance.balanceMinor < 0) {
+                                                MaterialTheme.colorScheme.error
+                                            } else {
+                                                MaterialTheme.colorScheme.onSurface
+                                            },
+                                        )
+                                    },
                                 )
                             }
-                            ListItem(
-                                modifier = Modifier.clickable {
-                                    onAccountHistoryClick(balance.account.id)
-                                },
-                                leadingContent = {
-                                    CategoryIcon(balance.account.iconKey, balance.account.colorKey)
-                                },
-                                headlineContent = { Text(balance.account.name) },
-                                trailingContent = {
+                        }
+                    }
+                }
+
+                item {
+                    SumsCard(
+                        title = stringResource(R.string.home_expenses),
+                        sums = state.expense,
+                        currencyCode = state.selectedBalance?.currencyCode ?: "",
+                        accent = MaterialTheme.colorScheme.error,
+                        onPeriodClick = { days ->
+                            state.selectedBalance?.let { actions.onSummaryClick(it.id, TxType.EXPENSE, days) }
+                        },
+                    )
+                }
+                item {
+                    SumsCard(
+                        title = stringResource(R.string.home_income),
+                        sums = state.income,
+                        currencyCode = state.selectedBalance?.currencyCode ?: "",
+                        accent = MaterialTheme.colorScheme.primary,
+                        onPeriodClick = { days ->
+                            state.selectedBalance?.let { actions.onSummaryClick(it.id, TxType.INCOME, days) }
+                        },
+                    )
+                }
+
+                item {
+                    Text(
+                        stringResource(R.string.home_transactions),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                }
+                if (state.recent.isEmpty()) {
+                    item {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            Icon(
+                                Icons.Outlined.Receipt,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Text(
+                                stringResource(R.string.home_empty_title),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Button(onClick = actions.onAddClick) {
+                                Text(stringResource(R.string.home_add_transaction))
+                            }
+                        }
+                    }
+                }
+                val zone = ZoneId.systemDefault()
+                val today = LocalDate.now(zone)
+                state.recent.groupBy { item ->
+                    Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
+                }.forEach { (date, transactions) ->
+                    stickyHeader(key = "date-$date") {
+                        Text(
+                            text = when (date) {
+                                today -> stringResource(R.string.home_today)
+                                today.minusDays(1) -> stringResource(R.string.home_yesterday)
+                                else -> date.format(dayFormatter)
+                            },
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface)
+                                .padding(vertical = 8.dp),
+                        )
+                    }
+                    transactions.forEachIndexed { index, item ->
+                        item(key = item.transaction.id) {
+                            val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
+                            Column(modifier = Modifier.animateItem()) {
+                                if (index > 0) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { actions.onItemClick(item.transaction.id) }
+                                        .padding(vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+                                    Column(
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 16.dp),
+                                    ) {
+                                        Text(item.categoryName, style = MaterialTheme.typography.bodyLarge)
+                                        Text(
+                                            listOfNotNull(
+                                                item.accountName.ifBlank { null },
+                                                Instant.ofEpochMilli(item.transaction.date)
+                                                    .atZone(zone)
+                                                    .format(timeFormatter),
+                                                item.transaction.note.ifBlank { null },
+                                            ).joinToString(" · "),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
                                     Text(
-                                        Money.format(balance.balanceMinor),
+                                        text = (if (isIncome) "+" else "−") +
+                                            "${Money.format(item.transaction.amountMinor)} ${item.currencySymbol}",
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (balance.balanceMinor < 0) {
-                                            MaterialTheme.colorScheme.error
+                                        color = if (isIncome) {
+                                            MaterialTheme.colorScheme.primary
                                         } else {
                                             MaterialTheme.colorScheme.onSurface
                                         },
                                     )
-                                },
-                            )
+                                }
+                            }
                         }
-                    }
-                }
-            }
-
-            item {
-                SumsCard(
-                    title = "Расходы",
-                    sums = state.expense,
-                    currencyCode = state.selectedBalance?.currencyCode ?: "",
-                    accent = MaterialTheme.colorScheme.error,
-                    onPeriodClick = { days ->
-                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.EXPENSE, days) }
-                    },
-                )
-            }
-            item {
-                SumsCard(
-                    title = "Доходы",
-                    sums = state.income,
-                    currencyCode = state.selectedBalance?.currencyCode ?: "",
-                    accent = MaterialTheme.colorScheme.primary,
-                    onPeriodClick = { days ->
-                        state.selectedBalance?.let { onSummaryClick(it.id, TxType.INCOME, days) }
-                    },
-                )
-            }
-
-            item {
-                Text(
-                    "Операции",
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-            }
-            if (state.recent.isEmpty()) {
-                item {
-                    Text(
-                        "Пока пусто. Нажми «+», чтобы добавить первую операцию.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            items(state.recent, key = { it.transaction.id }) { item ->
-                val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
-                Card(
-                    onClick = { onItemClick(item.transaction.id) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .animateItem(),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 12.dp),
-                        ) {
-                            Text(item.categoryName, style = MaterialTheme.typography.bodyLarge)
-                            Text(
-                                listOfNotNull(
-                                    item.accountName.ifBlank { null },
-                                    Instant.ofEpochMilli(item.transaction.date)
-                                        .atZone(ZoneId.systemDefault())
-                                        .format(dateFormatter),
-                                    item.transaction.note.ifBlank { null },
-                                ).joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        Text(
-                            text = (if (isIncome) "+" else "−") +
-                                "${Money.format(item.transaction.amountMinor)} ${item.currencySymbol}",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = if (isIncome) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        )
                     }
                 }
             }
@@ -368,17 +473,17 @@ private fun SumsCard(
     ) {
         Column(modifier = Modifier.padding(vertical = 8.dp)) {
             CardHeader(title = title, currencyCode = currencyCode, accent = accent)
-            SumRow("Сегодня", sums.dayMinor) { onPeriodClick(1) }
+            SumRow(stringResource(R.string.home_today), sums.dayMinor) { onPeriodClick(1) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("7 дней", sums.weekMinor) { onPeriodClick(7) }
+            SumRow(stringResource(R.string.home_seven_days), sums.weekMinor) { onPeriodClick(7) }
             HorizontalDivider(
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.outlineVariant,
             )
-            SumRow("30 дней", sums.monthMinor) { onPeriodClick(30) }
+            SumRow(stringResource(R.string.home_thirty_days), sums.monthMinor) { onPeriodClick(30) }
         }
     }
 }
@@ -394,7 +499,7 @@ private fun CardHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 4.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium, color = accent)
@@ -422,5 +527,83 @@ private fun SumRow(label: String, amountMinor: Long, onClick: () -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
             )
         },
+    )
+}
+
+
+private val previewHomeActions = HomeActions(
+    onMenuClick = {},
+    onAddClick = {},
+    onItemClick = {},
+    onAddBalanceClick = {},
+    onEditBalanceClick = {},
+    onBalanceHistoryClick = {},
+    onAccountHistoryClick = {},
+    onSummaryClick = { _, _, _ -> },
+    onBalanceSelected = {},
+)
+
+@Preview(name = "Light", showBackground = true)
+@Composable
+private fun HomeContentLightPreview() {
+    ExpeysiTheme(darkTheme = false) {
+        HomeContent(state = previewHomeState(), actions = previewHomeActions)
+    }
+}
+
+@Preview(
+    name = "Dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun HomeContentDarkPreview() {
+    ExpeysiTheme(darkTheme = true) {
+        HomeContent(state = previewHomeState(), actions = previewHomeActions)
+    }
+}
+
+private fun previewHomeState(): HomeUiState {
+    val balance = BalanceEntity(
+        id = "balance",
+        name = "Семейный бюджет",
+        currencyCode = "RUB",
+        updatedAt = 0,
+    )
+    val account = AccountEntity(
+        id = "account",
+        name = "Карта",
+        iconKey = "card",
+        openingBalanceMinor = 50_000,
+        balanceId = balance.id,
+        updatedAt = 0,
+    )
+    return HomeUiState(
+        balances = listOf(balance),
+        selectedBalance = balance,
+        currencySymbol = "₽",
+        accounts = listOf(AccountBalance(account = account, balanceMinor = 48_750, currencySymbol = "₽")),
+        totalBalanceMinor = 48_750,
+        expense = WindowSums(dayMinor = 1_250, weekMinor = 8_400, monthMinor = 32_000),
+        income = WindowSums(dayMinor = 0, weekMinor = 25_000, monthMinor = 75_000),
+        recent = listOf(
+            TransactionItem(
+                transaction = TransactionEntity(
+                    id = "transaction",
+                    type = TxType.EXPENSE.wire,
+                    amountMinor = 1_250,
+                    accountId = account.id,
+                    categoryId = "groceries",
+                    date = System.currentTimeMillis(),
+                    note = "Продукты на ужин",
+                    updatedAt = 0,
+                ),
+                categoryName = "Продукты",
+                categoryIconKey = "groceries",
+                categoryColorKey = "green",
+                accountName = account.name,
+                currencySymbol = "₽",
+            ),
+        ),
     )
 }
