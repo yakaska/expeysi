@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Expeysi</string>
+    <string name="auth_title">Expeysi</string>
+    <string name="auth_subtitle">Sign in to sync shared income and expenses</string>
+    <string name="auth_google_sign_in">Sign in with Google</string>
+    <string name="family_title">Shared finances</string>
+    <string name="family_subtitle">Create a family on the first device or enter an invitation code.</string>
+    <string name="family_create_title">Create a family</string>
+    <string name="family_create_description">A new shared income and expense journal for your family.</string>
+    <string name="family_create_action">Create a family</string>
+    <string name="family_or">or</string>
+    <string name="family_join_title">Join a family</string>
+    <string name="family_join_description">Enter the invitation code from another family member.</string>
+    <string name="family_code_label">Family code</string>
+    <string name="family_paste">Paste</string>
+    <string name="family_join_action">Join</string>
 </resources>
