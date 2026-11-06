@@ -18,3 +18,4 @@ Jetpack Compose, Material 3, синхронизация через Firebase Fire
 - `firebase/` — правила Firestore, конфигурация
 
 Детали процесса и зафиксированные решения — в `AGENTS.md` и `docs/plan.md`.
+Инструкция по сборке и публикации релизов — в `docs/releases.md`.

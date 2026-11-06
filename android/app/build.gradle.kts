@@ -23,6 +23,15 @@ android {
         versionName = "0.1.0"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = System.getenv("RELEASE_STORE_FILE")?.let(::file)
+            storePassword = System.getenv("RELEASE_STORE_PASSWORD")
+            keyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            keyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -30,6 +39,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -40,6 +50,22 @@ android {
 
     buildFeatures {
         compose = true
+    }
+}
+
+tasks.matching { it.name == "assembleRelease" }.configureEach {
+    doFirst {
+        val requiredVariables =
+            listOf(
+                "RELEASE_STORE_FILE",
+                "RELEASE_STORE_PASSWORD",
+                "RELEASE_KEY_ALIAS",
+                "RELEASE_KEY_PASSWORD",
+            )
+        val missingVariables = requiredVariables.filter { System.getenv(it).isNullOrBlank() }
+        check(missingVariables.isEmpty()) {
+            "Release signing is not configured. Missing: ${missingVariables.joinToString()}"
+        }
     }
 }
 
