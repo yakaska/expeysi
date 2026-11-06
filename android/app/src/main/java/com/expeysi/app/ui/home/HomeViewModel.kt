@@ -2,6 +2,7 @@ package com.expeysi.app.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.FamilyRepository
 import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.SelectedBalanceStore
 import com.expeysi.app.data.importer.BudgetImportService
@@ -27,11 +28,16 @@ import java.io.InputStream
 import java.time.ZoneId
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -57,6 +63,11 @@ data class ImportUiState(
     val message: String? = null,
 )
 
+data class LeaveFamilyUiState(
+    val inProgress: Boolean = false,
+    val failed: Boolean = false,
+)
+
 data class HomeUiState(
     val balances: List<BalanceEntity> = emptyList(),
     val selectedBalance: BalanceEntity? = null,
@@ -65,10 +76,12 @@ data class HomeUiState(
     val totalBalanceMinor: Long = 0,
     val expense: WindowSums = WindowSums(0, 0, 0),
     val income: WindowSums = WindowSums(0, 0, 0),
-    val recent: List<TransactionItem> = emptyList(),
+    val transactions: List<TransactionItem> = emptyList(),
+    val hasMoreTransactions: Boolean = false,
     val familyId: String? = null,
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     balanceDao: BalanceDao,
@@ -78,12 +91,15 @@ class HomeViewModel @Inject constructor(
     currencyDao: CurrencyDao,
     private val selectedBalanceStore: SelectedBalanceStore,
     private val familyStore: FamilyStore,
+    private val familyRepository: FamilyRepository,
     private val budgetImportService: BudgetImportService,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
     private val _importState = MutableStateFlow(ImportUiState())
     val importState: StateFlow<ImportUiState> = _importState.asStateFlow()
+    private val _leaveState = MutableStateFlow(LeaveFamilyUiState())
+    val leaveState: StateFlow<LeaveFamilyUiState> = _leaveState.asStateFlow()
 
     private val selection = combine(
         balanceDao.observeActive(),
@@ -92,13 +108,51 @@ class HomeViewModel @Inject constructor(
         balances to (balances.firstOrNull { it.id == selectedId } ?: balances.firstOrNull())
     }
 
-    val uiState: StateFlow<HomeUiState> = combine(
+    private val transactionLimit = MutableStateFlow(TRANSACTION_PAGE_SIZE)
+    private val feedAccountIds = combine(
+        selection,
+        accountDao.observeAll(),
+    ) { (_, selected), accounts ->
+        accounts.filter { !it.deleted && it.balanceId == selected?.id }.map { it.id }
+    }.distinctUntilChanged().onEach {
+        transactionLimit.value = TRANSACTION_PAGE_SIZE
+    }
+
+    private val transactionFeed = feedAccountIds.flatMapLatest { accountIds ->
+        combine(
+            transactionLimit.flatMapLatest { limit ->
+                transactionDao.observeActiveForAccounts(accountIds, limit).map { it to limit }
+            },
+            accountDao.observeAll(),
+            categoryDao.observeAll(),
+            currencyDao.observeAll(),
+            selection,
+        ) { (transactions, limit), accounts, categories, currencies, (_, selected) ->
+            val symbolByCode = currencies.associate { it.code to it.symbol }
+            val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
+            val categoryById = categories.associateBy { it.id }
+            val accountById = accounts.associateBy { it.id }
+            val items = transactions.map { tx ->
+                val category = categoryById[tx.categoryId]
+                TransactionItem(
+                    transaction = tx,
+                    categoryName = category?.name ?: "Без категории",
+                    categoryIconKey = category?.iconKey ?: "",
+                    categoryColorKey = category?.colorKey ?: "default",
+                    accountName = accountById[tx.accountId]?.name ?: "",
+                    currencySymbol = symbol,
+                )
+            }
+            items to (transactions.size >= limit)
+        }
+    }
+
+    private val summaryState = combine(
         selection,
         accountDao.observeAll(),
         transactionDao.observeActive(),
-        categoryDao.observeAll(),
         currencyDao.observeAll(),
-    ) { (balances, selected), accounts, transactions, categories, currencies ->
+    ) { (balances, selected), accounts, transactions, currencies ->
         val symbolByCode = currencies.associate { it.code to it.symbol }
         val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
 
@@ -124,20 +178,6 @@ class HomeViewModel @Inject constructor(
             todayStart,
         )
 
-        val categoryById = categories.associateBy { it.id }
-        val accountById = accounts.associateBy { it.id }
-        val recent = balanceTxs.take(50).map { tx ->
-            val category = categoryById[tx.categoryId]
-            TransactionItem(
-                transaction = tx,
-                categoryName = category?.name ?: "Без категории",
-                categoryIconKey = category?.iconKey ?: "",
-                categoryColorKey = category?.colorKey ?: "default",
-                accountName = accountById[tx.accountId]?.name ?: "",
-                currencySymbol = symbol,
-            )
-        }
-
         HomeUiState(
             balances = balances,
             selectedBalance = selected,
@@ -146,9 +186,15 @@ class HomeViewModel @Inject constructor(
             totalBalanceMinor = accountBalances.sumOf { it.balanceMinor },
             expense = windowSums(TxType.EXPENSE),
             income = windowSums(TxType.INCOME),
-            recent = recent,
             familyId = familyStore.familyId.value,
         )
+    }
+
+    val uiState: StateFlow<HomeUiState> = combine(
+        summaryState,
+        transactionFeed,
+    ) { state, (transactions, hasMore) ->
+        state.copy(transactions = transactions, hasMoreTransactions = hasMore)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun selectBalance(id: String) {
@@ -177,5 +223,31 @@ class HomeViewModel @Inject constructor(
 
     fun consumeImportMessage() {
         _importState.update { it.copy(message = null) }
+    }
+
+    fun leaveFamily() {
+        if (_leaveState.value.inProgress) return
+        viewModelScope.launch {
+            _leaveState.value = LeaveFamilyUiState(inProgress = true)
+            try {
+                withContext(Dispatchers.IO) { familyRepository.leaveFamily() }
+                selectedBalanceStore.clear()
+            } catch (e: Exception) {
+                _leaveState.value = LeaveFamilyUiState(failed = true)
+            }
+        }
+    }
+
+    fun consumeLeaveFamilyError() {
+        _leaveState.update { it.copy(failed = false) }
+    }
+
+    fun loadMoreTransactions() {
+        if (!uiState.value.hasMoreTransactions) return
+        transactionLimit.update { it + TRANSACTION_PAGE_SIZE }
+    }
+
+    private companion object {
+        const val TRANSACTION_PAGE_SIZE = 50
     }
 }

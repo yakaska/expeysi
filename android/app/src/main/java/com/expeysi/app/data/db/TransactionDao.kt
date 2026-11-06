@@ -21,6 +21,12 @@ interface TransactionDao {
     fun observeActiveForAccount(accountId: String): Flow<List<TransactionEntity>>
 
     @Query(
+        "SELECT * FROM transactions WHERE deleted = 0 AND accountId IN (:accountIds) " +
+            "ORDER BY date DESC, updatedAt DESC LIMIT :limit",
+    )
+    fun observeActiveForAccounts(accountIds: List<String>, limit: Int): Flow<List<TransactionEntity>>
+
+    @Query(
         "SELECT * FROM transactions WHERE deleted = 0 AND type = :type " +
             "AND date >= :startMillis AND date < :endMillis",
     )

@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ExpandLess
@@ -25,6 +26,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -48,10 +50,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.domain.AccountTotal
 import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
@@ -81,6 +85,7 @@ private val periodLabels = linkedMapOf(
 @Composable
 fun HistoryScreen(
     onBack: () -> Unit,
+    onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
@@ -201,6 +206,14 @@ fun HistoryScreen(
                 },
             )
         },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddClick) {
+                Icon(
+                    Icons.Filled.Add,
+                    contentDescription = stringResource(R.string.home_add_transaction),
+                )
+            }
+        },
     ) { innerPadding ->
         Column(
             modifier = Modifier
@@ -297,7 +310,11 @@ private fun TransactionList(items: List<TransactionItem>, onItemClick: (String) 
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(items, key = { it.transaction.id }) { item ->
-                HistoryItemCard(item = item, onClick = { onItemClick(item.transaction.id) })
+                HistoryItemCard(
+                    item = item,
+                    onClick = { onItemClick(item.transaction.id) },
+                    modifier = Modifier.animateItem(),
+                )
             }
         }
     }
@@ -487,11 +504,15 @@ private fun ChipRow(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun HistoryItemCard(item: TransactionItem, onClick: () -> Unit) {
+private fun HistoryItemCard(
+    item: TransactionItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
     Card(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
     ) {
         Row(
             modifier = Modifier

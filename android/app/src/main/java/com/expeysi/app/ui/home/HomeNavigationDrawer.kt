@@ -8,10 +8,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.Icon
@@ -21,7 +23,12 @@ import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,12 +42,15 @@ import com.expeysi.app.R
 fun HomeNavigationDrawer(
     drawerState: DrawerState,
     importing: Boolean,
+    leavingFamily: Boolean,
     onHomeClick: () -> Unit,
     onImportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
+    onLeaveFamilyClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    var showLeaveConfirmation by remember { mutableStateOf(false) }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -102,10 +112,49 @@ fun HomeNavigationDrawer(
                     onClick = onAccountsClick,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
+                NavigationDrawerItem(
+                    label = { Text(stringResource(R.string.family_leave_action)) },
+                    selected = false,
+                    icon = {
+                        if (leavingFamily) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                        } else {
+                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                        }
+                    },
+                    onClick = { if (!leavingFamily) showLeaveConfirmation = true },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
             }
         },
         content = content,
     )
+    if (showLeaveConfirmation) {
+        AlertDialog(
+            onDismissRequest = { if (!leavingFamily) showLeaveConfirmation = false },
+            title = { Text(stringResource(R.string.family_leave_action)) },
+            text = { Text(stringResource(R.string.family_leave_confirmation)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showLeaveConfirmation = false
+                        onLeaveFamilyClick()
+                    },
+                    enabled = !leavingFamily,
+                ) {
+                    Text(stringResource(R.string.family_leave_action))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showLeaveConfirmation = false },
+                    enabled = !leavingFamily,
+                ) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
 }
 
 @Composable

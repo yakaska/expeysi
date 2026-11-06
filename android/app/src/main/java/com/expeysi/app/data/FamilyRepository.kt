@@ -6,6 +6,7 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.tasks.await
 
 @Singleton
 class FamilyRepository @Inject constructor(
@@ -45,6 +46,22 @@ class FamilyRepository @Inject constructor(
             database.balanceDao().clear()
         }
         familyStore.select(familyId)
+    }
+
+    suspend fun leaveFamily() {
+        val uid = authRepository.userId ?: error("Пользователь не вошёл")
+        val familyId = familyStore.familyId.value ?: return
+        firestore.collection("families").document(familyId)
+            .collection("members").document(uid)
+            .delete()
+            .await()
+        database.withTransaction {
+            database.transactionDao().clear()
+            database.accountDao().clear()
+            database.categoryDao().clear()
+            database.balanceDao().clear()
+        }
+        familyStore.clear()
     }
 
     private fun memberData(uid: String) = mapOf(

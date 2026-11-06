@@ -65,6 +65,7 @@ private fun AppNavigation() {
     val navController = rememberNavController()
     val homeViewModel: HomeViewModel = hiltViewModel()
     val importState by homeViewModel.importState.collectAsStateWithLifecycle()
+    val leaveState by homeViewModel.leaveState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -82,10 +83,17 @@ private fun AppNavigation() {
             homeViewModel.consumeImportMessage()
         }
     }
+    LaunchedEffect(leaveState.failed) {
+        if (leaveState.failed) {
+            Toast.makeText(context, R.string.family_leave_error, Toast.LENGTH_LONG).show()
+            homeViewModel.consumeLeaveFamilyError()
+        }
+    }
 
     HomeNavigationDrawer(
         drawerState = drawerState,
         importing = importState.inProgress,
+        leavingFamily = leaveState.inProgress,
         onHomeClick = {
             scope.launch {
                 drawerState.close()
@@ -112,6 +120,7 @@ private fun AppNavigation() {
                 navController.navigate("accounts")
             }
         },
+        onLeaveFamilyClick = homeViewModel::leaveFamily,
     ) {
         NavHost(
             navController = navController,
@@ -208,6 +217,7 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
+                    onAddClick = { navController.navigate("add") },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
@@ -217,6 +227,7 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
+                    onAddClick = { navController.navigate("add") },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
