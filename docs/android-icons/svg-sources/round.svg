@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#EAF3FF"/>
+      <stop offset="1" stop-color="#C9DDF6"/>
+    </linearGradient>
+    <linearGradient id="fur" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EEF1F6"/>
+    </linearGradient>
+    <linearGradient id="kip" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3F73DA"/>
+      <stop offset="1" stop-color="#244DA8"/>
+    </linearGradient>
+    <radialGradient id="eye" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#E8BC4A"/>
+      <stop offset="1" stop-color="#B98A22"/>
+    </radialGradient>
+    <clipPath id="card"><rect x="16" y="16" width="480" height="480" rx="108"/></clipPath>
+    <clipPath id="head"><ellipse cx="256" cy="300" rx="152" ry="126"/></clipPath>
+  <clipPath id="circ"><circle cx="256" cy="256" r="256"/></clipPath></defs><g clip-path="url(#circ)"><rect width="512" height="512" fill="url(#bg)"/>
+    
+
+    <!-- body -->
+    <path d="M70 900 L70 520 C70 430 150 392 256 392 C362 392 442 430 442 520 L442 900 Z" fill="url(#fur)" stroke="#2E3440" stroke-width="7" stroke-linejoin="round"/>
+
+    <!-- ears -->
+    <path d="M104 112 Q112 100 126 110 L204 190 L116 266 Q96 190 104 112 Z" fill="url(#fur)" stroke="#2E3440" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M124 146 L180 202 L128 240 Q116 190 124 146 Z" fill="#F6B8BF"/>
+    <path d="M408 112 Q400 100 386 110 L308 190 L396 266 Q416 190 408 112 Z" fill="url(#fur)" stroke="#2E3440" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M388 146 L332 202 L384 240 Q396 190 388 146 Z" fill="#F6B8BF"/>
+
+    <!-- head -->
+    <ellipse cx="256" cy="300" rx="152" ry="126" fill="url(#fur)"/>
+    <g clip-path="url(#head)">
+      <!-- ginger patches -->
+      <path d="M96 240 Q120 200 176 214 Q196 236 186 272 Q140 262 118 300 Q96 280 96 240 Z" fill="#E7A863"/>
+      <path d="M416 240 Q392 200 336 214 Q316 236 326 272 Q372 262 394 300 Q416 280 416 240 Z" fill="#E7A863"/>
+      <path d="M196 200 Q256 186 316 200 L306 246 Q290 226 256 232 Q222 226 206 246 Z" fill="#E7A863"/>
+      <path d="M244 206 L256 244 L268 206 Z" fill="#FFFFFF"/>
+      <path d="M216 214 L226 236 M296 214 L286 236 M236 208 L240 224 M276 208 L272 224" stroke="#C98340" stroke-width="5" stroke-linecap="round"/>
+      <path d="M130 250 L150 262 M382 250 L362 262" stroke="#C98340" stroke-width="5" stroke-linecap="round"/>
+    </g>
+    <ellipse cx="256" cy="300" rx="152" ry="126" fill="none" stroke="#2E3440" stroke-width="7"/>
+
+    <!-- cheek puffs -->
+    <path d="M150 330 Q170 300 214 320" fill="none" stroke="#D7DCE6" stroke-width="4" stroke-linecap="round"/>
+    <path d="M362 330 Q342 300 298 320" fill="none" stroke="#D7DCE6" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- eyes -->
+    <ellipse cx="204" cy="264" rx="25" ry="26" fill="url(#eye)" stroke="#2E3440" stroke-width="5"/>
+    <ellipse cx="308" cy="264" rx="25" ry="26" fill="url(#eye)" stroke="#2E3440" stroke-width="5"/>
+    <circle cx="206" cy="266" r="10.5" fill="#1F2430"/>
+    <circle cx="306" cy="266" r="10.5" fill="#1F2430"/>
+    <circle cx="211" cy="259" r="4.5" fill="#FFFFFF"/>
+    <circle cx="311" cy="259" r="4.5" fill="#FFFFFF"/>
+
+    <!-- nose -->
+    <path d="M238 304 Q256 294 274 304 Q270 322 256 328 Q242 322 238 304 Z" fill="#F2A3B0" stroke="#2E3440" stroke-width="5" stroke-linejoin="round"/>
+
+    <!-- open mouth -->
+    <path d="M178 340 Q256 322 334 340 Q322 408 256 412 Q190 408 178 340 Z" fill="#B8435E" stroke="#2E3440" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M214 392 Q256 360 298 392 Q280 410 256 410 Q232 410 214 392 Z" fill="#F08BA0"/>
+    <path d="M256 328 L256 354" stroke="#2E3440" stroke-width="5" stroke-linecap="round"/>
+    <!-- fangs -->
+    <path d="M206 338 L226 336 L218 366 Z" fill="#FFFFFF" stroke="#2E3440" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M306 338 L286 336 L294 366 Z" fill="#FFFFFF" stroke="#2E3440" stroke-width="4" stroke-linejoin="round"/>
+
+    <!-- whiskers -->
+    <g stroke="#8E9AAB" stroke-width="3.5" stroke-linecap="round" fill="none">
+      <path d="M130 300 Q80 292 36 302"/>
+      <path d="M128 326 Q80 330 40 348"/>
+      <path d="M136 350 Q96 368 66 394"/>
+      <path d="M382 300 Q432 292 476 302"/>
+      <path d="M384 326 Q432 330 472 348"/>
+      <path d="M376 350 Q416 368 446 394"/>
+    </g>
+
+    <!-- kippah -->
+    <path d="M168 200 C176 108 336 108 344 200 C300 178 212 178 168 200 Z" fill="url(#kip)" stroke="#1B2F6B" stroke-width="7" stroke-linejoin="round"/>
+    <path d="M186 186 C220 172 292 172 326 186" fill="none" stroke="#6E98EA" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+    <!-- Star of David -->
+    <g fill="none" stroke="#FFFFFF" stroke-width="4" stroke-linejoin="round">
+      <path d="M256 124 L279 164 L233 164 Z"/>
+      <path d="M256 178 L233 138 L279 138 Z"/>
+    </g>
+  </g></svg>

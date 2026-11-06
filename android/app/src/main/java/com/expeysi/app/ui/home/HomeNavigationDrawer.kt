@@ -55,7 +55,7 @@ fun HomeNavigationDrawer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Image(
-                            painter = painterResource(R.drawable.expeysi_portrait),
+                            painter = painterResource(R.drawable.expeysi_icon),
                             contentDescription = null,
                             modifier = Modifier
                                 .size(72.dp)

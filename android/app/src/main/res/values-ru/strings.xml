@@ -1,4 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ЭксПейсы</string>
+    <string name="auth_title">Expeysi</string>
+    <string name="auth_subtitle">Войдите, чтобы синхронизировать общие доходы и расходы</string>
+    <string name="auth_google_sign_in">Войти через Google</string>
+    <string name="family_title">Общий учёт</string>
+    <string name="family_subtitle">Создайте семью на первом устройстве или введите код приглашения.</string>
+    <string name="family_create_title">Создать семью</string>
+    <string name="family_create_description">Новый общий журнал доходов и расходов для вашей семьи.</string>
+    <string name="family_create_action">Создать семью</string>
+    <string name="family_or">или</string>
+    <string name="family_join_title">Присоединиться</string>
+    <string name="family_join_description">Введите код приглашения от другого участника семьи.</string>
+    <string name="family_code_label">Код семьи</string>
+    <string name="family_paste">Вставить</string>
+    <string name="family_join_action">Присоединиться</string>
 </resources>

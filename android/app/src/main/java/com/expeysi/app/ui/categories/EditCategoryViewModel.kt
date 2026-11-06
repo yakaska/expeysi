@@ -35,7 +35,9 @@ class EditCategoryViewModel @Inject constructor(
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name.asStateFlow()
 
-    private val _type = MutableStateFlow(TxType.EXPENSE)
+    private val _type = MutableStateFlow(
+        TxType.fromWire(savedStateHandle["type"] ?: TxType.EXPENSE.wire),
+    )
     val type: StateFlow<TxType> = _type.asStateFlow()
 
     private val _iconKey = MutableStateFlow(IconCatalog.DEFAULT_KEY)

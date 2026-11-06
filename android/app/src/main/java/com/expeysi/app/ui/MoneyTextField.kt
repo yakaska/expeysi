@@ -36,9 +36,26 @@ fun MoneyTextField(
         value = fieldValue,
         onValueChange = { newValue ->
             val formatted = Money.formatInput(newValue.text)
+
+            fun mapPosition(position: Int): Int {
+                var charactersLeft = newValue.text.take(position).count { it != ' ' }
+                if (charactersLeft == 0) return 0
+                formatted.forEachIndexed { index, character ->
+                    if (character != ' ') {
+                        charactersLeft--
+                        if (charactersLeft == 0) return index + 1
+                    }
+                }
+                return formatted.length
+            }
+
             fieldValue = newValue.copy(
                 text = formatted,
-                selection = TextRange(formatted.length),
+                selection = TextRange(
+                    mapPosition(newValue.selection.start),
+                    mapPosition(newValue.selection.end),
+                ),
+                composition = null,
             )
             onValueChange(formatted)
         },

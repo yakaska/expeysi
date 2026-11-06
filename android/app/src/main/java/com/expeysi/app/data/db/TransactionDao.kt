@@ -29,6 +29,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun byId(id: String): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE accountId IN (:accountIds)")
+    suspend fun byAccountIds(accountIds: List<String>): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions")
     fun observeAll(): Flow<List<TransactionEntity>>
 
