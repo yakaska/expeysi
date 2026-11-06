@@ -15,4 +15,23 @@
     <string name="family_code_label">Код семьи</string>
     <string name="family_paste">Вставить</string>
     <string name="family_join_action">Присоединиться</string>
+    <string name="home_select_balance">Выбрать баланс</string>
+    <string name="home_edit_balance">Изменить баланс…</string>
+    <string name="home_new_balance">Новый баланс…</string>
+    <string name="home_family_code">Код семьи: %1$s</string>
+    <string name="home_family_code_copied">Код семьи скопирован</string>
+    <string name="home_open_menu">Открыть меню</string>
+    <string name="home_transaction_history">История операций</string>
+    <string name="home_scroll_to_top">Прокрутить наверх</string>
+    <string name="home_add_transaction">Добавить операцию</string>
+    <string name="home_accounts">Счета</string>
+    <string name="home_expenses">Расходы</string>
+    <string name="home_income">Доходы</string>
+    <string name="home_transactions">Операции</string>
+    <string name="home_empty_hint">Пока пусто. Нажми «+», чтобы добавить первую операцию.</string>
+    <string name="home_today">Сегодня</string>
+    <string name="home_yesterday">Вчера</string>
+    <string name="home_seven_days">7 дней</string>
+    <string name="home_thirty_days">30 дней</string>
+    <string name="home_empty_title">Пока пусто</string>
 </resources>

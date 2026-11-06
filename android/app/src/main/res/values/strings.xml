@@ -15,4 +15,23 @@
     <string name="family_code_label">Family code</string>
     <string name="family_paste">Paste</string>
     <string name="family_join_action">Join</string>
+    <string name="home_select_balance">Select balance</string>
+    <string name="home_edit_balance">Edit balance…</string>
+    <string name="home_new_balance">New balance…</string>
+    <string name="home_family_code">Family code: %1$s</string>
+    <string name="home_family_code_copied">Family code copied</string>
+    <string name="home_open_menu">Open menu</string>
+    <string name="home_transaction_history">Transaction history</string>
+    <string name="home_scroll_to_top">Scroll to top</string>
+    <string name="home_add_transaction">Add transaction</string>
+    <string name="home_accounts">Accounts</string>
+    <string name="home_expenses">Expenses</string>
+    <string name="home_income">Income</string>
+    <string name="home_transactions">Transactions</string>
+    <string name="home_empty_hint">Nothing here yet. Tap “+” to add your first transaction.</string>
+    <string name="home_today">Today</string>
+    <string name="home_yesterday">Yesterday</string>
+    <string name="home_seven_days">7 days</string>
+    <string name="home_thirty_days">30 days</string>
+    <string name="home_empty_title">Nothing here yet</string>
 </resources>
