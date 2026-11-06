@@ -2,7 +2,6 @@ package com.expeysi.app.data
 
 import androidx.room.withTransaction
 import com.expeysi.app.data.db.AppDatabase
-import com.expeysi.app.data.sync.SyncEngine
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import javax.inject.Inject
@@ -14,7 +13,6 @@ class FamilyRepository @Inject constructor(
     private val authRepository: AuthRepository,
     private val familyStore: FamilyStore,
     private val database: AppDatabase,
-    private val syncEngine: SyncEngine,
 ) {
     suspend fun createFamily() {
         val uid = authRepository.userId ?: error("Пользователь не вошёл")
@@ -31,7 +29,6 @@ class FamilyRepository @Inject constructor(
             batch.set(family.collection("members").document(uid), memberData(uid))
         }
         familyStore.select(family.id)
-        syncEngine.uploadAllLocal()
     }
 
     suspend fun joinFamily(code: String) {
