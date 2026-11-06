@@ -23,6 +23,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE id = :id")
     suspend fun byId(id: String): AccountEntity?
 
+    @Query("SELECT * FROM accounts WHERE balanceId = :balanceId")
+    suspend fun byBalanceId(balanceId: String): List<AccountEntity>
+
     @Query("DELETE FROM accounts")
     suspend fun clear()
 }

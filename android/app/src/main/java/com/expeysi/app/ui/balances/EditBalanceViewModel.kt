@@ -3,10 +3,14 @@ package com.expeysi.app.ui.balances
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.room.withTransaction
+import com.expeysi.app.data.db.AccountDao
+import com.expeysi.app.data.db.AppDatabase
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
+import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Currency
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +27,10 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class EditBalanceViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    private val database: AppDatabase,
     private val balanceDao: BalanceDao,
+    private val accountDao: AccountDao,
+    private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
     private val syncEngine: SyncEngine,
 ) : ViewModel() {
@@ -87,9 +94,24 @@ class EditBalanceViewModel @Inject constructor(
     fun delete() {
         val balance = original ?: return
         viewModelScope.launch {
-            val deleted = balance.copy(deleted = true, updatedAt = System.currentTimeMillis())
-            balanceDao.upsert(deleted)
-            syncEngine.uploadBalance(deleted)
+            val now = System.currentTimeMillis()
+            val deletedBalance = balance.copy(deleted = true, updatedAt = now)
+            val accounts = accountDao.byBalanceId(balance.id)
+            val transactions = transactionDao.byAccountIds(accounts.map { it.id })
+            val deletedAccounts = accounts.filterNot { it.deleted }
+                .map { it.copy(deleted = true, updatedAt = now) }
+            val deletedTransactions = transactions.filterNot { it.deleted }
+                .map { it.copy(deleted = true, updatedAt = now) }
+
+            database.withTransaction {
+                balanceDao.upsert(deletedBalance)
+                deletedAccounts.forEach { accountDao.upsert(it) }
+                deletedTransactions.forEach { transactionDao.upsert(it) }
+            }
+
+            syncEngine.uploadBalance(deletedBalance)
+            deletedAccounts.forEach(syncEngine::uploadAccount)
+            deletedTransactions.forEach(syncEngine::uploadTransaction)
             _saved.value = true
         }
     }

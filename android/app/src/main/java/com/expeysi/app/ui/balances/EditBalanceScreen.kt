@@ -63,7 +63,7 @@ fun EditBalanceScreen(
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("Удалить баланс?") },
-            text = { Text("Счета баланса останутся, но перестанут отображаться на главном экране.") },
+            text = { Text("Баланс, все его счета и операции будут удалены. Это действие нельзя отменить.") },
             confirmButton = {
                 TextButton(
                     onClick = {

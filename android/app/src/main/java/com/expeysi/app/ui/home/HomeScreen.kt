@@ -1,5 +1,6 @@
 package com.expeysi.app.ui.home
 
+import android.content.ClipData
 import android.widget.Toast
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -47,9 +48,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -72,13 +73,14 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onItemClick: (String) -> Unit,
     onAddBalanceClick: () -> Unit,
+    onEditBalanceClick: (String) -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
     onSummaryClick: (String, TxType, Int) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val clipboard = LocalClipboardManager.current
+    val clipboard = LocalClipboard.current
     val context = LocalContext.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -121,6 +123,15 @@ fun HomeScreen(
                                 )
                             }
                             HorizontalDivider()
+                            state.selectedBalance?.let { balance ->
+                                DropdownMenuItem(
+                                    text = { Text("Изменить баланс…") },
+                                    onClick = {
+                                        balanceMenuOpen = false
+                                        onEditBalanceClick(balance.id)
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Новый баланс…") },
                                 onClick = {
@@ -133,9 +144,17 @@ fun HomeScreen(
                                 DropdownMenuItem(
                                     text = { Text("Код семьи: $it") },
                                     onClick = {
-                                        clipboard.setText(AnnotatedString(it))
-                                        balanceMenuOpen = false
-                                        Toast.makeText(context, "Код семьи скопирован", Toast.LENGTH_SHORT).show()
+                                        coroutineScope.launch {
+                                            clipboard.setClipEntry(
+                                                ClipEntry(ClipData.newPlainText("family code", it)),
+                                            )
+                                            balanceMenuOpen = false
+                                            Toast.makeText(
+                                                context,
+                                                "Код семьи скопирован",
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        }
                                     },
                                 )
                             }
