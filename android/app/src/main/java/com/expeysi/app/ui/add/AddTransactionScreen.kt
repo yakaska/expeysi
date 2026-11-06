@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -54,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -70,6 +73,7 @@ import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.MoneyTextField
 import com.expeysi.app.ui.icons.CategoryIcon
+import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
@@ -96,6 +100,8 @@ fun AddTransactionScreen(
     val noteSuggestions by viewModel.noteSuggestions.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val canSave by viewModel.canSave.collectAsStateWithLifecycle()
+    val noteBringIntoViewRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
 
     var noteFieldValue by remember {
         mutableStateOf(TextFieldValue(note, selection = TextRange(note.length)))
@@ -433,10 +439,14 @@ fun AddTransactionScreen(
                                 noteFieldValue = it
                                 viewModel.onNoteChange(it.text)
                                 showNoteSuggestions = true
+                                coroutineScope.launch {
+                                    noteBringIntoViewRequester.bringIntoView()
+                                }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .bringIntoViewRequester(noteBringIntoViewRequester),
                             label = { Text("Комментарий (необязательно)") },
-                            singleLine = true,
                         )
                         DropdownMenu(
                             expanded = showNoteSuggestions && noteSuggestions.isNotEmpty(),
