@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.SelectedBalanceStore
+import com.expeysi.app.data.importer.BudgetImportService
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
@@ -22,12 +23,19 @@ import com.expeysi.app.domain.Windows
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.LocalDate
+import java.io.InputStream
 import java.time.ZoneId
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class AccountBalance(
     val account: AccountEntity,
@@ -42,6 +50,11 @@ data class TransactionItem(
     val categoryColorKey: String,
     val accountName: String,
     val currencySymbol: String,
+)
+
+data class ImportUiState(
+    val inProgress: Boolean = false,
+    val message: String? = null,
 )
 
 data class HomeUiState(
@@ -65,9 +78,12 @@ class HomeViewModel @Inject constructor(
     currencyDao: CurrencyDao,
     private val selectedBalanceStore: SelectedBalanceStore,
     private val familyStore: FamilyStore,
+    private val budgetImportService: BudgetImportService,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
+    private val _importState = MutableStateFlow(ImportUiState())
+    val importState: StateFlow<ImportUiState> = _importState.asStateFlow()
 
     private val selection = combine(
         balanceDao.observeActive(),
@@ -137,5 +153,29 @@ class HomeViewModel @Inject constructor(
 
     fun selectBalance(id: String) {
         selectedBalanceStore.select(id)
+    }
+
+    fun importBudget(input: InputStream?) {
+        if (_importState.value.inProgress) return
+        if (input == null) {
+            _importState.update { it.copy(message = "Не удалось открыть файл") }
+            return
+        }
+        viewModelScope.launch {
+            _importState.update { it.copy(inProgress = true, message = null) }
+            val message = try {
+                val result = withContext(Dispatchers.IO) { budgetImportService.import(input) }
+                "Импортировано операций: ${result.transactionCount}"
+            } catch (e: Exception) {
+                e.message ?: "Не удалось импортировать файл"
+            } finally {
+                _importState.update { it.copy(inProgress = false) }
+            }
+            _importState.update { it.copy(message = message) }
+        }
+    }
+
+    fun consumeImportMessage() {
+        _importState.update { it.copy(message = null) }
     }
 }
