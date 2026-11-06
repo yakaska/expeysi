@@ -7,6 +7,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
@@ -110,7 +113,14 @@ private fun AppNavigation() {
             }
         },
     ) {
-        NavHost(navController = navController, startDestination = "home") {
+        NavHost(
+            navController = navController,
+            startDestination = "home",
+            enterTransition = { slideInHorizontally(animationSpec = tween(300)) { it } },
+            exitTransition = { slideOutHorizontally(animationSpec = tween(300)) { -it } },
+            popEnterTransition = { slideInHorizontally(animationSpec = tween(300)) { -it } },
+            popExitTransition = { slideOutHorizontally(animationSpec = tween(300)) { it } },
+        ) {
             composable("home") {
                 HomeScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
