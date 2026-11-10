@@ -107,7 +107,7 @@ class AnalysisViewModel @Inject constructor(
         if (_uiState.value.type == type) return
         _uiState.update { it.copy(type = type) }
         persistPeriod()
-        reload()
+        reload(showScrim = false)
     }
 
     fun shiftMonth(delta: Int) {
@@ -210,8 +210,8 @@ class AnalysisViewModel @Inject constructor(
     }
 
     /**
-     * Перезагрузка отчёта; скрим затемняет контент только при смене типа,
-     * периода, фильтров или баланса — листание месяцев идёт без него,
+     * Перезагрузка отчёта; скрим затемняет контент только при смене периода,
+     * фильтров или баланса — листание месяцев и смена типа идут без него,
      * диаграмма сама анимирует старые данные в новые.
      */
     private fun reload(showScrim: Boolean = true) {
