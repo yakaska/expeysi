@@ -16,6 +16,27 @@ Expeysi — Android-приложение совместного учёта до�
 - Фоновая работа: WorkManager (при необходимости)
 - Своего сервера нет и не планируется
 
+## Строки UI (локализация)
+
+Никаких хардкод-строк в пользовательском интерфейсе. Любой текст, который видит пользователь, живет в ресурсах.
+
+- Строки: res/values/strings.xml того модуля, где они используются. Язык исходных строк - русский. Переводы не создавать.
+- Ключи: snake_case с префиксом экрана/фичи (login_title, profile_error_network). Общие - common_ (common_ok, common_retry). Перед добавлением проверить, нет ли такой строки; дубликаты не плодить.
+- Параметры: только позиционные (%1$s, %2$d), без конкатенации строк.
+- Зависимость от числа: <plurals>, не if/else.
+- Не переводимое (бренд, технические идентификаторы): translatable="false".
+- Спецсимволы экранировать (', &, <, @, ?).
+
+Использование:
+- Compose: stringResource(R.string.x), pluralStringResource
+- View/Fragment/Activity: getString(R.string.x)
+- XML: @string/x
+- ViewModel/Presenter: Context не передавать. Использовать UiText (StringResource + args) или @StringRes Int, резолвить в UI-слое.
+
+Не считается UI-строкой: логи, ключи SharedPreferences/DataStore, extras, routes, теги, URL, regex, JSON-ключи, строки в тестах.
+
+Перед завершением задачи: проверить diff на новые литералы в Text(), setText, Toast, Snackbar, AlertDialog, android:text/hint/contentDescription, android:label. Прогнать ./gradlew lint.
+
 ## Зафиксированные решения
 
 - Синхронизация через Firebase Firestore. Бесплатный тариф Spark, realtime-слушатели,

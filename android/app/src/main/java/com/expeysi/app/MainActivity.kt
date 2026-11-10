@@ -37,7 +37,9 @@ import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
 import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.home.HomeViewModel
+import com.expeysi.app.ui.placeholder.PlaceholderScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
+import com.expeysi.app.ui.transactionreport.TransactionReportScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -101,10 +103,22 @@ private fun AppNavigation() {
                 navController.popBackStack("home", inclusive = false)
             }
         },
-        onCategoryReportClick = {
+        onTransactionComparisonClick = {
             scope.launch {
                 drawerState.close()
                 navController.navigate("category-report")
+            }
+        },
+        onExpensesReportClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("transaction-report/expense")
+            }
+        },
+        onIncomesReportClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("transaction-report/income")
             }
         },
         onImportClick = {
@@ -113,6 +127,18 @@ private fun AppNavigation() {
                 importLauncher.launch(
                     arrayOf("text/*", "text/comma-separated-values", "application/octet-stream"),
                 )
+            }
+        },
+        onExportClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("data-export")
+            }
+        },
+        onDataImportClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("data-import")
             }
         },
         onCategoriesClick = {
@@ -157,6 +183,21 @@ private fun AppNavigation() {
                     onBack = { navigateBack() },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
+            }
+            composable(
+                route = "transaction-report/{type}",
+                arguments = listOf(navArgument("type") { type = NavType.StringType }),
+            ) {
+                TransactionReportScreen(
+                    onBack = { navigateBack() },
+                    onItemClick = { id -> navController.navigate("edit/$id") },
+                )
+            }
+            composable("data-export") {
+                PlaceholderScreen(title = R.string.drawer_data_export, onBack = { navigateBack() })
+            }
+            composable("data-import") {
+                PlaceholderScreen(title = R.string.drawer_data_import, onBack = { navigateBack() })
             }
             composable("add") {
                 AddTransactionScreen(
