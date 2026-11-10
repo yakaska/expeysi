@@ -46,7 +46,7 @@ private val donutStroke = 20.dp
 private const val DONUT_GAP_DEGREES = 2f
 private val swipeThreshold = 48.dp
 
-/** РљРѕР»СЊС†РµРІР°СЏ РґРёР°РіСЂР°РјРјР° СЃ СЃРµРіРјРµРЅС‚Р°РјРё РїРѕ РґРѕР»СЏРј РєР°С‚РµРіРѕСЂРёР№, СЃС‚СЂРµР»РєР°РјРё Рё СЃРІР°Р№РїРѕРј РјРµСЃСЏС†Р°. */
+/** Кольцевая диаграмма с сегментами по долям категорий, стрелками и свайпом месяца. */
 @Composable
 internal fun AnalysisDonut(
     shares: List<Float>,

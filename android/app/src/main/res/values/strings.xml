@@ -69,6 +69,8 @@
     <string name="analysis_prev_month_cd">Предыдущий месяц</string>
     <string name="analysis_next_month_cd">Следующий месяц</string>
     <string name="analysis_account_last4">···· %1$s</string>
+    <string name="analysis_no_balances">Балансы отсутствуют</string>
+    <string name="analysis_no_balances_hint">Добавьте баланс на главном экране, чтобы анализировать операции</string>
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>

@@ -205,13 +205,14 @@ private fun AppNavigation() {
                         navController.navigate(
                             "analysis/category/${Uri.encode(request.categoryId)}" +
                                 "?type=${request.type.wire}&month=${request.month}" +
+                                "&balance=${Uri.encode(request.balanceId.orEmpty())}" +
                                 "&accounts=${Uri.encode(accounts)}",
                         )
                     },
                 )
             }
             composable(
-                route = "analysis/category/{categoryId}?type={type}&month={month}&accounts={accounts}",
+                route = "analysis/category/{categoryId}?type={type}&month={month}&balance={balance}&accounts={accounts}",
                 arguments = listOf(
                     navArgument("categoryId") { type = NavType.StringType },
                     navArgument("type") {
@@ -219,6 +220,10 @@ private fun AppNavigation() {
                         defaultValue = "expense"
                     },
                     navArgument("month") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("balance") {
                         type = NavType.StringType
                         defaultValue = ""
                     },

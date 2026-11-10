@@ -21,6 +21,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -94,39 +96,43 @@ internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 32.dp),
             ) {
-                ControlRow(
-                    state = state,
-                    onFiltersClick = actions.onFiltersClick,
-                    onTypeSelect = actions.onTypeSelect,
-                )
-                TotalAmount(state = state)
-                when {
-                    state.isError -> ErrorState(onRetry = actions.onRetry)
-                    state.isFirstLoad -> AnalysisSkeleton()
-                    else -> {
-                        val summary = state.summary
-                        if (summary != null) {
-                            DonutBlock(
-                                type = state.type,
-                                month = state.month,
-                                summary = summary,
-                                onPreviousMonth = actions.onPreviousMonth,
-                                onNextMonth = actions.onNextMonth,
-                                onSegmentClick = { index ->
-                                    summary.categories.getOrNull(index)?.let(actions.onCategoryClick)
-                                },
-                            )
-                            val categories = summary.categories
-                            if (categories.isEmpty()) {
-                                EmptyCategoriesText(state.type)
-                            } else {
-                                CategoriesCard(
-                                    categories = categories,
-                                    currencySymbol = summary.currencySymbol,
-                                    expanded = state.expanded,
-                                    onCategoryClick = actions.onCategoryClick,
-                                    onExpandToggle = actions.onExpandToggle,
+                if (state.isBalanceMissing) {
+                    BalanceMissingState()
+                } else {
+                    ControlRow(
+                        state = state,
+                        onFiltersClick = actions.onFiltersClick,
+                        onTypeSelect = actions.onTypeSelect,
+                    )
+                    TotalAmount(state = state)
+                    when {
+                        state.isError -> ErrorState(onRetry = actions.onRetry)
+                        state.isFirstLoad -> AnalysisSkeleton()
+                        else -> {
+                            val summary = state.summary
+                            if (summary != null) {
+                                DonutBlock(
+                                    type = state.type,
+                                    month = state.month,
+                                    summary = summary,
+                                    onPreviousMonth = actions.onPreviousMonth,
+                                    onNextMonth = actions.onNextMonth,
+                                    onSegmentClick = { index ->
+                                        summary.categories.getOrNull(index)?.let(actions.onCategoryClick)
+                                    },
                                 )
+                                val categories = summary.categories
+                                if (categories.isEmpty()) {
+                                    EmptyCategoriesText(state.type)
+                                } else {
+                                    CategoriesCard(
+                                        categories = categories,
+                                        currencySymbol = summary.currencySymbol,
+                                        expanded = state.expanded,
+                                        onCategoryClick = actions.onCategoryClick,
+                                        onExpandToggle = actions.onExpandToggle,
+                                    )
+                                }
                             }
                         }
                     }
@@ -444,6 +450,45 @@ private fun EmptyCategoriesText(type: TxType) {
     )
 }
 
+/** Нет ни одного баланса: отчёт нечего показывать. */
+@Composable
+private fun BalanceMissingState() {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 64.dp, horizontal = 32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(64.dp)
+                .background(AnalysisColors.Card, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                Icons.Filled.AccountBalanceWallet,
+                contentDescription = null,
+                tint = AnalysisColors.TextSecondary,
+                modifier = Modifier.size(28.dp),
+            )
+        }
+        Spacer(modifier = Modifier.height(20.dp))
+        Text(
+            text = stringResource(R.string.analysis_no_balances),
+            color = AnalysisColors.TextPrimary,
+            fontSize = 17.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            text = stringResource(R.string.analysis_no_balances_hint),
+            color = AnalysisColors.TextSecondary,
+            fontSize = 14.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
 private val previewAccounts = listOf(
     AnalysisAccount(id = "cash", name = "Наличные", iconKey = "payments", colorKey = "green"),
     AnalysisAccount(id = "card", name = "Карта", iconKey = "credit_card", colorKey = "blue"),
@@ -532,6 +577,7 @@ private fun analysisPreviewState(
     type: TxType,
     summary: CategorySummary? = previewSummary(type),
 ): AnalysisUiState = AnalysisUiState(
+    balanceId = "main",
     type = type,
     month = YearMonth.of(2026, 4),
     accounts = previewAccounts,
@@ -580,6 +626,21 @@ private fun AnalysisContentLoadingPreview() {
     ExpeysiTheme(darkTheme = true) {
         AnalysisContent(
             state = analysisPreviewState(TxType.EXPENSE, summary = null),
+            actions = AnalysisActions(),
+        )
+    }
+}
+
+@Preview(name = "Нет балансов", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun AnalysisContentNoBalancePreview() {
+    ExpeysiTheme(darkTheme = true) {
+        AnalysisContent(
+            state = AnalysisUiState(
+                balanceId = null,
+                type = TxType.EXPENSE,
+                month = YearMonth.of(2026, 4),
+            ),
             actions = AnalysisActions(),
         )
     }

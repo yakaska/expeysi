@@ -52,20 +52,24 @@ data class OperationPage(
 )
 
 /**
- * Данные экрана «Анализ финансов». Расходы и доходы запрашиваются раздельно;
- * [accountIds] == null — все счета.
+ * Данные экрана «Анализ финансов». Расходы и доходы запрашиваются раздельно,
+ * всегда в рамках одного баланса; [accountIds] == null — все счета баланса,
+ * [balanceId] == null — баланса нет, данные пустые.
  */
 interface AnalysisRepository {
 
-    suspend fun accounts(): List<AnalysisAccount>
+    /** Счета одного баланса; при [balanceId] == null — пустой список. */
+    suspend fun accounts(balanceId: String?): List<AnalysisAccount>
 
     suspend fun categorySummary(
+        balanceId: String?,
         type: TxType,
         yearMonth: YearMonth,
         accountIds: Set<String>?,
     ): CategorySummary
 
     suspend fun categoryOperations(
+        balanceId: String?,
         categoryId: String,
         type: TxType,
         yearMonth: YearMonth,

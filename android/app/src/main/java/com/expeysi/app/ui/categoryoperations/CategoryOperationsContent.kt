@@ -56,7 +56,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 
-/** РЎРѕР±С‹С‚РёСЏ СЌРєСЂР°РЅР° РѕРїРµСЂР°С†РёР№ РєР°С‚РµРіРѕСЂРёРё. */
+/** События экрана операций категории. */
 data class CategoryOperationsActions(
     val onBack: () -> Unit = {},
     val onOperationClick: (Operation) -> Unit = {},
@@ -64,7 +64,7 @@ data class CategoryOperationsActions(
     val onLoadNext: () -> Unit = {},
 )
 
-/** Р“РѕС‚РѕРІРѕРµ СЃРѕСЃС‚РѕСЏРЅРёРµ + СЃРѕР±С‹С‚РёСЏ; РѕС‚СЂРёСЃРѕРІРєР° Р±РµР· Р»РѕРіРёРєРё Рё РґРѕСЃС‚СѓРїР° Рє РґР°РЅРЅС‹Рј. */
+/** Готовое состояние + события; отрисовка без логики и доступа к данным. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun CategoryOperationsContent(
@@ -282,8 +282,11 @@ private fun OperationsSkeleton() {
     }
 }
 
-private fun operationMillis(year: Int, month: Int, day: Int, hour: Int = 12): Long = LocalDate.of(year, month, day).atTime(hour, 0).atZone(ZoneId.systemDefault())
-    .toInstant().toEpochMilli()
+private fun operationMillis(year: Int, month: Int, day: Int, hour: Int = 12): Long = LocalDate.of(year, month, day)
+    .atTime(hour, 0)
+    .atZone(ZoneId.systemDefault())
+    .toInstant()
+    .toEpochMilli()
 
 private fun previewState(
     groups: List<OperationDateGroup>,
@@ -292,10 +295,10 @@ private fun previewState(
     isLoadingMore: Boolean = false,
     isError: Boolean = false,
 ): CategoryOperationsUiState = CategoryOperationsUiState(
-    categoryName = "Р•РґР°",
+    categoryName = "Еда",
     month = YearMonth.of(2026, 4),
     totalMinor = 7_844_900,
-    currencySymbol = "в‚Ѕ",
+    currencySymbol = "₽",
     groups = groups,
     hasMore = hasMore,
     isLoading = isLoading,
@@ -310,8 +313,8 @@ private val previewGroups = listOf(
             Operation(
                 id = "t1",
                 dateMillis = operationMillis(2026, 4, 10, 14),
-                title = "Р•РґР°",
-                subtitle = "РџСЏС‚С‘СЂРѕС‡РєР°",
+                title = "Еда",
+                subtitle = "Пятёрочка",
                 amountMinor = 128_600,
                 iconKey = "restaurant",
                 colorKey = "orange",
@@ -320,8 +323,8 @@ private val previewGroups = listOf(
             Operation(
                 id = "t2",
                 dateMillis = operationMillis(2026, 4, 10, 9),
-                title = "Р•РґР°",
-                subtitle = "РљРѕС„Рµ СЃ СЃРѕР±РѕР№",
+                title = "Еда",
+                subtitle = "Кофе с собой",
                 amountMinor = 26_000,
                 iconKey = "restaurant",
                 colorKey = "orange",
@@ -335,8 +338,8 @@ private val previewGroups = listOf(
             Operation(
                 id = "t3",
                 dateMillis = operationMillis(2026, 4, 9, 19),
-                title = "Р•РґР°",
-                subtitle = "РџРёС†С†РµСЂРёСЏ",
+                title = "Еда",
+                subtitle = "Пиццерия",
                 amountMinor = 214_000,
                 iconKey = "restaurant",
                 colorKey = "orange",
@@ -353,8 +356,8 @@ private val previewIncomeGroups = listOf(
             Operation(
                 id = "t4",
                 dateMillis = operationMillis(2026, 4, 9, 11),
-                title = "Р—Р°СЂРїР»Р°С‚Р°",
-                subtitle = "РђРїСЂРµР»СЊ",
+                title = "Зарплата",
+                subtitle = "Апрель",
                 amountMinor = 12_000_000,
                 iconKey = "work",
                 colorKey = "green",
@@ -364,7 +367,7 @@ private val previewIncomeGroups = listOf(
     ),
 )
 
-@Preview(name = "РћРїРµСЂР°С†РёРё", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Операции", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CategoryOperationsContentPreview() {
     ExpeysiTheme(darkTheme = true) {
@@ -372,16 +375,16 @@ private fun CategoryOperationsContentPreview() {
     }
 }
 
-@Preview(name = "Р”РѕС…РѕРґС‹", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Доходы", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CategoryOperationsIncomePreview() {
     ExpeysiTheme(darkTheme = true) {
         CategoryOperationsContent(
             state = CategoryOperationsUiState(
-                categoryName = "Р—Р°СЂРїР»Р°С‚Р°",
+                categoryName = "Зарплата",
                 month = YearMonth.of(2026, 4),
                 totalMinor = 12_000_000,
-                currencySymbol = "в‚Ѕ",
+                currencySymbol = "₽",
                 groups = previewIncomeGroups,
             ),
             actions = CategoryOperationsActions(),
@@ -389,7 +392,7 @@ private fun CategoryOperationsIncomePreview() {
     }
 }
 
-@Preview(name = "Р—Р°РіСЂСѓР·РєР°", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Загрузка", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CategoryOperationsLoadingPreview() {
     ExpeysiTheme(darkTheme = true) {
@@ -400,7 +403,7 @@ private fun CategoryOperationsLoadingPreview() {
     }
 }
 
-@Preview(name = "РџСѓСЃС‚Рѕ", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Пусто", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CategoryOperationsEmptyPreview() {
     ExpeysiTheme(darkTheme = true) {
@@ -411,7 +414,7 @@ private fun CategoryOperationsEmptyPreview() {
     }
 }
 
-@Preview(name = "РћС€РёР±РєР°", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Ошибка", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 private fun CategoryOperationsErrorPreview() {
     ExpeysiTheme(darkTheme = true) {

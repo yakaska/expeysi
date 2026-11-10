@@ -17,6 +17,9 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE deleted = 0 ORDER BY name")
     fun observeActive(): Flow<List<AccountEntity>>
 
+    @Query("SELECT * FROM accounts WHERE deleted = 0 AND balanceId = :balanceId ORDER BY name")
+    suspend fun listByBalance(balanceId: String): List<AccountEntity>
+
     @Query("SELECT * FROM accounts WHERE deleted = 0 ORDER BY name")
     suspend fun listActive(): List<AccountEntity>
 

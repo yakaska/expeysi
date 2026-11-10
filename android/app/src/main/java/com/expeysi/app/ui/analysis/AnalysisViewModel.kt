@@ -3,6 +3,7 @@ package com.expeysi.app.ui.analysis
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.SelectedBalanceStore
 import com.expeysi.app.data.analysis.AnalysisAccount
 import com.expeysi.app.data.analysis.AnalysisRepository
 import com.expeysi.app.data.analysis.CategorySummary
@@ -14,18 +15,24 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
 
-/** Готовое состояние экрана «Анализ финансов»; отображение от него зависит, а не от бэкенда. */
+/**
+ * Готовое состояние экрана «Анализ финансов»; отображение от него зависит,
+ * а не от бэкенда. Отчёт всегда в рамках одного выбранного баланса.
+ */
 data class AnalysisUiState(
+    val balanceId: String? = null,
     val type: TxType = TxType.EXPENSE,
     val month: YearMonth = YearMonth.now(),
     val accounts: List<AnalysisAccount> = emptyList(),
-    /** Применённая фильтрация счетов; null — все счета. */
+    /** Применённая фильтрация счетов; null — все счета баланса. */
     val selectedAccountIds: Set<String>? = null,
     /** Черновик фильтрации в открытой шторке. */
     val filterDraft: Set<String>? = null,
@@ -35,9 +42,13 @@ data class AnalysisUiState(
     val isError: Boolean = false,
     val expanded: Boolean = false,
 ) {
+    /** Баланса нет: вместо отчёта — статусный экран. */
+    val isBalanceMissing: Boolean
+        get() = balanceId == null
+
     /** Первое открытие без данных: вместо контента — скелетоны. */
     val isFirstLoad: Boolean
-        get() = summary == null && !isError
+        get() = summary == null && !isError && !isBalanceMissing
 }
 
 /** Семантика выбора счетов: null означает «все счета». */
@@ -54,6 +65,7 @@ object AccountSelection {
 @HiltViewModel
 class AnalysisViewModel @Inject constructor(
     private val repository: AnalysisRepository,
+    private val selectedBalanceStore: SelectedBalanceStore,
     private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
@@ -72,14 +84,16 @@ class AnalysisViewModel @Inject constructor(
     private var job: Job? = null
 
     init {
-        reload(initial = true)
+        selectedBalanceStore.selectedId
+            .onEach { balanceId -> onBalanceChanged(balanceId) }
+            .launchIn(viewModelScope)
     }
 
     fun selectType(type: TxType) {
         if (_uiState.value.type == type) return
         _uiState.update { it.copy(type = type) }
         persistSelection()
-        reload(initial = false)
+        reload()
     }
 
     fun shiftMonth(delta: Int) {
@@ -87,7 +101,7 @@ class AnalysisViewModel @Inject constructor(
         if (next.isAfter(currentMonth)) return
         _uiState.update { it.copy(month = next) }
         persistSelection()
-        reload(initial = false)
+        reload()
     }
 
     fun toggleExpanded() {
@@ -125,31 +139,60 @@ class AnalysisViewModel @Inject constructor(
             it.copy(filtersOpen = false, filterDraft = null, selectedAccountIds = draft)
         }
         persistSelection()
-        if (draft != current.selectedAccountIds) reload(initial = false)
+        if (draft != current.selectedAccountIds) reload()
     }
 
     fun retry() {
-        reload(initial = _uiState.value.summary == null)
+        reload()
     }
 
-    private fun reload(initial: Boolean) {
-        job?.cancel()
+    /** Смена баланса на главном экране: перезагрузка и сброс выбора счетов. */
+    private fun onBalanceChanged(balanceId: String?) {
+        if (_uiState.value.balanceId == balanceId) return
         _uiState.update {
-            if (initial) it.copy(isError = false) else it.copy(isRefreshing = true, isError = false)
+            it.copy(
+                balanceId = balanceId,
+                accounts = emptyList(),
+                selectedAccountIds = null,
+                filterDraft = null,
+                filtersOpen = false,
+            )
         }
+        savedStateHandle[KEY_ACCOUNTS] = ""
+        reload()
+    }
+
+    private fun reload() {
+        job?.cancel()
         val snapshot = _uiState.value
+        if (snapshot.balanceId == null) {
+            _uiState.update { it.copy(summary = null, isRefreshing = false, isError = false) }
+            return
+        }
+        val initial = snapshot.summary == null
+        if (initial) {
+            _uiState.update { it.copy(isError = false) }
+        } else {
+            _uiState.update { it.copy(isRefreshing = true, isError = false) }
+        }
+        val params = _uiState.value
         job = viewModelScope.launch {
             val result = runCatching {
-                val accounts = snapshot.accounts.ifEmpty {
+                val accounts = params.accounts.ifEmpty {
                     try {
-                        repository.accounts()
+                        repository.accounts(params.balanceId)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
                         emptyList()
                     }
                 }
-                accounts to repository.categorySummary(snapshot.type, snapshot.month, snapshot.selectedAccountIds)
+                accounts to repository.categorySummary(
+                    balanceId = params.balanceId,
+                    type = params.type,
+                    yearMonth = params.month,
+                    accountIds = params.selectedAccountIds,
+                )
             }
             ensureActive()
             result.fold(

@@ -1,4 +1,4 @@
-package com.expeysi.app.ui.categoryoperations
+﻿package com.expeysi.app.ui.categoryoperations
 
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -47,6 +47,8 @@ class CategoryOperationsViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
+    private val balanceId: String? =
+        savedStateHandle.get<String>("balance")?.takeUnless { it.isBlank() }
     private val categoryId: String = savedStateHandle.get<String>("categoryId").orEmpty()
     private val type: TxType =
         TxType.fromWire(savedStateHandle.get<String>("type") ?: TxType.EXPENSE.wire)
@@ -74,7 +76,7 @@ class CategoryOperationsViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, isLoadingMore = false, isError = false) }
         job = viewModelScope.launch {
             val result = runCatching {
-                repository.categoryOperations(categoryId, type, month, accountIds, PAGE_SIZE, 0)
+                repository.categoryOperations(balanceId, categoryId, type, month, accountIds, PAGE_SIZE, 0)
             }
             ensureActive()
             result.fold(
@@ -96,7 +98,7 @@ class CategoryOperationsViewModel @Inject constructor(
         val offset = loaded.size
         job = viewModelScope.launch {
             val result = runCatching {
-                repository.categoryOperations(categoryId, type, month, accountIds, PAGE_SIZE, offset)
+                repository.categoryOperations(balanceId, categoryId, type, month, accountIds, PAGE_SIZE, offset)
             }
             ensureActive()
             result.fold(
@@ -125,7 +127,8 @@ class CategoryOperationsViewModel @Inject constructor(
         }
     }
 
-    private fun groupsOf(operations: List<Operation>): List<OperationDateGroup> = operations.groupBy { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }
+    private fun groupsOf(operations: List<Operation>): List<OperationDateGroup> = operations
+        .groupBy { Instant.ofEpochMilli(it.dateMillis).atZone(zone).toLocalDate() }
         .map { (date, ops) -> OperationDateGroup(date, ops) }
         .sortedByDescending { it.date }
 

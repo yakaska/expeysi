@@ -9,6 +9,7 @@ import java.time.YearMonth
 
 /** Параметры перехода к операциям категории. */
 data class OpenCategoryRequest(
+    val balanceId: String?,
     val categoryId: String,
     val type: TxType,
     val month: YearMonth,
@@ -36,6 +37,7 @@ fun AnalysisScreen(
                 val snapshot = viewModel.uiState.value
                 onOpenCategory(
                     OpenCategoryRequest(
+                        balanceId = snapshot.balanceId,
                         categoryId = category.categoryId,
                         type = snapshot.type,
                         month = snapshot.month,

@@ -1,6 +1,7 @@
 package com.expeysi.app.data.analysis
 
 import com.expeysi.app.data.db.AccountDao
+import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
@@ -14,6 +15,7 @@ import javax.inject.Singleton
 @Singleton
 class RoomAnalysisRepository @Inject constructor(
     private val transactionDao: TransactionDao,
+    private val balanceDao: BalanceDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val currencyDao: CurrencyDao,
@@ -21,17 +23,22 @@ class RoomAnalysisRepository @Inject constructor(
 
     private val zone: ZoneId = ZoneId.systemDefault()
 
-    override suspend fun accounts(): List<AnalysisAccount> = accountDao.listActive().map {
-        AnalysisAccount(id = it.id, name = it.name, iconKey = it.iconKey, colorKey = it.colorKey)
+    override suspend fun accounts(balanceId: String?): List<AnalysisAccount> {
+        if (balanceId == null) return emptyList()
+        return accountDao.listByBalance(balanceId).map {
+            AnalysisAccount(id = it.id, name = it.name, iconKey = it.iconKey, colorKey = it.colorKey)
+        }
     }
 
     override suspend fun categorySummary(
+        balanceId: String?,
         type: TxType,
         yearMonth: YearMonth,
         accountIds: Set<String>?,
     ): CategorySummary {
-        val resolvedIds = resolveAccountIds(accountIds)
-        if (resolvedIds.isEmpty()) return CategorySummary(0L, currencySymbol(), emptyList())
+        val symbol = currencySymbol(balanceId)
+        val resolvedIds = resolveAccountIds(balanceId, accountIds)
+        if (resolvedIds.isEmpty()) return CategorySummary(0L, symbol, emptyList())
         val bounds = Periods.month(yearMonth.atDay(1), zone)
         val categories = categoryDao.listActive(type.wire)
         val stats = transactionDao
@@ -51,12 +58,13 @@ class RoomAnalysisRepository @Inject constructor(
             .sortedByDescending { it.amountMinor }
         return CategorySummary(
             totalMinor = stats.sumOf { it.amountMinor },
-            currencySymbol = currencySymbol(),
+            currencySymbol = symbol,
             categories = stats,
         )
     }
 
     override suspend fun categoryOperations(
+        balanceId: String?,
         categoryId: String,
         type: TxType,
         yearMonth: YearMonth,
@@ -64,14 +72,15 @@ class RoomAnalysisRepository @Inject constructor(
         limit: Int,
         offset: Int,
     ): OperationPage {
-        val resolvedIds = resolveAccountIds(accountIds)
+        val symbol = currencySymbol(balanceId)
         val category = categoryDao.byId(categoryId)
+        val resolvedIds = resolveAccountIds(balanceId, accountIds)
         if (resolvedIds.isEmpty()) {
             return OperationPage(
                 categoryName = category?.name ?: "",
                 operations = emptyList(),
                 totalMinor = 0L,
-                currencySymbol = currencySymbol(),
+                currencySymbol = symbol,
                 hasMore = false,
             )
         }
@@ -87,7 +96,7 @@ class RoomAnalysisRepository @Inject constructor(
         )
         val hasMore = rows.size > limit
         val loaded = rows.take(limit)
-        val accountNameById = accountDao.listActive().associate { it.id to it.name }
+        val accountNameById = accountDao.listByBalance(balanceId.orEmpty()).associate { it.id to it.name }
         val operations = loaded.map { tx ->
             Operation(
                 id = tx.id,
@@ -110,12 +119,22 @@ class RoomAnalysisRepository @Inject constructor(
                 endMillis = bounds.endMillisExclusive,
                 accountIds = resolvedIds,
             ),
-            currencySymbol = currencySymbol(),
+            currencySymbol = symbol,
             hasMore = hasMore,
         )
     }
 
-    private suspend fun resolveAccountIds(accountIds: Set<String>?): List<String> = accountIds?.toList() ?: accountDao.listActive().map { it.id }
+    /** Скоуп = все счета баланса, пересечённые с ручным выбором. */
+    private suspend fun resolveAccountIds(balanceId: String?, accountIds: Set<String>?): List<String> {
+        if (balanceId == null) return emptyList()
+        val balanceAccountIds = accountDao.listByBalance(balanceId).map { it.id }.toSet()
+        val selection = accountIds ?: balanceAccountIds
+        return (balanceAccountIds intersect selection).toList()
+    }
 
-    private suspend fun currencySymbol(): String = currencyDao.listAll().find { it.code == "RUB" }?.symbol ?: "RUB"
+    /** Символ валюты баланса; у одного баланса одна валюта, смешивать нельзя. */
+    private suspend fun currencySymbol(balanceId: String?): String {
+        val code = balanceId?.let { balanceDao.byId(it)?.currencyCode } ?: return ""
+        return currencyDao.listAll().find { it.code == code }?.symbol ?: code
+    }
 }
