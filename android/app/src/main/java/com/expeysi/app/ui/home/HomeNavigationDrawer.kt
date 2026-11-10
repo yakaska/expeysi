@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
@@ -44,6 +45,7 @@ fun HomeNavigationDrawer(
     importing: Boolean,
     leavingFamily: Boolean,
     onHomeClick: () -> Unit,
+    onCategoryReportClick: () -> Unit,
     onImportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
@@ -81,6 +83,13 @@ fun HomeNavigationDrawer(
                     selected = true,
                     icon = { Icon(Icons.Filled.Home, contentDescription = null) },
                     onClick = onHomeClick,
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+                NavigationDrawerItem(
+                    label = { Text("Операции по категориям") },
+                    selected = false,
+                    icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
+                    onClick = onCategoryReportClick,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
                 DrawerSection("Данные")

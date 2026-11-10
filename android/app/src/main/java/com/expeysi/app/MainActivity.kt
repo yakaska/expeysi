@@ -31,6 +31,7 @@ import com.expeysi.app.ui.auth.AuthScreen
 import com.expeysi.app.ui.balances.EditBalanceScreen
 import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
+import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
@@ -100,6 +101,12 @@ private fun AppNavigation() {
                 navController.popBackStack("home", inclusive = false)
             }
         },
+        onCategoryReportClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("category-report")
+            }
+        },
         onImportClick = {
             scope.launch {
                 drawerState.close()
@@ -143,6 +150,12 @@ private fun AppNavigation() {
                         navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
                     },
                     viewModel = homeViewModel,
+                )
+            }
+            composable("category-report") {
+                CategoryReportScreen(
+                    onBack = { navigateBack() },
+                    onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
             composable("add") {
