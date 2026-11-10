@@ -117,7 +117,7 @@ class AnalysisViewModel @Inject constructor(
         if (next.isAfter(currentMonth)) return
         _uiState.update { it.copy(period = it.period.copy(month = next)) }
         persistPeriod()
-        reload()
+        reload(showScrim = false)
     }
 
     fun openPeriodPicker() {
@@ -209,7 +209,12 @@ class AnalysisViewModel @Inject constructor(
         reload()
     }
 
-    private fun reload() {
+    /**
+     * Перезагрузка отчёта; скрим затемняет контент только при смене типа,
+     * периода, фильтров или баланса — листание месяцев идёт без него,
+     * диаграмма сама анимирует старые данные в новые.
+     */
+    private fun reload(showScrim: Boolean = true) {
         job?.cancel()
         val snapshot = _uiState.value
         if (snapshot.balanceId == null) {
@@ -220,7 +225,7 @@ class AnalysisViewModel @Inject constructor(
         if (initial) {
             _uiState.update { it.copy(isError = false) }
         } else {
-            _uiState.update { it.copy(isRefreshing = true, isError = false) }
+            _uiState.update { it.copy(isRefreshing = showScrim, isError = false) }
         }
         val params = _uiState.value
         val (startMillis, endMillisExclusive) = params.period.bounds(ZonedDateTime.now(zone), zone)

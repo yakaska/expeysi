@@ -83,14 +83,16 @@ internal fun AnalysisDonut(
     }
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        if (previousVisible) {
-            IconButton(onClick = onPrevious) {
-                Icon(
-                    Icons.Filled.ChevronLeft,
-                    contentDescription = stringResource(R.string.analysis_prev_month_cd),
-                    tint = AnalysisColors.TextPrimary,
-                )
-            }
+        IconButton(onClick = onPrevious, enabled = previousVisible) {
+            Icon(
+                Icons.Filled.ChevronLeft,
+                contentDescription = if (previousVisible) {
+                    stringResource(R.string.analysis_prev_month_cd)
+                } else {
+                    null
+                },
+                tint = if (previousVisible) AnalysisColors.TextPrimary else Color.Transparent,
+            )
         }
         Box(
             modifier = Modifier
@@ -177,14 +179,16 @@ internal fun AnalysisDonut(
                 }
             }
         }
-        if (nextVisible) {
-            IconButton(onClick = onNext) {
-                Icon(
-                    Icons.Filled.ChevronRight,
-                    contentDescription = stringResource(R.string.analysis_next_month_cd),
-                    tint = AnalysisColors.TextPrimary,
-                )
-            }
+        IconButton(onClick = onNext, enabled = nextVisible) {
+            Icon(
+                Icons.Filled.ChevronRight,
+                contentDescription = if (nextVisible) {
+                    stringResource(R.string.analysis_next_month_cd)
+                } else {
+                    null
+                },
+                tint = if (nextVisible) AnalysisColors.TextPrimary else Color.Transparent,
+            )
         }
     }
 }
