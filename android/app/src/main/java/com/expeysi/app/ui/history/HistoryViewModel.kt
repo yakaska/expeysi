@@ -66,7 +66,6 @@ private data class Filters(
     val period: HistoryPeriod,
     val customRange: DateRangeFilter?,
     val types: Set<TxType>,
-    val accountIds: Set<String>?,
     val categoryIds: Set<String>?,
 )
 
@@ -102,10 +101,6 @@ class HistoryViewModel @Inject constructor(
     )
     val selectedTypes: StateFlow<Set<TxType>> = _selectedTypes.asStateFlow()
 
-    /** null = выбраны все. */
-    private val _selectedAccountIds = MutableStateFlow<Set<String>?>(null)
-    val selectedAccountIds: StateFlow<Set<String>?> = _selectedAccountIds.asStateFlow()
-
     private val _selectedCategoryIds = MutableStateFlow<Set<String>?>(null)
     val selectedCategoryIds: StateFlow<Set<String>?> = _selectedCategoryIds.asStateFlow()
 
@@ -135,10 +130,9 @@ class HistoryViewModel @Inject constructor(
         _period,
         _customRange,
         _selectedTypes,
-        _selectedAccountIds,
         _selectedCategoryIds,
-    ) { period, range, types, accountIds, categoryIds ->
-        Filters(period, range, types, accountIds, categoryIds)
+    ) { period, range, types, categoryIds ->
+        Filters(period, range, types, categoryIds)
     }
 
     val uiState: StateFlow<HistoryUiState> = combine(
@@ -179,7 +173,6 @@ class HistoryViewModel @Inject constructor(
                 }
             }
             .filter { TxType.fromWire(it.type) in f.types }
-            .filter { mode == HistoryViewMode.ACCOUNTS || f.accountIds == null || it.accountId in f.accountIds }
             .filter { f.categoryIds == null || it.categoryId in f.categoryIds }
 
         val entries = filtered.map {
@@ -237,16 +230,6 @@ class HistoryViewModel @Inject constructor(
     fun toggleType(type: TxType) {
         _selectedTypes.update { current ->
             if (type in current) current - type else current + type
-        }
-        _detail.value = null
-    }
-
-    fun toggleAccount(id: String) {
-        val allIds = uiState.value.accounts.map { it.id }.toSet()
-        _selectedAccountIds.update { current ->
-            val effective = current ?: allIds
-            val updated = if (id in effective) effective - id else effective + id
-            if (updated == allIds) null else updated
         }
         _detail.value = null
     }

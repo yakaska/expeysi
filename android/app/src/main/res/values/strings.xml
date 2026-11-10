@@ -38,4 +38,20 @@
     <string name="family_leave_confirmation">Leave this family? Shared data will remain available to other members. You can rejoin later with an invitation code.</string>
     <string name="family_leave_error">Couldn’t leave the family. Check your connection and try again.</string>
     <string name="action_cancel">Cancel</string>
+    <string name="common_back">Назад</string>
+    <string name="drawer_transaction_comparison">Сравнение</string>
+    <string name="drawer_expenses_report">Расходы</string>
+    <string name="drawer_incomes_report">Доходы</string>
+    <string name="drawer_data_export">Экспорт</string>
+    <string name="drawer_data_import">Импорт</string>
+    <string name="report_operations">Операции</string>
+    <string name="report_categories">Категории</string>
+    <string name="report_total_income">Всего получено</string>
+    <string name="report_total_expense">Всего потрачено</string>
+    <string name="report_uncategorized">Без категории</string>
+    <string name="report_empty">Нет операций за выбранный период.</string>
+    <string name="report_share_percent">%1$d%%</string>
+    <string name="money_suffix_million">млн</string>
+    <string name="money_suffix_billion">млрд</string>
+    <string name="placeholder_in_development">Раздел в разработке</string>
 </resources>

@@ -1,18 +1,25 @@
 package com.expeysi.app.ui.home
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Category
+import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -45,8 +52,12 @@ fun HomeNavigationDrawer(
     importing: Boolean,
     leavingFamily: Boolean,
     onHomeClick: () -> Unit,
-    onCategoryReportClick: () -> Unit,
+    onTransactionComparisonClick: () -> Unit,
+    onExpensesReportClick: () -> Unit,
+    onIncomesReportClick: () -> Unit,
     onImportClick: () -> Unit,
+    onExportClick: () -> Unit,
+    onDataImportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
     onLeaveFamilyClick: () -> Unit,
@@ -57,83 +68,113 @@ fun HomeNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
             ModalDrawerSheet(modifier = Modifier.fillMaxWidth(2f / 3f)) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RectangleShape,
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RectangleShape,
+                        color = MaterialTheme.colorScheme.primaryContainer,
                     ) {
-                        Image(
-                            painter = painterResource(R.drawable.expeysi_icon),
-                            contentDescription = null,
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape),
-                        )
-                        Spacer(Modifier.size(12.dp))
-                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Image(
+                                painter = painterResource(R.drawable.expeysi_icon),
+                                contentDescription = null,
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape),
+                            )
+                            Spacer(Modifier.size(12.dp))
+                            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+                        }
                     }
+                    DrawerSection("Отчёты")
+                    NavigationDrawerItem(
+                        label = { Text("Главная") },
+                        selected = true,
+                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                        onClick = onHomeClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_transaction_comparison)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.CompareArrows, contentDescription = null) },
+                        onClick = onTransactionComparisonClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_expenses_report)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
+                        onClick = onExpensesReportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_incomes_report)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                        onClick = onIncomesReportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    DrawerSection("Данные")
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_data_export)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.FileDownload, contentDescription = null) },
+                        onClick = onExportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_data_import)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.FileUpload, contentDescription = null) },
+                        onClick = onDataImportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Импорт из Бюджета") },
+                        selected = false,
+                        icon = {
+                            if (importing) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                Icon(Icons.Filled.AttachMoney, contentDescription = null)
+                            }
+                        },
+                        onClick = { if (!importing) onImportClick() },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    DrawerSection("Разное")
+                    NavigationDrawerItem(
+                        label = { Text("Категории") },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.Category, contentDescription = null) },
+                        onClick = onCategoriesClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text("Счета") },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
+                        onClick = onAccountsClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.family_leave_action)) },
+                        selected = false,
+                        icon = {
+                            if (leavingFamily) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                            } else {
+                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                            }
+                        },
+                        onClick = { if (!leavingFamily) showLeaveConfirmation = true },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
                 }
-                DrawerSection("Отчёты")
-                NavigationDrawerItem(
-                    label = { Text("Главная") },
-                    selected = true,
-                    icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                    onClick = onHomeClick,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Операции по категориям") },
-                    selected = false,
-                    icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
-                    onClick = onCategoryReportClick,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                DrawerSection("Данные")
-                NavigationDrawerItem(
-                    label = { Text("Импорт из Бюджета") },
-                    selected = false,
-                    icon = {
-                        if (importing) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(Icons.Filled.FileUpload, contentDescription = null)
-                        }
-                    },
-                    onClick = { if (!importing) onImportClick() },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                DrawerSection("Разное")
-                NavigationDrawerItem(
-                    label = { Text("Категории") },
-                    selected = false,
-                    icon = { Icon(Icons.Filled.Category, contentDescription = null) },
-                    onClick = onCategoriesClick,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                NavigationDrawerItem(
-                    label = { Text("Счета") },
-                    selected = false,
-                    icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
-                    onClick = onAccountsClick,
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
-                NavigationDrawerItem(
-                    label = { Text(stringResource(R.string.family_leave_action)) },
-                    selected = false,
-                    icon = {
-                        if (leavingFamily) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        } else {
-                            Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                        }
-                    },
-                    onClick = { if (!leavingFamily) showLeaveConfirmation = true },
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                )
             }
         },
         content = content,

@@ -49,6 +49,68 @@ class MoneyTest {
     }
 
     @Test
+    fun `компактное форматирование без копеек`() {
+        val below = Money.compact(1_234_500L)
+        assertEquals(Money.Scale.NONE, below.scale)
+        assertEquals("12 345", below.digits)
+    }
+
+    @Test
+    fun `компактное форматирование с копейками`() {
+        val below = Money.compact(123_456L)
+        assertEquals(Money.Scale.NONE, below.scale)
+        assertEquals("1 234,56", below.digits)
+    }
+
+    @Test
+    fun `компактное форматирование миллионов`() {
+        val millions = Money.compact(670_000_000L)
+        assertEquals(Money.Scale.MILLION, millions.scale)
+        assertEquals("6,7", millions.digits)
+
+        val exact = Money.compact(600_000_000L)
+        assertEquals(Money.Scale.MILLION, exact.scale)
+        assertEquals("6", exact.digits)
+    }
+
+    @Test
+    fun `компактное форматирование миллиардов`() {
+        val billions = Money.compact(120_000_000_000L)
+        assertEquals(Money.Scale.BILLION, billions.scale)
+        assertEquals("1,2", billions.digits)
+    }
+
+    @Test
+    fun `компактное форматирование округляет вверх`() {
+        // 9 999 999 999,90 → 10 млрд.
+        val rounded = Money.compact(999_999_999_990L)
+        assertEquals(Money.Scale.BILLION, rounded.scale)
+        assertEquals("10", rounded.digits)
+    }
+
+    @Test
+    fun `компактное форматирование уходит на следующий порядок`() {
+        // 999 999 990 → не «1 000 млн», а «1 млрд».
+        val bumped = Money.compact(99_999_999_900L)
+        assertEquals(Money.Scale.BILLION, bumped.scale)
+        assertEquals("1", bumped.digits)
+    }
+
+    @Test
+    fun `компактное форматирование сохраняет знак`() {
+        val negative = Money.compact(-670_000_000L)
+        assertEquals(Money.Scale.MILLION, negative.scale)
+        assertEquals("-6,7", negative.digits)
+    }
+
+    @Test
+    fun `ноль отображается как обычное число`() {
+        val zero = Money.compact(0)
+        assertEquals(Money.Scale.NONE, zero.scale)
+        assertEquals("0", zero.digits)
+    }
+
+    @Test
     fun `вставленная сумма поддерживает разные пробелы`() {
         assertEquals(123_456L, Money.parseToMinor("1\u00A0234,56"))
         assertEquals(123_456L, Money.parseToMinor("\n1\u202F234,56 "))
