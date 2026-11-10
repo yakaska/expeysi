@@ -53,7 +53,6 @@ import com.expeysi.app.ui.common.AmountFormat
 import com.expeysi.app.ui.common.RuDates
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 
 /** События экрана операций категории. */
@@ -89,7 +88,7 @@ internal fun CategoryOperationsContent(
                         Text(
                             text = stringResource(
                                 R.string.categoryops_subtitle,
-                                RuDates.monthLabel(state.month, currentYear = YearMonth.now().year),
+                                state.periodLabel,
                                 AmountFormat.withCurrency(state.totalMinor, state.currencySymbol),
                             ),
                             fontSize = 12.sp,
@@ -296,7 +295,7 @@ private fun previewState(
     isError: Boolean = false,
 ): CategoryOperationsUiState = CategoryOperationsUiState(
     categoryName = "Еда",
-    month = YearMonth.of(2026, 4),
+    periodLabel = "Апрель 2026",
     totalMinor = 7_844_900,
     currencySymbol = "₽",
     groups = groups,
@@ -382,7 +381,7 @@ private fun CategoryOperationsIncomePreview() {
         CategoryOperationsContent(
             state = CategoryOperationsUiState(
                 categoryName = "Зарплата",
-                month = YearMonth.of(2026, 4),
+                periodLabel = "Апрель 2026",
                 totalMinor = 12_000_000,
                 currencySymbol = "₽",
                 groups = previewIncomeGroups,

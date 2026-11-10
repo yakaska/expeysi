@@ -202,9 +202,12 @@ private fun AppNavigation() {
                             ?.takeIf { it.isNotEmpty() }
                             ?.let(Uri::encode)
                             .orEmpty()
+                        val start = request.startMillis?.toString().orEmpty()
+                        val end = request.endMillisExclusive?.toString().orEmpty()
                         navController.navigate(
                             "analysis/category/${Uri.encode(request.categoryId)}" +
-                                "?type=${request.type.wire}&month=${request.month}" +
+                                "?type=${request.type.wire}&start=$start&end=$end" +
+                                "&label=${Uri.encode(request.periodLabel)}" +
                                 "&balance=${Uri.encode(request.balanceId.orEmpty())}" +
                                 "&accounts=${Uri.encode(accounts)}",
                         )
@@ -212,14 +215,22 @@ private fun AppNavigation() {
                 )
             }
             composable(
-                route = "analysis/category/{categoryId}?type={type}&month={month}&balance={balance}&accounts={accounts}",
+                route = "analysis/category/{categoryId}?type={type}&start={start}&end={end}&label={label}&balance={balance}&accounts={accounts}",
                 arguments = listOf(
                     navArgument("categoryId") { type = NavType.StringType },
                     navArgument("type") {
                         type = NavType.StringType
                         defaultValue = "expense"
                     },
-                    navArgument("month") {
+                    navArgument("start") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("end") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("label") {
                         type = NavType.StringType
                         defaultValue = ""
                     },

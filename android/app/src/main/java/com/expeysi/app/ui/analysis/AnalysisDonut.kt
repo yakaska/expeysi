@@ -46,17 +46,24 @@ private val donutStroke = 20.dp
 private const val DONUT_GAP_DEGREES = 2f
 private val swipeThreshold = 48.dp
 
-/** Кольцевая диаграмма с сегментами по долям категорий, стрелками и свайпом месяца. */
+/**
+ * Кольцевая диаграмма с сегментами по долям категорий: клик по сегменту открывает
+ * категорию, клик в отверстие — пикер периода; в режиме месяцев доступны
+ * свайп и стрелки.
+ */
 @Composable
 internal fun AnalysisDonut(
     shares: List<Float>,
     colors: List<Color>,
     centerLabel: String,
     description: String,
-    nextEnabled: Boolean,
+    previousVisible: Boolean,
+    nextVisible: Boolean,
+    swipeEnabled: Boolean,
     onSegmentClick: (Int) -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
+    onCenterClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val strokePx = with(LocalDensity.current) { donutStroke.toPx() }
@@ -76,33 +83,43 @@ internal fun AnalysisDonut(
     }
 
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onPrevious) {
-            Icon(
-                Icons.Filled.ChevronLeft,
-                contentDescription = stringResource(R.string.analysis_prev_month_cd),
-                tint = AnalysisColors.TextPrimary,
-            )
+        if (previousVisible) {
+            IconButton(onClick = onPrevious) {
+                Icon(
+                    Icons.Filled.ChevronLeft,
+                    contentDescription = stringResource(R.string.analysis_prev_month_cd),
+                    tint = AnalysisColors.TextPrimary,
+                )
+            }
         }
         Box(
             modifier = Modifier
                 .weight(1f)
                 .height(donutDiameter)
                 .semantics { contentDescription = description }
-                .pointerInput(shares) {
+                .pointerInput(shares, onCenterClick) {
                     detectTapGestures { offset ->
+                        val centerX = size.width / 2f
+                        val centerY = size.height / 2f
+                        val radius = min(size.width, size.height) / 2f
+                        if (DonutGeometry.isInsideHole(offset.x, offset.y, centerX, centerY, radius, strokePx)) {
+                            onCenterClick()
+                            return@detectTapGestures
+                        }
                         val index = DonutGeometry.segmentIndexAt(
                             x = offset.x,
                             y = offset.y,
-                            centerX = size.width / 2f,
-                            centerY = size.height / 2f,
-                            radius = min(size.width, size.height) / 2f,
+                            centerX = centerX,
+                            centerY = centerY,
+                            radius = radius,
                             stroke = strokePx,
                             shares = shares,
                         )
                         if (index >= 0) onSegmentClick(index)
                     }
                 }
-                .pointerInput(onPrevious, onNext) {
+                .pointerInput(swipeEnabled, onPrevious, onNext) {
+                    if (!swipeEnabled) return@pointerInput
                     var accumulated = 0f
                     val threshold = with(density) { swipeThreshold.toPx() }
                     detectHorizontalDragGestures(
@@ -160,12 +177,14 @@ internal fun AnalysisDonut(
                 }
             }
         }
-        IconButton(onClick = onNext, enabled = nextEnabled) {
-            Icon(
-                Icons.Filled.ChevronRight,
-                contentDescription = stringResource(R.string.analysis_next_month_cd),
-                tint = AnalysisColors.TextPrimary,
-            )
+        if (nextVisible) {
+            IconButton(onClick = onNext) {
+                Icon(
+                    Icons.Filled.ChevronRight,
+                    contentDescription = stringResource(R.string.analysis_next_month_cd),
+                    tint = AnalysisColors.TextPrimary,
+                )
+            }
         }
     }
 }

@@ -1,7 +1,6 @@
 package com.expeysi.app.data.analysis
 
 import com.expeysi.app.domain.TxType
-import java.time.YearMonth
 
 /** Счёт для фильтра шторки. */
 data class AnalysisAccount(
@@ -54,7 +53,8 @@ data class OperationPage(
 /**
  * Данные экрана «Анализ финансов». Расходы и доходы запрашиваются раздельно,
  * всегда в рамках одного баланса; [accountIds] == null — все счета баланса,
- * [balanceId] == null — баланса нет, данные пустые.
+ * [balanceId] == null — баланса нет, данные пустые. Границы периода:
+ * null — без ограничения.
  */
 interface AnalysisRepository {
 
@@ -64,7 +64,8 @@ interface AnalysisRepository {
     suspend fun categorySummary(
         balanceId: String?,
         type: TxType,
-        yearMonth: YearMonth,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: Set<String>?,
     ): CategorySummary
 
@@ -72,9 +73,13 @@ interface AnalysisRepository {
         balanceId: String?,
         categoryId: String,
         type: TxType,
-        yearMonth: YearMonth,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: Set<String>?,
         limit: Int,
         offset: Int,
     ): OperationPage
+
+    /** Самая ранняя операция баланса; null — операций нет. */
+    suspend fun earliestOperationMillis(balanceId: String?): Long?
 }

@@ -40,26 +40,30 @@ interface TransactionDao {
 
     @Query(
         "SELECT * FROM transactions WHERE deleted = 0 AND type = :type " +
-            "AND date >= :startMillis AND date < :endMillis AND accountId IN (:accountIds) " +
+            "AND (:startMillis IS NULL OR date >= :startMillis) " +
+            "AND (:endMillisExclusive IS NULL OR date < :endMillisExclusive) " +
+            "AND accountId IN (:accountIds) " +
             "ORDER BY date DESC, updatedAt DESC",
     )
     suspend fun byTypeAndPeriod(
         type: String,
-        startMillis: Long,
-        endMillis: Long,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: List<String>,
     ): List<TransactionEntity>
 
     @Query(
         "SELECT * FROM transactions WHERE deleted = 0 AND type = :type AND categoryId = :categoryId " +
-            "AND date >= :startMillis AND date < :endMillis AND accountId IN (:accountIds) " +
+            "AND (:startMillis IS NULL OR date >= :startMillis) " +
+            "AND (:endMillisExclusive IS NULL OR date < :endMillisExclusive) " +
+            "AND accountId IN (:accountIds) " +
             "ORDER BY date DESC, updatedAt DESC LIMIT :limit OFFSET :offset",
     )
     suspend fun byCategoryAndPeriod(
         type: String,
         categoryId: String,
-        startMillis: Long,
-        endMillis: Long,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: List<String>,
         limit: Int,
         offset: Int,
@@ -67,16 +71,23 @@ interface TransactionDao {
 
     @Query(
         "SELECT COALESCE(SUM(amountMinor), 0) FROM transactions WHERE deleted = 0 AND type = :type " +
-            "AND categoryId = :categoryId AND date >= :startMillis AND date < :endMillis " +
+            "AND categoryId = :categoryId " +
+            "AND (:startMillis IS NULL OR date >= :startMillis) " +
+            "AND (:endMillisExclusive IS NULL OR date < :endMillisExclusive) " +
             "AND accountId IN (:accountIds)",
     )
     suspend fun sumByCategoryAndPeriod(
         type: String,
         categoryId: String,
-        startMillis: Long,
-        endMillis: Long,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: List<String>,
     ): Long
+
+    @Query(
+        "SELECT MIN(date) FROM transactions WHERE deleted = 0 AND accountId IN (:accountIds)",
+    )
+    suspend fun earliestMillis(accountIds: List<String>): Long?
 
     @Query("SELECT * FROM transactions")
     fun observeAll(): Flow<List<TransactionEntity>>

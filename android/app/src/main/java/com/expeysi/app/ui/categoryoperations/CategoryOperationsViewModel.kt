@@ -18,7 +18,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
 
@@ -31,7 +30,8 @@ data class OperationDateGroup(
 /** Готовое состояние экрана операций категории. */
 data class CategoryOperationsUiState(
     val categoryName: String = "",
-    val month: YearMonth = YearMonth.now(),
+    /** Метка периода из отчёта, например «Апрель 2026» или «Неделя». */
+    val periodLabel: String = "",
     val totalMinor: Long = 0,
     val currencySymbol: String = "",
     val groups: List<OperationDateGroup> = emptyList(),
@@ -52,9 +52,11 @@ class CategoryOperationsViewModel @Inject constructor(
     private val categoryId: String = savedStateHandle.get<String>("categoryId").orEmpty()
     private val type: TxType =
         TxType.fromWire(savedStateHandle.get<String>("type") ?: TxType.EXPENSE.wire)
-    private val month: YearMonth =
-        savedStateHandle.get<String>("month")?.let { runCatching { YearMonth.parse(it) }.getOrNull() }
-            ?: YearMonth.now()
+    private val startMillis: Long? =
+        savedStateHandle.get<String>("start")?.trim()?.takeUnless { it.isBlank() }?.toLongOrNull()
+    private val endMillisExclusive: Long? =
+        savedStateHandle.get<String>("end")?.trim()?.takeUnless { it.isBlank() }?.toLongOrNull()
+    private val periodLabel: String = savedStateHandle.get<String>("label").orEmpty()
     private val accountIds: Set<String>? = savedStateHandle.get<String>("accounts")
         ?.split(',')?.filter { it.isNotBlank() }?.toSet()?.takeIf { it.isNotEmpty() }
 
@@ -63,7 +65,7 @@ class CategoryOperationsViewModel @Inject constructor(
     private var job: Job? = null
     private val loaded = mutableListOf<Operation>()
 
-    private val _uiState = MutableStateFlow(CategoryOperationsUiState(month = month))
+    private val _uiState = MutableStateFlow(CategoryOperationsUiState(periodLabel = periodLabel))
     val uiState: StateFlow<CategoryOperationsUiState> = _uiState.asStateFlow()
 
     init {
@@ -76,7 +78,16 @@ class CategoryOperationsViewModel @Inject constructor(
         _uiState.update { it.copy(isLoading = true, isLoadingMore = false, isError = false) }
         job = viewModelScope.launch {
             val result = runCatching {
-                repository.categoryOperations(balanceId, categoryId, type, month, accountIds, PAGE_SIZE, 0)
+                repository.categoryOperations(
+                    balanceId = balanceId,
+                    categoryId = categoryId,
+                    type = type,
+                    startMillis = startMillis,
+                    endMillisExclusive = endMillisExclusive,
+                    accountIds = accountIds,
+                    limit = PAGE_SIZE,
+                    offset = 0,
+                )
             }
             ensureActive()
             result.fold(
@@ -98,7 +109,16 @@ class CategoryOperationsViewModel @Inject constructor(
         val offset = loaded.size
         job = viewModelScope.launch {
             val result = runCatching {
-                repository.categoryOperations(balanceId, categoryId, type, month, accountIds, PAGE_SIZE, offset)
+                repository.categoryOperations(
+                    balanceId = balanceId,
+                    categoryId = categoryId,
+                    type = type,
+                    startMillis = startMillis,
+                    endMillisExclusive = endMillisExclusive,
+                    accountIds = accountIds,
+                    limit = PAGE_SIZE,
+                    offset = offset,
+                )
             }
             ensureActive()
             result.fold(

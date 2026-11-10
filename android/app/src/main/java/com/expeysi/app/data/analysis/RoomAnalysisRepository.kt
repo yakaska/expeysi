@@ -5,10 +5,7 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
-import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.TxType
-import java.time.YearMonth
-import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -21,8 +18,6 @@ class RoomAnalysisRepository @Inject constructor(
     private val currencyDao: CurrencyDao,
 ) : AnalysisRepository {
 
-    private val zone: ZoneId = ZoneId.systemDefault()
-
     override suspend fun accounts(balanceId: String?): List<AnalysisAccount> {
         if (balanceId == null) return emptyList()
         return accountDao.listByBalance(balanceId).map {
@@ -33,16 +28,16 @@ class RoomAnalysisRepository @Inject constructor(
     override suspend fun categorySummary(
         balanceId: String?,
         type: TxType,
-        yearMonth: YearMonth,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: Set<String>?,
     ): CategorySummary {
         val symbol = currencySymbol(balanceId)
         val resolvedIds = resolveAccountIds(balanceId, accountIds)
         if (resolvedIds.isEmpty()) return CategorySummary(0L, symbol, emptyList())
-        val bounds = Periods.month(yearMonth.atDay(1), zone)
         val categories = categoryDao.listActive(type.wire)
         val stats = transactionDao
-            .byTypeAndPeriod(type.wire, bounds.startMillis, bounds.endMillisExclusive, resolvedIds)
+            .byTypeAndPeriod(type.wire, startMillis, endMillisExclusive, resolvedIds)
             .groupBy { it.categoryId }
             .map { (categoryId, rows) ->
                 val category = categories.firstOrNull { it.id == categoryId }
@@ -67,7 +62,8 @@ class RoomAnalysisRepository @Inject constructor(
         balanceId: String?,
         categoryId: String,
         type: TxType,
-        yearMonth: YearMonth,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
         accountIds: Set<String>?,
         limit: Int,
         offset: Int,
@@ -84,12 +80,11 @@ class RoomAnalysisRepository @Inject constructor(
                 hasMore = false,
             )
         }
-        val bounds = Periods.month(yearMonth.atDay(1), zone)
         val rows = transactionDao.byCategoryAndPeriod(
             type = type.wire,
             categoryId = categoryId,
-            startMillis = bounds.startMillis,
-            endMillis = bounds.endMillisExclusive,
+            startMillis = startMillis,
+            endMillisExclusive = endMillisExclusive,
             accountIds = resolvedIds,
             limit = limit + 1,
             offset = offset,
@@ -115,13 +110,19 @@ class RoomAnalysisRepository @Inject constructor(
             totalMinor = transactionDao.sumByCategoryAndPeriod(
                 type = type.wire,
                 categoryId = categoryId,
-                startMillis = bounds.startMillis,
-                endMillis = bounds.endMillisExclusive,
+                startMillis = startMillis,
+                endMillisExclusive = endMillisExclusive,
                 accountIds = resolvedIds,
             ),
             currencySymbol = symbol,
             hasMore = hasMore,
         )
+    }
+
+    override suspend fun earliestOperationMillis(balanceId: String?): Long? {
+        val resolvedIds = resolveAccountIds(balanceId, null)
+        if (resolvedIds.isEmpty()) return null
+        return transactionDao.earliestMillis(resolvedIds)
     }
 
     /** Скоуп = все счета баланса, пересечённые с ручным выбором. */

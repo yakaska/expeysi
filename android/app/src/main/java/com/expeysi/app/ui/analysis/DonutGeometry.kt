@@ -66,4 +66,23 @@ object DonutGeometry {
         }
         return shares.lastIndex
     }
+
+    /**
+     * Точка внутри отверстия кольца: открытие пикера периода по клику в центр.
+     * Граница совпадает с внутренней границей касания сегментов, чтобы
+     * области не перекрывались.
+     */
+    fun isInsideHole(
+        x: Float,
+        y: Float,
+        centerX: Float,
+        centerY: Float,
+        radius: Float,
+        stroke: Float,
+    ): Boolean {
+        val dx = x - centerX
+        val dy = y - centerY
+        val distance = sqrt(dx * dx + dy * dy)
+        return distance < radius - stroke / 2f - HIT_SLOP
+    }
 }

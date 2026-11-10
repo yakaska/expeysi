@@ -106,6 +106,10 @@ class HomeViewModel @Inject constructor(
         selectedBalanceStore.selectedId,
     ) { balances, selectedId ->
         balances to (balances.firstOrNull { it.id == selectedId } ?: balances.firstOrNull())
+    }.onEach { (_, selected) ->
+        if (selected != null && selectedBalanceStore.selectedId.value != selected.id) {
+            selectedBalanceStore.select(selected.id)
+        }
     }
 
     private val transactionLimit = MutableStateFlow(TRANSACTION_PAGE_SIZE)

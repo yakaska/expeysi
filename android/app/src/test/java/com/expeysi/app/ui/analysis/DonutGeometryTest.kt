@@ -88,4 +88,17 @@ class DonutGeometryTest {
     fun `нулевые доли не определяют сегмент`() {
         assertEquals(-1, DonutGeometry.segmentIndexAt(0f, -100f, 0f, 0f, 100f, 20f, listOf(0f, 0f)))
     }
+
+    @Test
+    fun `центр кольца считается отверстием`() {
+        assertEquals(true, DonutGeometry.isInsideHole(0f, 0f, 0f, 0f, 100f, 20f))
+    }
+
+    @Test
+    fun `касание у внутреннего края отверстия разграничивается`() {
+        val (insideX, insideY) = pointAt(angleDegrees = 40f, radius = 81f)
+        assertEquals(true, DonutGeometry.isInsideHole(insideX, insideY, 0f, 0f, 100f, 20f))
+        val (outsideX, outsideY) = pointAt(angleDegrees = 40f, radius = 83f)
+        assertEquals(false, DonutGeometry.isInsideHole(outsideX, outsideY, 0f, 0f, 100f, 20f))
+    }
 }

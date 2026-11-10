@@ -47,15 +47,18 @@ import com.expeysi.app.R
 import com.expeysi.app.data.analysis.AnalysisAccount
 import com.expeysi.app.data.analysis.CategoryStat
 import com.expeysi.app.data.analysis.CategorySummary
+import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.AmountFormat
-import com.expeysi.app.ui.common.RuDates
 import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.operationsLabel
 import com.expeysi.app.ui.common.rublesLabel
+import com.expeysi.app.ui.history.PeriodPickerSheet
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.theme.ExpeysiTheme
+import java.time.LocalDate
 import java.time.YearMonth
+import java.time.ZoneId
 
 private const val VISIBLE_CATEGORIES = 4
 
@@ -68,6 +71,10 @@ data class AnalysisActions(
     val onTypeSelect: (TxType) -> Unit = {},
     val onPreviousMonth: () -> Unit = {},
     val onNextMonth: () -> Unit = {},
+    val onCenterClick: () -> Unit = {},
+    val onPeriodSelected: (HistoryPeriod) -> Unit = {},
+    val onRangeSelected: (LocalDate, LocalDate) -> Unit = { _, _ -> },
+    val onPeriodPickerDismiss: () -> Unit = {},
     val onCategoryClick: (CategoryStat) -> Unit = {},
     val onExpandToggle: () -> Unit = {},
     val onDraftAccountToggle: (String) -> Unit = {},
@@ -112,9 +119,9 @@ internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
                             val summary = state.summary
                             if (summary != null) {
                                 DonutBlock(
-                                    type = state.type,
-                                    month = state.month,
+                                    state = state,
                                     summary = summary,
+                                    onCenterClick = actions.onCenterClick,
                                     onPreviousMonth = actions.onPreviousMonth,
                                     onNextMonth = actions.onNextMonth,
                                     onSegmentClick = { index ->
@@ -151,6 +158,19 @@ internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
                 onReset = actions.onFiltersReset,
                 onApply = actions.onFiltersApply,
                 onDismiss = actions.onFiltersDismiss,
+            )
+        }
+        if (state.periodPickerOpen) {
+            PeriodPickerSheet(
+                period = when (state.period.kind) {
+                    AnalysisPeriodKind.MONTHS -> HistoryPeriod.MONTH
+                    AnalysisPeriodKind.SLIDING -> state.period.sliding
+                    AnalysisPeriodKind.RANGE -> HistoryPeriod.ALL
+                },
+                customRange = if (state.period.kind == AnalysisPeriodKind.RANGE) state.period.range else null,
+                onPeriodSelected = actions.onPeriodSelected,
+                onRangeSelected = actions.onRangeSelected,
+                onDismiss = actions.onPeriodPickerDismiss,
             )
         }
     }
@@ -298,7 +318,7 @@ private fun TotalAmount(state: AnalysisUiState) {
             Text(
                 text = AmountFormat.withCurrency(summary.totalMinor, summary.currencySymbol),
                 color = AnalysisColors.TextPrimary,
-                fontSize = 32.sp,
+                fontSize = 28.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
@@ -307,13 +327,14 @@ private fun TotalAmount(state: AnalysisUiState) {
 
 @Composable
 private fun DonutBlock(
-    type: TxType,
-    month: YearMonth,
+    state: AnalysisUiState,
     summary: CategorySummary,
+    onCenterClick: () -> Unit,
     onPreviousMonth: () -> Unit,
     onNextMonth: () -> Unit,
     onSegmentClick: (Int) -> Unit,
 ) {
+    val zone = ZoneId.systemDefault()
     val total = summary.totalMinor
     val shares = if (total <= 0L) {
         emptyList()
@@ -321,23 +342,32 @@ private fun DonutBlock(
         summary.categories.map { it.amountMinor.toFloat() / total }
     }
     val typeLabel =
-        stringResource(if (type == TxType.EXPENSE) R.string.home_expenses else R.string.home_income)
-    val description = stringResource(
-        R.string.analysis_chart_cd,
-        typeLabel,
-        RuDates.monthName(month),
-        "${AmountFormat.amount(total)} ${rublesLabel(total / 100)}",
-    )
+        stringResource(if (state.type == TxType.EXPENSE) R.string.home_expenses else R.string.home_income)
+    val amountPart = "${AmountFormat.amount(total)} ${rublesLabel(total / 100)}"
+    val description = if (state.period.kind == AnalysisPeriodKind.MONTHS) {
+        stringResource(
+            R.string.analysis_chart_cd,
+            typeLabel,
+            state.period.sinceLabel(),
+            amountPart,
+        )
+    } else {
+        stringResource(R.string.analysis_chart_cd_any, typeLabel, state.period.sinceLabel(), amountPart)
+    }
     AnalysisDonut(
         shares = shares,
         colors = summary.categories.map { CategoryPalette.color(it.colorKey) },
-        centerLabel = RuDates.monthLabel(month, currentYear = YearMonth.now().year),
+        centerLabel = state.period.centerLabel(zone),
         description = description,
-        nextEnabled = month.isBefore(YearMonth.now()),
+        previousVisible = state.period.kind == AnalysisPeriodKind.MONTHS &&
+            hasOperationsInPreviousMonth(state.period.month, state.earliestMillis, zone),
+        nextVisible = state.nextMonthVisible,
+        swipeEnabled = state.period.monthsNavigable,
         onSegmentClick = onSegmentClick,
         onPrevious = onPreviousMonth,
         onNext = onNextMonth,
-        modifier = Modifier.padding(horizontal = 8.dp),
+        onCenterClick = onCenterClick,
+        modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
     )
 }
 
@@ -573,13 +603,16 @@ private fun previewSummary(type: TxType): CategorySummary {
     )
 }
 
+private val previewMonth = YearMonth.of(2026, 4)
+
 private fun analysisPreviewState(
     type: TxType,
     summary: CategorySummary? = previewSummary(type),
 ): AnalysisUiState = AnalysisUiState(
     balanceId = "main",
     type = type,
-    month = YearMonth.of(2026, 4),
+    period = AnalysisPeriod(month = previewMonth),
+    currentMonth = previewMonth,
     accounts = previewAccounts,
     summary = summary,
 )
@@ -639,7 +672,6 @@ private fun AnalysisContentNoBalancePreview() {
             state = AnalysisUiState(
                 balanceId = null,
                 type = TxType.EXPENSE,
-                month = YearMonth.of(2026, 4),
             ),
             actions = AnalysisActions(),
         )
