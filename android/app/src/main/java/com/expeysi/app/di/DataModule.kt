@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.expeysi.app.data.analysis.AnalysisRepository
+import com.expeysi.app.data.analysis.RoomAnalysisRepository
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AppDatabase
 import com.expeysi.app.data.db.BalanceDao
@@ -19,6 +21,7 @@ import com.expeysi.app.data.db.MIGRATION_5_6
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
+import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,7 +37,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object DataModule {
-
     @Provides
     @Singleton
     fun provideDatabase(
@@ -81,4 +83,13 @@ object DataModule {
     @Provides
     @Singleton
     fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences = context.getSharedPreferences("expeysi_prefs", Context.MODE_PRIVATE)
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class AnalysisRepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAnalysisRepository(impl: RoomAnalysisRepository): AnalysisRepository
 }

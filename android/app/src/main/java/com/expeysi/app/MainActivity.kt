@@ -1,5 +1,6 @@
 package com.expeysi.app
 
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -27,10 +28,12 @@ import androidx.navigation.navArgument
 import com.expeysi.app.ui.accounts.AccountsScreen
 import com.expeysi.app.ui.accounts.EditAccountScreen
 import com.expeysi.app.ui.add.AddTransactionScreen
+import com.expeysi.app.ui.analysis.AnalysisScreen
 import com.expeysi.app.ui.auth.AuthScreen
 import com.expeysi.app.ui.balances.EditBalanceScreen
 import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
+import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.history.HistoryScreen
@@ -101,6 +104,12 @@ private fun AppNavigation() {
             scope.launch {
                 drawerState.close()
                 navController.popBackStack("home", inclusive = false)
+            }
+        },
+        onAnalysisClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("analysis")
             }
         },
         onTransactionComparisonClick = {
@@ -183,6 +192,43 @@ private fun AppNavigation() {
                     onBack = { navigateBack() },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
+            }
+            composable("analysis") {
+                AnalysisScreen(
+                    onBack = { navigateBack() },
+                    onOpenCategory = { request ->
+                        val accounts = request.accountIds
+                            ?.joinToString(",")
+                            ?.takeIf { it.isNotEmpty() }
+                            ?.let(Uri::encode)
+                            .orEmpty()
+                        navController.navigate(
+                            "analysis/category/${Uri.encode(request.categoryId)}" +
+                                "?type=${request.type.wire}&month=${request.month}" +
+                                "&accounts=${Uri.encode(accounts)}",
+                        )
+                    },
+                )
+            }
+            composable(
+                route = "analysis/category/{categoryId}?type={type}&month={month}&accounts={accounts}",
+                arguments = listOf(
+                    navArgument("categoryId") { type = NavType.StringType },
+                    navArgument("type") {
+                        type = NavType.StringType
+                        defaultValue = "expense"
+                    },
+                    navArgument("month") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("accounts") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
+                CategoryOperationsScreen(onBack = { navigateBack() })
             }
             composable(
                 route = "transaction-report/{type}",

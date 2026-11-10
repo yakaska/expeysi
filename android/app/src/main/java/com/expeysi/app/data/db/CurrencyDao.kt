@@ -14,4 +14,7 @@ interface CurrencyDao {
 
     @Query("SELECT * FROM currencies ORDER BY code")
     fun observeAll(): Flow<List<CurrencyEntity>>
+
+    @Query("SELECT * FROM currencies ORDER BY code")
+    suspend fun listAll(): List<CurrencyEntity>
 }
