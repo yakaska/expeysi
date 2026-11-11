@@ -190,7 +190,7 @@ private fun CategoriesView(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Text(
-                        "${Money.format(if (state.isIncomeOnly) state.totalIncomeMinor else state.totalExpenseMinor)} ${state.currencySymbol}",
+                        "${Money.formatAuto(if (state.isIncomeOnly) state.totalIncomeMinor else state.totalExpenseMinor)} ${state.currencySymbol}",
                         style = MaterialTheme.typography.headlineSmall,
                     )
                 }
@@ -209,7 +209,7 @@ private fun CategoriesView(
                     headlineContent = { Text(category?.name ?: "Без категории") },
                     trailingContent = {
                         Text(
-                            "${Money.format(if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
+                            "${Money.formatAuto(if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
                             style = MaterialTheme.typography.titleMedium,
                         )
                     },
@@ -293,7 +293,7 @@ private fun AccountCard(
             trailingContent = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        "${Money.format(if (total.expenseMinor == 0L) total.incomeMinor else total.expenseMinor)} $currencySymbol",
+                        "${Money.formatAuto(if (total.expenseMinor == 0L) total.incomeMinor else total.expenseMinor)} $currencySymbol",
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Icon(
@@ -317,7 +317,7 @@ private fun AccountCard(
                     headlineContent = { Text(row.name) },
                     trailingContent = {
                         Text(
-                            "${Money.format(if (row.total.expenseMinor == 0L) row.total.incomeMinor else row.total.expenseMinor)} $currencySymbol",
+                            "${Money.formatAuto(if (row.total.expenseMinor == 0L) row.total.incomeMinor else row.total.expenseMinor)} $currencySymbol",
                             style = MaterialTheme.typography.bodyLarge,
                         )
                     },
@@ -375,7 +375,7 @@ internal fun HistoryItemCard(
             }
             Text(
                 text = (if (isIncome) "+" else "−") +
-                    "${Money.format(item.transaction.amountMinor)} ${item.currencySymbol}",
+                    "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
                 style = MaterialTheme.typography.titleMedium,
                 color = if (isIncome) {
                     MaterialTheme.colorScheme.primary

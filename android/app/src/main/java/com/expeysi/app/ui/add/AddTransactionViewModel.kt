@@ -129,7 +129,7 @@ class AddTransactionViewModel @Inject constructor(
                 transactionDao.byId(editId)?.let { tx ->
                     original = tx
                     _type.value = TxType.fromWire(tx.type)
-                    _amountText.value = Money.format(tx.amountMinor)
+                    _amountText.value = Money.formatInput(Money.formatAuto(tx.amountMinor))
                     _selectedAccountId.value = tx.accountId
                     _selectedCategoryId.value = tx.categoryId
                     val dateTime = Instant.ofEpochMilli(tx.date).atZone(zone)

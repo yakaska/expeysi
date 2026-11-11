@@ -122,4 +122,73 @@ class MoneyTest {
     fun `парсинг и форматирование согласованы`() {
         assertEquals(123_456L, Money.parseToMinor(Money.format(123_456)))
     }
+
+    @Test
+    fun `форматирование без дробной части`() {
+        assertEquals("0", Money.formatWhole(0))
+        assertEquals("9", Money.formatWhole(999))
+        assertEquals("9\u00A0999", Money.formatWhole(999_999))
+        assertEquals("10\u00A0000", Money.formatWhole(1_000_000))
+        assertEquals("-487", Money.formatWhole(-48_750))
+        assertEquals("-92\u00A0233\u00A0720\u00A0368\u00A0547\u00A0758", Money.formatWhole(Long.MIN_VALUE))
+    }
+
+    @Test
+    fun `автоформатирование убирает нулевые копейки`() {
+        assertEquals("0", Money.formatAuto(0))
+        assertEquals("1", Money.formatAuto(100))
+        assertEquals("1,50", Money.formatAuto(150))
+        assertEquals("1 234,56", Money.formatAuto(123_456))
+        assertEquals("58\u00A0000", Money.formatAuto(58_000_00L))
+        assertEquals("-1,50", Money.formatAuto(-150))
+        assertEquals("-58\u00A0000", Money.formatAuto(-58_000_00L))
+    }
+
+    @Test
+    fun `поле редактирования получает сумму через формат ввода`() {
+        assertEquals("58 000", Money.formatInput(Money.formatAuto(58_000_00L)))
+        assertEquals("1 234,56", Money.formatInput(Money.formatAuto(123_456)))
+        assertEquals("-50", Money.formatInput(Money.formatAuto(-5_000)))
+        assertEquals(58_000_00L, Money.parseToMinor("58 000"))
+        assertEquals(123_456L, Money.parseToMinor(Money.formatInput(Money.formatAuto(123_456))))
+    }
+
+    @Test
+    fun `компактная строка без крупных порядков`() {
+        val million = "млн"
+        val billion = "млрд"
+        assertEquals("0", Money.formatCompact(0, million, billion))
+        assertEquals("9", Money.formatCompact(999, million, billion))
+        assertEquals("9\u00A0999", Money.formatCompact(999_999, million, billion))
+        assertEquals("10\u00A0000", Money.formatCompact(1_000_000, million, billion))
+        assertEquals("455\u00A0841", Money.formatCompact(45_584_137, million, billion))
+        assertEquals("-455\u00A0841", Money.formatCompact(-45_584_137, million, billion))
+    }
+
+    @Test
+    fun `компактная строка с единицами порядка`() {
+        val million = "млн"
+        val billion = "млрд"
+        assertEquals("6,7\u00A0млн", Money.formatCompact(670_000_000L, million, billion))
+        assertEquals("6\u00A0млн", Money.formatCompact(600_000_000L, million, billion))
+        assertEquals("-6,7\u00A0млн", Money.formatCompact(-670_000_000L, million, billion))
+        assertEquals("1,2\u00A0млрд", Money.formatCompact(120_000_000_000L, million, billion))
+    }
+
+    @Test
+    fun `округление компактной строки не даёт 1000 млн`() {
+        // 999 950 000 основных единиц → не «1000,0 млн», а «1 млрд».
+        assertEquals("1\u00A0млрд", Money.formatCompact(99_995_000_000L, "млн", "млрд"))
+        assertEquals("10\u00A0млн", Money.formatCompact(999_950_000L, "млн", "млрд"))
+    }
+
+    @Test
+    fun `экстремальные значения не бросают исключений`() {
+        Money.formatWhole(Long.MAX_VALUE)
+        Money.formatWhole(Long.MIN_VALUE)
+        Money.formatCompact(Long.MAX_VALUE, "млн", "млрд")
+        Money.compact(Long.MAX_VALUE)
+        Money.compact(Long.MIN_VALUE)
+        assertEquals("92\u00A0233\u00A0720\u00A0368\u00A0547\u00A0758", Money.formatCompact(Long.MAX_VALUE, "млн", "млрд"))
+    }
 }

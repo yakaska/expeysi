@@ -75,7 +75,7 @@ class EditAccountViewModel @Inject constructor(
                     _name.value = account.name
                     _iconKey.value = account.iconKey
                     _colorKey.value = account.colorKey
-                    _openingBalanceText.value = Money.format(account.openingBalanceMinor)
+                    _openingBalanceText.value = Money.formatInput(Money.formatAuto(account.openingBalanceMinor))
                     _balanceId.value = account.balanceId
                 }
             }

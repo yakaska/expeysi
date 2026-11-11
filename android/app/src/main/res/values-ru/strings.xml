@@ -33,6 +33,11 @@
     <string name="home_yesterday">Вчера</string>
     <string name="home_seven_days">7 дней</string>
     <string name="home_thirty_days">30 дней</string>
+    <string name="home_balance">Баланс</string>
+    <string name="home_title_with_currency">%1$s · %2$s</string>
+    <string name="home_more_accounts" translatable="false">+%1$d</string>
+    <string name="home_top_categories">Расходы по категориям</string>
+    <string name="home_total">Итого</string>
     <string name="home_empty_title">Пока пусто</string>
     <string name="family_leave_action">Выйти из семьи</string>
     <string name="family_leave_confirmation">Выйти из семьи? Общие данные останутся у остальных участников. Присоединиться снова можно по коду приглашения.</string>

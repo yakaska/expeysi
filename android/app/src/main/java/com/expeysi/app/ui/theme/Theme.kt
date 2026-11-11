@@ -8,6 +8,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
 
 private val LightColors = lightColorScheme()
@@ -26,8 +27,12 @@ fun ExpeysiTheme(
         darkTheme -> DarkColors
         else -> LightColors
     }
-    MaterialTheme(
-        colorScheme = colorScheme,
-        content = content,
-    )
+    CompositionLocalProvider(
+        LocalFinanceColors provides if (darkTheme) DarkFinanceColors else LightFinanceColors,
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            content = content,
+        )
+    }
 }

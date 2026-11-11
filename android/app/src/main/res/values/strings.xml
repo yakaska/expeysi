@@ -33,6 +33,11 @@
     <string name="home_yesterday">Yesterday</string>
     <string name="home_seven_days">7 days</string>
     <string name="home_thirty_days">30 days</string>
+    <string name="home_balance">Balance</string>
+    <string name="home_title_with_currency">%1$s · %2$s</string>
+    <string name="home_more_accounts" translatable="false">+%1$d</string>
+    <string name="home_top_categories">Expenses by category</string>
+    <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
     <string name="family_leave_action">Leave family</string>
     <string name="family_leave_confirmation">Leave this family? Shared data will remain available to other members. You can rejoin later with an invitation code.</string>

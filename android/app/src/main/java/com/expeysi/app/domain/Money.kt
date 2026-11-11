@@ -4,6 +4,9 @@ import kotlin.math.abs
 
 object Money {
 
+    /** Неразрывный пробел: группировка разрядов и связь числа с единицей порядка. */
+    private const val NON_BREAKING_SPACE = "\u00A0"
+
     /** Порядок компактной записи: NONE — обычное число, MILLION/BILLION — сокращение. */
     enum class Scale(val majorUnits: Long) {
         NONE(1L),
@@ -53,6 +56,35 @@ object Money {
         return "$sign$rubles,$kopecks"
     }
 
+    /** 123456 → "1 234": целые основные единицы без копеек, группы разрядов — неразрывный пробел. */
+    fun formatWhole(minor: Long): String {
+        val major = minor / 100
+        val sign = if (major < 0) "-" else ""
+        return sign + grouped(abs(major), NON_BREAKING_SPACE)
+    }
+
+    /** Целая сумма — без копеек ("58 000"), с дробной частью — как в format() ("1 234,56"). */
+    fun formatAuto(minor: Long): String = if (minor % 100 == 0L) formatWhole(minor) else format(minor)
+
+    /**
+     * Компактный вид одной строкой: до миллиона основных единиц — целое число без
+     * копеек, от миллиона — один знак после запятой и единица из ресурсов UI-слоя
+     * ("6,7 млн"; 999,95 млн → "1 млрд" вместо "1000,0 млн"). Знак минус сохраняется.
+     */
+    fun formatCompact(minor: Long, millionSuffix: String, billionSuffix: String): String {
+        val compact = compact(minor)
+        return when (compact.scale) {
+            Scale.NONE -> formatWhole(minor)
+            Scale.MILLION -> compactScaledText(compact.digits, millionSuffix)
+            Scale.BILLION -> compactScaledText(compact.digits, billionSuffix)
+        }
+    }
+
+    private fun compactScaledText(digits: String, suffix: String): String {
+        val normalized = digits.replace(" ", NON_BREAKING_SPACE)
+        return normalized + NON_BREAKING_SPACE + suffix
+    }
+
     /**
      * Компактный вид для сводок. Суммы от миллиона основных единиц — с одним знаком
      * после запятой ("6,7" + Scale.MILLION), ниже порога — обычное число без нулевой
@@ -79,7 +111,11 @@ object Money {
     /** Округлённый до одного знака minor / масштаб; при переходе через порядок масштаб повышается. */
     private tailrec fun compactScaled(sign: String, minor: Long, scale: Scale): CompactAmount {
         val unitMinor = scale.majorUnits * 100
-        val tenths = (minor * 10 + unitMinor / 2) / unitMinor
+        /*
+         * (minor * 10 + unitMinor / 2) / unitMinor переполняет long на больших minor,
+         * поэтому деление выполнено до умножения; minor >= 0, кроме Long.MIN_VALUE.
+         */
+        val tenths = (minor / unitMinor) * 10 + ((minor % unitMinor) * 10 + unitMinor / 2) / unitMinor
         return when {
             /* Округление дотянуло до следующего порядка: 999 999 990 → "1" (млрд). */
             scale == Scale.MILLION && tenths >= 10_000L -> compactScaled(sign, minor, Scale.BILLION)
@@ -93,7 +129,7 @@ object Money {
         }
     }
 
-    private fun grouped(value: Long): String = value.toString().reversed().chunked(3).joinToString(" ").reversed()
+    private fun grouped(value: Long, separator: String = " "): String = value.toString().reversed().chunked(3).joinToString(separator).reversed()
 
     private fun compact(text: String): String = text.filterNot {
         it.isWhitespace() || Character.isSpaceChar(it)
