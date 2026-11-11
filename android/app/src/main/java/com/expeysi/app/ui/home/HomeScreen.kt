@@ -87,6 +87,7 @@ import com.expeysi.app.domain.CategoryShares
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
+import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.operationsLabel
 import com.expeysi.app.ui.icons.CategoryIcon
@@ -376,19 +377,20 @@ fun HomeContent(
                 state.transactions.groupBy { item ->
                     Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
                 }.forEach { (date, transactions) ->
+                    val (incomeItems, expenseItems) = transactions.partition {
+                        TxType.fromWire(it.transaction.type) == TxType.INCOME
+                    }
                     stickyHeader(key = "date-$date") {
-                        Text(
-                            text = when (date) {
+                        DayGroupHeader(
+                            dateLabel = when (date) {
                                 today -> stringResource(R.string.home_today)
                                 today.minusDays(1) -> stringResource(R.string.home_yesterday)
                                 else -> date.format(dayFormatter)
                             },
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(vertical = 8.dp),
+                            incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
+                            expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
+                            currencySymbol = transactions.first().currencySymbol,
+                            modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     transactions.forEachIndexed { index, item ->

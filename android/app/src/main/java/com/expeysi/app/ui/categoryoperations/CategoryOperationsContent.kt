@@ -46,6 +46,7 @@ import com.expeysi.app.data.analysis.Operation
 import com.expeysi.app.ui.analysis.ErrorState
 import com.expeysi.app.ui.analysis.SkeletonBar
 import com.expeysi.app.ui.common.AmountFormat
+import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.RuDates
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.ExpeysiTheme
@@ -154,15 +155,14 @@ private fun OperationsList(
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         state.groups.forEach { group ->
+            val (incomeOps, expenseOps) = group.operations.partition { it.isIncome }
             stickyHeader(key = "date-${group.date}") {
-                Text(
-                    text = RuDates.dayHeader(group.date),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                DayGroupHeader(
+                    dateLabel = RuDates.dayHeader(group.date),
+                    incomeMinor = incomeOps.sumOf { it.amountMinor },
+                    expenseMinor = expenseOps.sumOf { it.amountMinor },
+                    currencySymbol = state.currencySymbol,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             items(group.operations, key = { it.id }) { operation ->

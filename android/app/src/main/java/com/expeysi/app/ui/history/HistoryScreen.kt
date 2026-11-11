@@ -5,7 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Column
@@ -62,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -334,19 +334,20 @@ private fun TransactionList(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
     ) {
         grouped.forEach { (date, groupItems) ->
+            val (incomeItems, expenseItems) = groupItems.partition {
+                TxType.fromWire(it.transaction.type) == TxType.INCOME
+            }
             stickyHeader(key = "date-$date") {
-                Text(
-                    text = when (date) {
+                DayGroupHeader(
+                    dateLabel = when (date) {
                         today -> stringResource(R.string.home_today)
                         today.minusDays(1) -> stringResource(R.string.home_yesterday)
                         else -> date.format(dayHeaderFormatter)
                     },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
+                    expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
+                    currencySymbol = groupItems.first().currencySymbol,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
             groupItems.forEachIndexed { index, item ->
