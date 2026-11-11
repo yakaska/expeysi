@@ -217,7 +217,7 @@ private fun CategoryReportContent(
                             )
                             Spacer(modifier = Modifier.weight(1f))
                             Text(
-                                "${Money.format(state.balanceMinor)} ${state.currencySymbol}",
+                                "${Money.formatAuto(state.balanceMinor)} ${state.currencySymbol}",
                                 style = MaterialTheme.typography.titleMedium,
                                 color = if (state.balanceMinor < 0) {
                                     MaterialTheme.colorScheme.error
@@ -316,7 +316,7 @@ private fun ReportTransactionRow(
         }
         Text(
             text = (if (isIncome) "+" else "−") +
-                "${Money.format(item.transaction.amountMinor)} ${item.currencySymbol}",
+                "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
             style = MaterialTheme.typography.titleMedium,
             color = if (isIncome) {
                 MaterialTheme.colorScheme.primary

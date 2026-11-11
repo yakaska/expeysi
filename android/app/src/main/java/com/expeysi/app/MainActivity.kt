@@ -184,6 +184,7 @@ private fun AppNavigation() {
                     onSummaryClick = { id, type, days ->
                         navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
                     },
+                    onAnalysisClick = { navController.navigate("analysis") },
                     viewModel = homeViewModel,
                 )
             }

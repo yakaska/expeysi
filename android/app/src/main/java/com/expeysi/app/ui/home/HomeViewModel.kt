@@ -1,10 +1,13 @@
 package com.expeysi.app.ui.home
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.FamilyRepository
 import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.SelectedBalanceStore
+import com.expeysi.app.data.analysis.AnalysisRepository
+import com.expeysi.app.data.analysis.CategoryStat
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
@@ -31,6 +34,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -68,6 +72,8 @@ data class LeaveFamilyUiState(
     val failed: Boolean = false,
 )
 
+private const val DEFAULT_PERIOD_DAYS = 30
+
 data class HomeUiState(
     val balances: List<BalanceEntity> = emptyList(),
     val selectedBalance: BalanceEntity? = null,
@@ -76,6 +82,9 @@ data class HomeUiState(
     val totalBalanceMinor: Long = 0,
     val expense: WindowSums = WindowSums(0, 0, 0),
     val income: WindowSums = WindowSums(0, 0, 0),
+    val periodDays: Int = DEFAULT_PERIOD_DAYS,
+    /** Расходы по категориям за выбранный период; пусто — блока нет. */
+    val topCategories: List<CategoryStat> = emptyList(),
     val transactions: List<TransactionItem> = emptyList(),
     val hasMoreTransactions: Boolean = false,
     val familyId: String? = null,
@@ -93,6 +102,8 @@ class HomeViewModel @Inject constructor(
     private val familyStore: FamilyStore,
     private val familyRepository: FamilyRepository,
     private val budgetImportService: BudgetImportService,
+    private val analysisRepository: AnalysisRepository,
+    private val savedStateHandle: SavedStateHandle,
 ) : ViewModel() {
 
     private val zone: ZoneId = ZoneId.systemDefault()
@@ -100,6 +111,8 @@ class HomeViewModel @Inject constructor(
     val importState: StateFlow<ImportUiState> = _importState.asStateFlow()
     private val _leaveState = MutableStateFlow(LeaveFamilyUiState())
     val leaveState: StateFlow<LeaveFamilyUiState> = _leaveState.asStateFlow()
+
+    private val periodDays = MutableStateFlow(savedStateHandle.get<Int>(KEY_PERIOD_DAYS) ?: DEFAULT_PERIOD_DAYS)
 
     private val selection = combine(
         balanceDao.observeActive(),
@@ -194,15 +207,51 @@ class HomeViewModel @Inject constructor(
         )
     }
 
+    /** Топ расходов по категориям за выбранный период; тот же запрос, что у экрана анализа. */
+    private val topCategoriesFeed = combine(
+        selection,
+        periodDays,
+    ) { (_, selected), days ->
+        selected?.id to days
+    }.distinctUntilChanged().flatMapLatest { (balanceId, days) ->
+        flow {
+            val start = Periods.day(LocalDate.now(zone), zone).startMillis - (days - 1) * DAY_MILLIS
+            val categories = if (balanceId == null) {
+                emptyList()
+            } else {
+                runCatching {
+                    analysisRepository
+                        .categorySummary(balanceId, TxType.EXPENSE, start, null, null)
+                        .categories
+                }.getOrDefault(emptyList())
+            }
+            emit(categories)
+        }
+    }
+
     val uiState: StateFlow<HomeUiState> = combine(
         summaryState,
         transactionFeed,
-    ) { state, (transactions, hasMore) ->
-        state.copy(transactions = transactions, hasMoreTransactions = hasMore)
+        topCategoriesFeed,
+        periodDays,
+    ) { state, (transactions, hasMore), topCategories, days ->
+        state.copy(
+            transactions = transactions,
+            hasMoreTransactions = hasMore,
+            topCategories = topCategories,
+            periodDays = days,
+        )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeUiState())
 
     fun selectBalance(id: String) {
         selectedBalanceStore.select(id)
+    }
+
+    /** Период верхней сводки и блока топ категорий: 1, 7 или 30 дней. */
+    fun selectPeriod(days: Int) {
+        if (periodDays.value == days) return
+        periodDays.value = days
+        savedStateHandle[KEY_PERIOD_DAYS] = days
     }
 
     fun importBudget(input: InputStream?) {
@@ -253,5 +302,7 @@ class HomeViewModel @Inject constructor(
 
     private companion object {
         const val TRANSACTION_PAGE_SIZE = 50
+        const val DAY_MILLIS = 86_400_000L
+        const val KEY_PERIOD_DAYS = "home_period_days"
     }
 }
