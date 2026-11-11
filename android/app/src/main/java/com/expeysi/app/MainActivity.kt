@@ -183,6 +183,13 @@ private fun AppNavigation() {
                     onEditBalanceClick = { id -> navController.navigate("balances/edit/$id") },
                     onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
                     onAccountHistoryClick = { id -> navController.navigate("history/account/$id") },
+                    onAddAccountClick = { balanceId ->
+                        if (balanceId == null) {
+                            navController.navigate("accounts/add")
+                        } else {
+                            navController.navigate("accounts/add?balanceId=$balanceId")
+                        }
+                    },
                     onSummaryClick = { id, type, days ->
                         navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
                     },
@@ -289,7 +296,16 @@ private fun AppNavigation() {
                     onItemClick = { id -> navController.navigate("accounts/edit/$id") },
                 )
             }
-            composable("accounts/add") {
+            composable(
+                route = "accounts/add?balanceId={balanceId}",
+                arguments = listOf(
+                    navArgument("balanceId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 EditAccountScreen(onClose = { navigateBack() })
             }
             composable(

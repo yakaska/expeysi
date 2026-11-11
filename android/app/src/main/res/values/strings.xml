@@ -40,6 +40,7 @@
     <string name="home_balance">Total</string>
     <string name="home_title_with_currency">%1$s · %2$s</string>
     <string name="home_more_accounts" translatable="false">+%1$d</string>
+    <string name="home_add_account">Добавить счёт</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>

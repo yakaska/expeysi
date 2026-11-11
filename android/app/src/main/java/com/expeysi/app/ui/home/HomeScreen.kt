@@ -125,6 +125,7 @@ data class HomeActions(
     val onEditBalanceClick: (String) -> Unit,
     val onBalanceHistoryClick: (String) -> Unit,
     val onAccountHistoryClick: (String) -> Unit,
+    val onAddAccountClick: (String?) -> Unit = {},
     val onSummaryClick: (String, TxType, Int) -> Unit,
     val onBalanceSelected: (String) -> Unit,
     val onLoadMoreTransactions: () -> Unit,
@@ -141,6 +142,7 @@ fun HomeScreen(
     onEditBalanceClick: (String) -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
+    onAddAccountClick: (String?) -> Unit = {},
     onSummaryClick: (String, TxType, Int) -> Unit,
     onAnalysisClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -156,6 +158,7 @@ fun HomeScreen(
             onEditBalanceClick = onEditBalanceClick,
             onBalanceHistoryClick = onBalanceHistoryClick,
             onAccountHistoryClick = onAccountHistoryClick,
+            onAddAccountClick = onAddAccountClick,
             onSummaryClick = onSummaryClick,
             onBalanceSelected = viewModel::selectBalance,
             onLoadMoreTransactions = viewModel::loadMoreTransactions,
@@ -306,6 +309,7 @@ fun HomeContent(
                         currencySymbol = state.currencySymbol,
                         accounts = state.accounts,
                         onAccountClick = actions.onAccountHistoryClick,
+                        onAddAccountClick = { actions.onAddAccountClick(state.selectedBalance?.id) },
                         onBalanceSwitcherClick = { balanceSheetOpen = true },
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
@@ -478,6 +482,7 @@ private fun HeroCard(
     currencySymbol: String,
     accounts: List<AccountBalance>,
     onAccountClick: (String) -> Unit,
+    onAddAccountClick: () -> Unit = {},
     onBalanceSwitcherClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -537,6 +542,14 @@ private fun HeroCard(
                 AccountChipsRow(
                     accounts = accounts,
                     onAccountClick = onAccountClick,
+                    onAddAccountClick = onAddAccountClick,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            } else {
+                // Нет единственного счёта (0) или он уже показан строкой выше (1) —
+                // отдельно держим чип быстрого добавления счёта.
+                AddAccountChip(
+                    onClick = onAddAccountClick,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -618,6 +631,7 @@ private fun SingleAccountRow(
 private fun AccountChipsRow(
     accounts: List<AccountBalance>,
     onAccountClick: (String) -> Unit,
+    onAddAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val millionUnit = stringResource(R.string.money_suffix_million)
@@ -645,7 +659,35 @@ private fun AccountChipsRow(
                 )
             }
         }
+        item(key = "add-account") {
+            AddAccountChip(onClick = onAddAccountClick)
+        }
     }
+}
+
+/** Чип быстрого добавления счёта: ведёт на экран создания в выбранном балансе. */
+@Composable
+private fun AddAccountChip(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AssistChip(
+        onClick = onClick,
+        leadingIcon = {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        label = {
+            Text(
+                text = stringResource(R.string.home_add_account),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable
