@@ -40,6 +40,12 @@
     <string name="home_balance">Всего</string>
     <string name="home_title_with_currency">%1$s · %2$s</string>
     <string name="home_more_accounts" translatable="false">+%1$d</string>
+    <string name="home_add_account">Добавить счёт</string>
+    <string name="history_mode_transactions">Операции</string>
+    <string name="history_mode_categories">Категории</string>
+    <string name="history_mode_accounts">Счета</string>
+    <string name="history_back_groups_cd">К группам</string>
+    <string name="history_expand_cd">Развернуть</string>
     <string name="home_top_categories">Расходы по категориям</string>
     <string name="home_total">Итого</string>
     <string name="home_empty_title">Пока пусто</string>
@@ -63,6 +69,11 @@
     <string name="report_share_percent">%1$d%%</string>
     <string name="money_suffix_million">млн</string>
     <string name="money_suffix_billion">млрд</string>
+    <string name="calc_title">Калькулятор</string>
+    <string name="calc_done">Готово</string>
+    <string name="calc_close_cd">Закрыть</string>
+    <string name="calc_backspace_cd">Удалить последний символ</string>
+    <string name="calc_error">Ошибка</string>
     <string name="placeholder_in_development">Раздел в разработке</string>
     <string name="analysis_title">Анализ финансов</string>
     <string name="analysis_menu_cd">Меню</string>
@@ -76,8 +87,10 @@
     <string name="analysis_empty_income">Нет доходов за период</string>
     <string name="analysis_error">Не удалось загрузить данные</string>
     <string name="analysis_chart_cd">%1$s за %2$s %3$s</string>
-    <string name="analysis_prev_month_cd">Предыдущий месяц</string>
-    <string name="analysis_next_month_cd">Следующий месяц</string>
+    <string name="analysis_prev_period_cd">Предыдущий период</string>
+    <string name="analysis_next_period_cd">Следующий период</string>
+    <string name="analysis_quarter_label">%1$d-й квартал %2$d</string>
+    <string name="analysis_half_year_label">%1$d-е полугодие %2$d</string>
     <string name="analysis_account_last4">···· %1$s</string>
     <string name="analysis_no_balances">Балансы отсутствуют</string>
     <string name="analysis_no_balances_hint">Добавьте баланс на главном экране, чтобы анализировать операции</string>
@@ -105,6 +118,7 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
+    <string name="common_day_header_total">%1$s · %2$s</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d операция</item>
         <item quantity="few">%1$d операции</item>
