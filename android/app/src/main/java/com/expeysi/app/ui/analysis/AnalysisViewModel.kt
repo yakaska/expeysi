@@ -62,19 +62,26 @@ data class AnalysisUiState(
     /** Стрелка «следующий месяц» видна, пока есть куда листать вперёд. */
     val nextMonthVisible: Boolean
         get() = period.kind == AnalysisPeriodKind.MONTHS && period.month.isBefore(currentMonth)
+
+    /** Фильтр реально ограничивает счета: выбрано подмножество, а не все. */
+    val isFilterActive: Boolean
+        get() {
+            val selected = selectedAccountIds ?: return false
+            return accounts.any { it.id !in selected }
+        }
 }
 
 /** Семантика выбора счетов: null означает «все счета». */
 object AccountSelection {
 
     /**
-     * Переключение одного счёта. Со «всех счетов» первый тап выбирает только его;
-     * ручной выбор всех счетов сводится к «все счета».
+     * Переключение одного счёта. Со «всех счетов» первый тап выбирает его;
+     * дальше набор меняется как есть — схлопывания в «все счета» и обратно нет,
+     * чтобы выбор не менялся без действий пользователя.
      */
-    fun toggle(current: Set<String>?, allIds: Set<String>, id: String): Set<String>? {
+    fun toggle(current: Set<String>?, id: String): Set<String> {
         if (current == null) return setOf(id)
-        val updated = if (id in current) current - id else current + id
-        return if (updated == allIds) null else updated
+        return if (id in current) current - id else current + id
     }
 }
 
@@ -168,9 +175,8 @@ class AnalysisViewModel @Inject constructor(
     }
 
     fun toggleDraftAccount(accountId: String) {
-        val allIds = _uiState.value.accounts.map { it.id }.toSet()
-        if (allIds.isEmpty()) return
-        val updated = AccountSelection.toggle(_uiState.value.filterDraft, allIds, accountId)
+        if (_uiState.value.accounts.isEmpty()) return
+        val updated = AccountSelection.toggle(_uiState.value.filterDraft, accountId)
         _uiState.update { it.copy(filterDraft = updated) }
     }
 
