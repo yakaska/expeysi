@@ -13,10 +13,15 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.expeysi.app.ui.theme.TopCardShape
 
 /** Скелетон первой загрузки: пустое кольцо и строки категорий. */
 @Composable
@@ -30,26 +35,30 @@ internal fun AnalysisSkeleton() {
         Box(
             modifier = Modifier
                 .size(250.dp)
-                .border(20.dp, AnalysisColors.Skeleton, CircleShape),
+                .border(20.dp, MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
         )
         Spacer(modifier = Modifier.height(24.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(AnalysisColors.Card, AnalysisColors.cardShape)
-                .padding(vertical = 8.dp),
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = TopCardShape,
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
         ) {
-            repeat(4) { index ->
-                if (index > 0) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 72.dp)
-                            .height(1.dp)
-                            .background(AnalysisColors.Divider),
-                    )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+            ) {
+                repeat(4) { index ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 72.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant,
+                        )
+                    }
+                    SkeletonRow()
                 }
-                SkeletonRow()
             }
         }
     }
@@ -64,7 +73,11 @@ private fun SkeletonRow() {
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(40.dp).background(AnalysisColors.Skeleton, CircleShape))
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+        )
         Column(
             modifier = Modifier
                 .weight(1f)

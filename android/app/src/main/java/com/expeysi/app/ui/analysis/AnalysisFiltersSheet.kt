@@ -19,10 +19,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,9 +33,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expeysi.app.R
 import com.expeysi.app.data.analysis.AnalysisAccount
+import com.expeysi.app.ui.icons.CategoryIcon
 
 /**
  * Нижняя шторка «Фильтры». Секции расширяемые: новая секция — новый FilterSection.
@@ -56,7 +56,7 @@ internal fun AnalysisFiltersSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = AnalysisColors.Card,
+        containerColor = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(
             modifier = Modifier
@@ -67,8 +67,7 @@ internal fun AnalysisFiltersSheet(
         ) {
             Text(
                 text = stringResource(R.string.analysis_filters),
-                color = AnalysisColors.TextPrimary,
-                fontSize = 20.sp,
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(bottom = 8.dp),
             )
             FilterSection(title = stringResource(R.string.home_accounts)) {
@@ -77,11 +76,10 @@ internal fun AnalysisFiltersSheet(
                         Icon(
                             Icons.Filled.CreditCard,
                             contentDescription = null,
-                            tint = AnalysisColors.TextPrimary,
                             modifier = Modifier.size(22.dp),
                         )
                     },
-                    iconColor = AnalysisColors.Divider,
+                    iconColor = MaterialTheme.colorScheme.outlineVariant,
                     title = stringResource(R.string.analysis_all_accounts),
                     subtitle = "",
                     selected = draft == null,
@@ -90,7 +88,7 @@ internal fun AnalysisFiltersSheet(
                 accounts.forEach { account ->
                     FilterAccountRow(
                         iconContent = {
-                            AnalysisCategoryBadge(iconKey = account.iconKey, colorKey = account.colorKey)
+                            CategoryIcon(iconKey = account.iconKey, colorKey = account.colorKey)
                         },
                         iconColor = Color.Transparent,
                         title = account.name,
@@ -105,19 +103,12 @@ internal fun AnalysisFiltersSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                TextButton(
-                    onClick = onReset,
-                    colors = ButtonDefaults.textButtonColors(contentColor = AnalysisColors.TextPrimary),
-                ) {
+                TextButton(onClick = onReset) {
                     Text(text = stringResource(R.string.analysis_reset))
                 }
                 Button(
                     onClick = onApply,
                     modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color.White,
-                        contentColor = Color.Black,
-                    ),
                 ) {
                     Text(text = stringResource(R.string.analysis_apply))
                 }
@@ -132,8 +123,8 @@ private fun FilterSection(title: String, content: @Composable ColumnScope.() -> 
     Column {
         Text(
             text = title,
-            color = AnalysisColors.TextSecondary,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(vertical = 8.dp),
         )
         content()
@@ -168,14 +159,13 @@ private fun FilterAccountRow(
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
                 text = title,
-                color = AnalysisColors.TextPrimary,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
             )
             if (subtitle.isNotBlank()) {
                 Text(
                     text = stringResource(R.string.analysis_account_last4, subtitle),
-                    color = AnalysisColors.TextSecondary,
-                    fontSize = 13.sp,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }

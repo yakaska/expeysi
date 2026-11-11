@@ -26,24 +26,22 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expeysi.app.R
 import com.expeysi.app.data.analysis.AnalysisAccount
 import com.expeysi.app.data.analysis.CategoryStat
@@ -55,8 +53,10 @@ import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.operationsLabel
 import com.expeysi.app.ui.common.rublesLabel
 import com.expeysi.app.ui.history.PeriodPickerSheet
+import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.theme.ExpeysiTheme
+import com.expeysi.app.ui.theme.TopCardShape
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -90,7 +90,7 @@ data class AnalysisActions(
 @Composable
 internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
     Scaffold(
-        containerColor = AnalysisColors.Background,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = { AnalysisTopBar(onBack = actions.onBack, onMenuClick = actions.onMenuClick) },
     ) { padding ->
         Box(
@@ -184,8 +184,7 @@ private fun AnalysisTopBar(onBack: () -> Unit, onMenuClick: () -> Unit) {
         title = {
             Text(
                 text = stringResource(R.string.analysis_title),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.titleLarge,
             )
         },
         navigationIcon = {
@@ -204,12 +203,6 @@ private fun AnalysisTopBar(onBack: () -> Unit, onMenuClick: () -> Unit) {
                 )
             }
         },
-        colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = AnalysisColors.Background,
-            titleContentColor = AnalysisColors.TextPrimary,
-            navigationIconContentColor = AnalysisColors.TextPrimary,
-            actionIconContentColor = AnalysisColors.TextPrimary,
-        ),
     )
 }
 
@@ -255,14 +248,13 @@ private fun FilterButton(active: Boolean, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .size(44.dp)
-            .background(AnalysisColors.Card, CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             Icons.Filled.Tune,
             contentDescription = stringResource(R.string.analysis_filters),
-            tint = AnalysisColors.TextPrimary,
             modifier = Modifier.size(20.dp),
         )
         if (active) {
@@ -271,7 +263,7 @@ private fun FilterButton(active: Boolean, onClick: () -> Unit) {
                     .align(Alignment.TopEnd)
                     .padding(5.dp)
                     .size(8.dp)
-                    .background(AnalysisColors.Accent, CircleShape),
+                    .background(MaterialTheme.colorScheme.primary, CircleShape),
             )
         }
     }
@@ -288,7 +280,11 @@ private fun TypePill(
         modifier = modifier
             .height(40.dp)
             .background(
-                color = if (selected) Color.White else AnalysisColors.Card,
+                color = if (selected) {
+                    MaterialTheme.colorScheme.inverseSurface
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                },
                 shape = RoundedCornerShape(20.dp),
             )
             .clickable(onClick = onClick),
@@ -296,9 +292,12 @@ private fun TypePill(
     ) {
         Text(
             text = label,
-            color = if (selected) Color.Black else AnalysisColors.TextSecondary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) {
+                MaterialTheme.colorScheme.inverseOnSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
     }
 }
@@ -318,10 +317,7 @@ private fun TotalAmount(state: AnalysisUiState) {
         } else {
             Text(
                 text = AmountFormat.withCurrency(summary.totalMinor, summary.currencySymbol),
-                color = AnalysisColors.TextPrimary,
-                fontSize = 28.sp,
-                lineHeight = 34.sp,
-                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.headlineMedium,
             )
         }
     }
@@ -383,18 +379,20 @@ private fun CategoriesCard(
 ) {
     val visible = if (expanded) categories else categories.take(VISIBLE_CATEGORIES)
     val rest = categories.drop(VISIBLE_CATEGORIES)
-    Column(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
-            .background(AnalysisColors.Card, AnalysisColors.cardShape),
+            .padding(horizontal = 16.dp),
+        shape = TopCardShape,
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer,
+        ),
     ) {
         visible.forEachIndexed { index, category ->
             if (index > 0) {
                 HorizontalDivider(
                     modifier = Modifier.padding(start = 72.dp),
-                    color = AnalysisColors.Divider,
-                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
             }
             CategoryRow(
@@ -421,8 +419,8 @@ private fun CategoriesCard(
                             AmountFormat.withCurrency(rest.sumOf { it.amountMinor }, currencySymbol),
                         )
                     },
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
-                    fontSize = 14.sp,
                 )
             }
         }
@@ -443,26 +441,23 @@ private fun CategoryRow(
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnalysisCategoryBadge(iconKey = category.iconKey, colorKey = category.colorKey)
+        CategoryIcon(iconKey = category.iconKey, colorKey = category.colorKey)
         Column(modifier = Modifier.weight(1f).padding(start = 16.dp)) {
             Text(
                 text = category.name.ifBlank { stringResource(R.string.report_uncategorized) },
-                color = AnalysisColors.TextPrimary,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = operationsLabel(category.operationCount),
-                color = AnalysisColors.TextSecondary,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Text(
             text = AmountFormat.withCurrency(category.amountMinor, currencySymbol),
-            color = AnalysisColors.TextPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
             softWrap = false,
         )
     }
@@ -474,8 +469,8 @@ private fun EmptyCategoriesText(type: TxType) {
         text = stringResource(
             if (type == TxType.EXPENSE) R.string.analysis_empty_expense else R.string.analysis_empty_income,
         ),
-        color = AnalysisColors.TextSecondary,
-        fontSize = 15.sp,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 48.dp, horizontal = 16.dp),
@@ -494,27 +489,25 @@ private fun BalanceMissingState() {
         Box(
             modifier = Modifier
                 .size(64.dp)
-                .background(AnalysisColors.Card, CircleShape),
+                .background(MaterialTheme.colorScheme.surfaceContainer, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 Icons.Filled.AccountBalanceWallet,
                 contentDescription = null,
-                tint = AnalysisColors.TextSecondary,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(28.dp),
             )
         }
         Spacer(modifier = Modifier.height(20.dp))
         Text(
             text = stringResource(R.string.analysis_no_balances),
-            color = AnalysisColors.TextPrimary,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
         )
         Text(
             text = stringResource(R.string.analysis_no_balances_hint),
-            color = AnalysisColors.TextSecondary,
-            fontSize = 14.sp,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(top = 8.dp),
         )
@@ -619,74 +612,138 @@ private fun analysisPreviewState(
     summary = summary,
 )
 
-@Preview(name = "Расходы", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun AnalysisContentExpensesPreview() {
-    ExpeysiTheme(darkTheme = true) {
+private fun AnalysisThemePreview(state: AnalysisUiState, dark: Boolean) {
+    ExpeysiTheme(darkTheme = dark) {
         AnalysisContent(
-            state = analysisPreviewState(TxType.EXPENSE),
+            state = state,
             actions = AnalysisActions(),
         )
     }
 }
 
-@Preview(name = "Доходы", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Расходы · Light", showBackground = true)
 @Composable
-private fun AnalysisContentIncomesPreview() {
-    ExpeysiTheme(darkTheme = true) {
-        AnalysisContent(
-            state = analysisPreviewState(TxType.INCOME),
-            actions = AnalysisActions(),
-        )
-    }
+private fun AnalysisContentExpensesLightPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.EXPENSE), dark = false)
 }
 
-@Preview(name = "Пусто", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(
+    name = "Расходы · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
-private fun AnalysisContentEmptyPreview() {
-    ExpeysiTheme(darkTheme = true) {
-        AnalysisContent(
-            state = analysisPreviewState(
-                TxType.EXPENSE,
-                summary = CategorySummary(0L, "₽", emptyList()),
-            ),
-            actions = AnalysisActions(),
-        )
-    }
+private fun AnalysisContentExpensesDarkPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.EXPENSE), dark = true)
 }
 
-@Preview(name = "Загрузка", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Доходы · Light", showBackground = true)
 @Composable
-private fun AnalysisContentLoadingPreview() {
-    ExpeysiTheme(darkTheme = true) {
-        AnalysisContent(
-            state = analysisPreviewState(TxType.EXPENSE, summary = null),
-            actions = AnalysisActions(),
-        )
-    }
+private fun AnalysisContentIncomesLightPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.INCOME), dark = false)
 }
 
-@Preview(name = "Нет балансов", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(
+    name = "Доходы · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
 @Composable
-private fun AnalysisContentNoBalancePreview() {
-    ExpeysiTheme(darkTheme = true) {
-        AnalysisContent(
-            state = AnalysisUiState(
-                balanceId = null,
-                type = TxType.EXPENSE,
-            ),
-            actions = AnalysisActions(),
-        )
-    }
+private fun AnalysisContentIncomesDarkPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.INCOME), dark = true)
 }
 
-@Preview(name = "Ошибка", showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(name = "Пусто · Light", showBackground = true)
 @Composable
-private fun AnalysisContentErrorPreview() {
-    ExpeysiTheme(darkTheme = true) {
-        AnalysisContent(
-            state = analysisPreviewState(TxType.EXPENSE, summary = null).copy(isError = true),
-            actions = AnalysisActions(),
-        )
-    }
+private fun AnalysisContentEmptyLightPreview() {
+    AnalysisThemePreview(
+        analysisPreviewState(
+            TxType.EXPENSE,
+            summary = CategorySummary(0L, "₽", emptyList()),
+        ),
+        dark = false,
+    )
+}
+
+@Preview(
+    name = "Пусто · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun AnalysisContentEmptyDarkPreview() {
+    AnalysisThemePreview(
+        analysisPreviewState(
+            TxType.EXPENSE,
+            summary = CategorySummary(0L, "₽", emptyList()),
+        ),
+        dark = true,
+    )
+}
+
+@Preview(name = "Загрузка · Light", showBackground = true)
+@Composable
+private fun AnalysisContentLoadingLightPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.EXPENSE, summary = null), dark = false)
+}
+
+@Preview(
+    name = "Загрузка · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun AnalysisContentLoadingDarkPreview() {
+    AnalysisThemePreview(analysisPreviewState(TxType.EXPENSE, summary = null), dark = true)
+}
+
+@Preview(name = "Нет балансов · Light", showBackground = true)
+@Composable
+private fun AnalysisContentNoBalanceLightPreview() {
+    AnalysisThemePreview(
+        AnalysisUiState(
+            balanceId = null,
+            type = TxType.EXPENSE,
+        ),
+        dark = false,
+    )
+}
+
+@Preview(
+    name = "Нет балансов · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun AnalysisContentNoBalanceDarkPreview() {
+    AnalysisThemePreview(
+        AnalysisUiState(
+            balanceId = null,
+            type = TxType.EXPENSE,
+        ),
+        dark = true,
+    )
+}
+
+@Preview(name = "Ошибка · Light", showBackground = true)
+@Composable
+private fun AnalysisContentErrorLightPreview() {
+    AnalysisThemePreview(
+        analysisPreviewState(TxType.EXPENSE, summary = null).copy(isError = true),
+        dark = false,
+    )
+}
+
+@Preview(
+    name = "Ошибка · Dark",
+    showBackground = true,
+    uiMode = Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun AnalysisContentErrorDarkPreview() {
+    AnalysisThemePreview(
+        analysisPreviewState(TxType.EXPENSE, summary = null).copy(isError = true),
+        dark = true,
+    )
 }

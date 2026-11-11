@@ -9,48 +9,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expeysi.app.R
-import com.expeysi.app.ui.icons.CategoryPalette
-import com.expeysi.app.ui.icons.IconCatalog
-
-/** Круглый бейдж категории: фон цвета категории с прозрачностью, иконка цветом категории. */
-@Composable
-internal fun AnalysisCategoryBadge(
-    iconKey: String,
-    colorKey: String,
-    modifier: Modifier = Modifier,
-    diameter: Dp = 40.dp,
-) {
-    val color = CategoryPalette.color(colorKey)
-    Box(
-        modifier = modifier
-            .size(diameter)
-            .background(color.copy(alpha = 0.18f), CircleShape),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = IconCatalog.icon(iconKey),
-            contentDescription = null,
-            tint = color,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
 
 /** Серые скелет-полоски на месте текста. */
 @Composable
@@ -58,7 +28,7 @@ internal fun SkeletonBar(width: Dp, height: Dp, modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .size(width, height)
-            .background(AnalysisColors.Skeleton, RoundedCornerShape(6.dp)),
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest, RoundedCornerShape(6.dp)),
     )
 }
 
@@ -67,7 +37,7 @@ internal fun SkeletonBar(width: Dp, height: Dp, modifier: Modifier = Modifier) {
 internal fun RefreshScrim(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
-            .background(Color.Black.copy(alpha = 0.4f))
+            .background(MaterialTheme.colorScheme.background.copy(alpha = 0.6f))
             .pointerInput(Unit) { detectTapGestures { } },
     )
 }
@@ -83,17 +53,11 @@ internal fun ErrorState(onRetry: () -> Unit) {
     ) {
         Text(
             text = stringResource(R.string.analysis_error),
-            color = AnalysisColors.TextSecondary,
-            fontSize = 15.sp,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(modifier = Modifier.height(16.dp))
-        Button(
-            onClick = onRetry,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White,
-                contentColor = Color.Black,
-            ),
-        ) {
+        Button(onClick = onRetry) {
             Text(text = stringResource(R.string.common_retry))
         }
     }

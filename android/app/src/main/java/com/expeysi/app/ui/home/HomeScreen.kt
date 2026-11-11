@@ -30,7 +30,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
@@ -100,6 +99,7 @@ import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import com.expeysi.app.ui.theme.LocalFinanceColors
+import com.expeysi.app.ui.theme.TopCardShape
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
@@ -120,7 +120,6 @@ private const val MONTH_PERIOD_INDEX = 2
 private val homePeriodLabels = listOf(R.string.home_today, R.string.home_seven_days, R.string.home_thirty_days)
 private val homePeriodDays = listOf(1, 7, 30)
 
-private val TOP_CARD_SHAPE = RoundedCornerShape(28.dp)
 private const val TOP_CATEGORIES_VISIBLE = 3
 private const val VISIBLE_ACCOUNT_CHIPS = 3
 
@@ -509,7 +508,7 @@ private fun HeroCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = TOP_CARD_SHAPE,
+        shape = TopCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
@@ -522,7 +521,7 @@ private fun HeroCard(
                             Color.Transparent,
                         ),
                     ),
-                    shape = TOP_CARD_SHAPE,
+                    shape = TopCardShape,
                 )
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -695,7 +694,7 @@ private fun PeriodSummaryCard(
 
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = TOP_CARD_SHAPE,
+        shape = TopCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(
@@ -816,7 +815,7 @@ private fun TopExpensesCard(
     val shares = CategoryShares.of(categories.map { it.amountMinor })
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = TOP_CARD_SHAPE,
+        shape = TopCardShape,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
