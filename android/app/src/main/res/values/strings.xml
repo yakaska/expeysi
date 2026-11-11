@@ -60,13 +60,10 @@
     <string name="drawer_incomes_report">Доходы</string>
     <string name="drawer_data_export">Экспорт</string>
     <string name="drawer_data_import">Импорт</string>
-    <string name="report_operations">Операции</string>
-    <string name="report_categories">Категории</string>
     <string name="report_total_income">Всего получено</string>
     <string name="report_total_expense">Всего потрачено</string>
     <string name="report_uncategorized">Без категории</string>
     <string name="report_empty">Нет операций за выбранный период.</string>
-    <string name="report_share_percent">%1$d%%</string>
     <string name="money_suffix_million">млн</string>
     <string name="money_suffix_billion">млрд</string>
     <string name="calc_title">Калькулятор</string>
