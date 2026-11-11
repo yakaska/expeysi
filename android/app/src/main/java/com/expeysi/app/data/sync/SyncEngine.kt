@@ -106,6 +106,8 @@ class SyncEngine @Inject constructor(
             mapOf(
                 "name" to value.name,
                 "currencyCode" to value.currencyCode,
+                "iconKey" to value.iconKey,
+                "colorKey" to value.colorKey,
                 "deleted" to value.deleted,
                 "updatedAt" to value.updatedAt,
             ),
@@ -168,6 +170,8 @@ class SyncEngine @Inject constructor(
             writes += family.collection("balances").document(value.id) to mapOf(
                 "name" to value.name,
                 "currencyCode" to value.currencyCode,
+                "iconKey" to value.iconKey,
+                "colorKey" to value.colorKey,
                 "deleted" to value.deleted,
                 "updatedAt" to value.updatedAt,
             )
@@ -257,6 +261,8 @@ class SyncEngine @Inject constructor(
             id = document.id,
             name = document.getString("name") ?: return,
             currencyCode = document.getString("currencyCode") ?: "RUB",
+            iconKey = document.getString("iconKey") ?: "",
+            colorKey = document.getString("colorKey") ?: "default",
             deleted = document.getBoolean("deleted") ?: false,
             updatedAt = document.getLong("updatedAt") ?: 0,
         )

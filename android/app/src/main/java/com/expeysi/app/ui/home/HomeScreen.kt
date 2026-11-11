@@ -1,7 +1,5 @@
 package com.expeysi.app.ui.home
 
-import android.content.ClipData
-import android.widget.Toast
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -43,8 +41,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -57,7 +53,6 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,10 +69,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.platform.ClipEntry
-import androidx.compose.ui.platform.LocalClipboard
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -177,12 +171,10 @@ fun HomeContent(
     state: HomeUiState,
     actions: HomeActions,
 ) {
-    val clipboard = LocalClipboard.current
-    val context = LocalContext.current
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var showScrollToTop by remember { mutableStateOf(false) }
-    var balanceMenuOpen by remember { mutableStateOf(false) }
+    var balanceSheetOpen by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(listState) {
         var previousPosition = 0 to 0
@@ -212,68 +204,11 @@ fun HomeContent(
         topBar = {
             TopAppBar(
                 title = {
-                    TextButton(onClick = { balanceMenuOpen = true }) {
-                        Text(
-                            state.selectedBalance?.let { balance ->
-                                stringResource(R.string.home_title_with_currency, balance.name, balance.currencyCode)
-                            } ?: stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleLarge,
-                        )
-                        Icon(
-                            Icons.Filled.ArrowDropDown,
-                            contentDescription = stringResource(R.string.home_select_balance),
-                        )
-                        DropdownMenu(
-                            expanded = balanceMenuOpen,
-                            onDismissRequest = { balanceMenuOpen = false },
-                        ) {
-                            state.balances.forEach { balance ->
-                                DropdownMenuItem(
-                                    text = { Text(balance.name) },
-                                    onClick = {
-                                        actions.onBalanceSelected(balance.id)
-                                        balanceMenuOpen = false
-                                    },
-                                )
-                            }
-                            HorizontalDivider()
-                            state.selectedBalance?.let { balance ->
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_edit_balance)) },
-                                    onClick = {
-                                        balanceMenuOpen = false
-                                        actions.onEditBalanceClick(balance.id)
-                                    },
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.home_new_balance)) },
-                                onClick = {
-                                    balanceMenuOpen = false
-                                    actions.onAddBalanceClick()
-                                },
-                            )
-                            state.familyId?.let {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.home_family_code, it)) },
-                                    onClick = {
-                                        coroutineScope.launch {
-                                            clipboard.setClipEntry(
-                                                ClipEntry(ClipData.newPlainText("family code", it)),
-                                            )
-                                            balanceMenuOpen = false
-                                            Toast.makeText(
-                                                context,
-                                                R.string.home_family_code_copied,
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
+                    Text(
+                        state.selectedBalance?.name
+                            ?: stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = actions.onMenuClick) {
@@ -351,10 +286,12 @@ fun HomeContent(
             ) {
                 item {
                     HeroCard(
+                        selectedBalance = state.selectedBalance,
                         totalBalanceMinor = state.totalBalanceMinor,
                         currencySymbol = state.currencySymbol,
                         accounts = state.accounts,
                         onAccountClick = actions.onAccountHistoryClick,
+                        onBalanceSwitcherClick = { balanceSheetOpen = true },
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
                 }
@@ -496,14 +433,37 @@ fun HomeContent(
             }
         }
     }
+    if (balanceSheetOpen) {
+        BalanceSwitcherSheet(
+            balances = state.balances,
+            selectedBalance = state.selectedBalance,
+            balanceTotals = state.balanceTotals,
+            balanceSymbols = state.balanceSymbols,
+            onBalanceSelected = { id ->
+                actions.onBalanceSelected(id)
+                balanceSheetOpen = false
+            },
+            onAddBalance = {
+                actions.onAddBalanceClick()
+                balanceSheetOpen = false
+            },
+            onEditBalance = {
+                state.selectedBalance?.let { actions.onEditBalanceClick(it.id) }
+                balanceSheetOpen = false
+            },
+            onDismiss = { balanceSheetOpen = false },
+        )
+    }
 }
 
 @Composable
 private fun HeroCard(
+    selectedBalance: BalanceEntity?,
     totalBalanceMinor: Long,
     currencySymbol: String,
     accounts: List<AccountBalance>,
     onAccountClick: (String) -> Unit,
+    onBalanceSwitcherClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -526,11 +486,24 @@ private fun HeroCard(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(
-                text = stringResource(R.string.home_balance),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.home_balance),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                if (selectedBalance != null) {
+                    selectedBalanceChip(
+                        name = selectedBalance.name,
+                        currencyCode = selectedBalance.currencyCode,
+                        onBalanceSwitcherClick = onBalanceSwitcherClick,
+                    )
+                }
+            }
             Text(
                 text = "${Money.formatAuto(totalBalanceMinor)} $currencySymbol",
                 style = MaterialTheme.typography.displaySmall,
@@ -554,6 +527,44 @@ private fun HeroCard(
             }
         }
     }
+}
+
+/** Чип переключателя баланса: имя и код валюты, если его нет в имени. */
+@Composable
+private fun selectedBalanceChip(
+    name: String,
+    currencyCode: String,
+    onBalanceSwitcherClick: () -> Unit,
+) {
+    val chipText = balanceChipText(name, currencyCode)
+    val chipCd = stringResource(R.string.home_select_balance_current, chipText)
+    AssistChip(
+        onClick = onBalanceSwitcherClick,
+        label = {
+            Text(
+                text = chipText,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        trailingIcon = {
+            Icon(
+                Icons.Filled.ArrowDropDown,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        modifier = Modifier
+            .widthIn(max = 200.dp)
+            .semantics { contentDescription = chipCd },
+    )
+}
+
+/** Текст чипа: «Название» или «Название · КОД», если кода нет в названии. */
+private fun balanceChipText(name: String, currencyCode: String): String {
+    val suffix = chipCurrencyCode(name, currencyCode)
+    return if (suffix.isBlank()) name else "$name · $suffix"
 }
 
 @Composable
@@ -953,6 +964,89 @@ private enum class PreviewCase {
     Zero,
 }
 
+private val previewHeroCardAccount = AccountEntity(
+    id = "account-card",
+    name = "Карта",
+    iconKey = "credit_card",
+    colorKey = "blue",
+    openingBalanceMinor = 50_000,
+    balanceId = "b",
+    updatedAt = 0,
+)
+
+@Preview(name = "Hero · короткое название", showBackground = true)
+@Composable
+private fun HeroCardShortNamePreview() {
+    HeroCardPreview(name = "Семейный", currencyCode = "RUB", dark = false)
+}
+
+@Preview(
+    name = "Hero · короткое название · Dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun HeroCardShortNameDarkPreview() {
+    HeroCardPreview(name = "Семейный", currencyCode = "RUB", dark = true)
+}
+
+@Preview(name = "Hero · длинное название", showBackground = true)
+@Composable
+private fun HeroCardLongNamePreview() {
+    HeroCardPreview(name = "Семейный баланс на месяц и все запасы", currencyCode = "RUB", dark = false)
+}
+
+@Preview(
+    name = "Hero · длинное название · Dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun HeroCardLongNameDarkPreview() {
+    HeroCardPreview(name = "Семейный баланс на месяц и все запасы", currencyCode = "RUB", dark = true)
+}
+
+@Preview(name = "Hero · код в названии", showBackground = true)
+@Composable
+private fun HeroCardCurrencyInNamePreview() {
+    HeroCardPreview(name = "Вьетнам (VND)", currencyCode = "VND", dark = false)
+}
+
+@Preview(
+    name = "Hero · код в названии · Dark",
+    showBackground = true,
+    uiMode = android.content.res.Configuration.UI_MODE_NIGHT_YES,
+)
+@Composable
+private fun HeroCardCurrencyInNameDarkPreview() {
+    HeroCardPreview(name = "Вьетнам (VND)", currencyCode = "VND", dark = true)
+}
+
+@Composable
+private fun HeroCardPreview(name: String, currencyCode: String, dark: Boolean) {
+    ExpeysiTheme(darkTheme = dark) {
+        HeroCard(
+            selectedBalance = BalanceEntity(
+                id = "b",
+                name = name,
+                currencyCode = currencyCode,
+                updatedAt = 0,
+            ),
+            totalBalanceMinor = 48_750_00,
+            currencySymbol = "₽",
+            accounts = listOf(
+                AccountBalance(
+                    account = previewHeroCardAccount,
+                    balanceMinor = 48_750,
+                    currencySymbol = "₽",
+                ),
+            ),
+            onAccountClick = {},
+            onBalanceSwitcherClick = {},
+        )
+    }
+}
+
 @Preview(name = "Light · один счёт", showBackground = true)
 @Composable
 private fun HomeContentSingleLightPreview() {
@@ -1036,7 +1130,7 @@ private fun HomeContentZeroDarkPreview() {
 private fun previewHomeState(case: PreviewCase): HomeUiState {
     val balance = BalanceEntity(
         id = "balance",
-        name = "Семейный бюджет",
+        name = "Семейный баланс",
         currencyCode = "RUB",
         updatedAt = 0,
     )

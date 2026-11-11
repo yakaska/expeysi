@@ -98,6 +98,18 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
     }
 }
 
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE balances ADD COLUMN iconKey TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE balances ADD COLUMN colorKey TEXT NOT NULL DEFAULT 'default'")
+        // Иконка и цвет пресет-баланса (детерминированный id), как с цветами счетов в 5→6.
+        db.execSQL(
+            "UPDATE balances SET iconKey = 'payments', colorKey = 'blue' WHERE id = ?",
+            arrayOf(PresetData.BALANCE_MAIN_ID),
+        )
+    }
+}
+
 @Database(
     entities = [
         AccountEntity::class,
@@ -106,7 +118,7 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

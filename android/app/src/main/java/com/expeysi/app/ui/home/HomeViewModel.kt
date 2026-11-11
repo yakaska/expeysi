@@ -80,6 +80,10 @@ data class HomeUiState(
     val currencySymbol: String = "",
     val accounts: List<AccountBalance> = emptyList(),
     val totalBalanceMinor: Long = 0,
+    /** Итог по счетам каждого баланса; для шторки переключателя. */
+    val balanceTotals: Map<String, Long> = emptyMap(),
+    /** Символ валюты по id баланса; для шторки переключателя. */
+    val balanceSymbols: Map<String, String> = emptyMap(),
     val expense: WindowSums = WindowSums(0, 0, 0),
     val income: WindowSums = WindowSums(0, 0, 0),
     val periodDays: Int = DEFAULT_PERIOD_DAYS,
@@ -201,6 +205,8 @@ class HomeViewModel @Inject constructor(
             currencySymbol = symbol,
             accounts = accountBalances,
             totalBalanceMinor = accountBalances.sumOf { it.balanceMinor },
+            balanceTotals = balanceTotals(balances, accounts, transactions),
+            balanceSymbols = balances.associate { it.id to (symbolByCode[it.currencyCode] ?: it.currencyCode) },
             expense = windowSums(TxType.EXPENSE),
             income = windowSums(TxType.INCOME),
             familyId = familyStore.familyId.value,

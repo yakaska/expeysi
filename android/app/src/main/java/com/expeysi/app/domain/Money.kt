@@ -67,14 +67,15 @@ object Money {
     fun formatAuto(minor: Long): String = if (minor % 100 == 0L) formatWhole(minor) else format(minor)
 
     /**
-     * Компактный вид одной строкой: до миллиона основных единиц — целое число без
-     * копеек, от миллиона — один знак после запятой и единица из ресурсов UI-слоя
-     * ("6,7 млн"; 999,95 млн → "1 млрд" вместо "1000,0 млн"). Знак минус сохраняется.
+     * Компактный вид одной строкой: до миллиона основных единиц — целое число либо
+     * дробная часть, если она есть ("1 234,56"); от миллиона — один знак после
+     * запятой и единица из ресурсов UI-слоя ("6,7 млн"; 999,95 млн → "1 млрд"
+     * вместо "1000,0 млн"). Знак минус сохраняется.
      */
     fun formatCompact(minor: Long, millionSuffix: String, billionSuffix: String): String {
         val compact = compact(minor)
         return when (compact.scale) {
-            Scale.NONE -> formatWhole(minor)
+            Scale.NONE -> compact.digits
             Scale.MILLION -> compactScaledText(compact.digits, millionSuffix)
             Scale.BILLION -> compactScaledText(compact.digits, billionSuffix)
         }
@@ -101,7 +102,7 @@ object Money {
         }
         return when (scale) {
             Scale.NONE -> {
-                val digits = if (minor % 100 == 0L) grouped(major) else format(absolute)
+                val digits = if (minor % 100 == 0L) grouped(major, NON_BREAKING_SPACE) else format(absolute)
                 CompactAmount(sign + digits, Scale.NONE)
             }
             else -> compactScaled(sign, absolute, scale)
