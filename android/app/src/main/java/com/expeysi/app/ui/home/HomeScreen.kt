@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Receipt
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -585,6 +586,9 @@ private fun selectedBalanceChip(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         },
+        // Без подложки и обводки: чип растворяется в карточке, подсветка рамки не выбивается.
+        colors = AssistChipDefaults.assistChipColors(containerColor = Color.Transparent),
+        border = null,
         modifier = Modifier
             .widthIn(max = 200.dp)
             .semantics { contentDescription = chipCd },

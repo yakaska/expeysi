@@ -87,8 +87,10 @@
     <string name="analysis_empty_income">Нет доходов за период</string>
     <string name="analysis_error">Не удалось загрузить данные</string>
     <string name="analysis_chart_cd">%1$s за %2$s %3$s</string>
-    <string name="analysis_prev_month_cd">Предыдущий месяц</string>
-    <string name="analysis_next_month_cd">Следующий месяц</string>
+    <string name="analysis_prev_period_cd">Предыдущий период</string>
+    <string name="analysis_next_period_cd">Следующий период</string>
+    <string name="analysis_quarter_label">%1$d-й квартал %2$d</string>
+    <string name="analysis_half_year_label">%1$d-е полугодие %2$d</string>
     <string name="analysis_account_last4">···· %1$s</string>
     <string name="analysis_no_balances">Балансы отсутствуют</string>
     <string name="analysis_no_balances_hint">Добавьте баланс на главном экране, чтобы анализировать операции</string>

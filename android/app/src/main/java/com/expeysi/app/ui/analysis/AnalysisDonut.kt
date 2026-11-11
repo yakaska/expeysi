@@ -89,7 +89,7 @@ internal fun AnalysisDonut(
             Icon(
                 Icons.Filled.ChevronLeft,
                 contentDescription = if (previousVisible) {
-                    stringResource(R.string.analysis_prev_month_cd)
+                    stringResource(R.string.analysis_prev_period_cd)
                 } else {
                     null
                 },
@@ -185,7 +185,7 @@ internal fun AnalysisDonut(
             Icon(
                 Icons.Filled.ChevronRight,
                 contentDescription = if (nextVisible) {
-                    stringResource(R.string.analysis_next_month_cd)
+                    stringResource(R.string.analysis_next_period_cd)
                 } else {
                     null
                 },

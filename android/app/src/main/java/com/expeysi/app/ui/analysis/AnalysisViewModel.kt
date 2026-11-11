@@ -35,8 +35,6 @@ data class AnalysisUiState(
     val balanceId: String? = null,
     val type: TxType = TxType.EXPENSE,
     val period: AnalysisPeriod = AnalysisPeriod(month = YearMonth.now()),
-    /** Текущий месяц устройства: ограничение навигации вперёд. */
-    val currentMonth: YearMonth = YearMonth.now(),
     val accounts: List<AnalysisAccount> = emptyList(),
     /** Применённая фильтрация счетов; null — все счета баланса. */
     val selectedAccountIds: Set<String>? = null,
@@ -45,7 +43,7 @@ data class AnalysisUiState(
     val filtersOpen: Boolean = false,
     val periodPickerOpen: Boolean = false,
     val summary: CategorySummary? = null,
-    /** Самая ранняя операция баланса: управляет стрелкой «предыдущий месяц». */
+    /** Самая ранняя операция баланса: управляет стрелкой «предыдущий период». */
     val earliestMillis: Long? = null,
     val isRefreshing: Boolean = false,
     val isError: Boolean = false,
@@ -58,10 +56,6 @@ data class AnalysisUiState(
     /** Первое открытие без данных: вместо контента — скелетоны. */
     val isFirstLoad: Boolean
         get() = summary == null && !isError && !isBalanceMissing
-
-    /** Стрелка «следующий месяц» видна, пока есть куда листать вперёд. */
-    val nextMonthVisible: Boolean
-        get() = period.kind == AnalysisPeriodKind.MONTHS && period.month.isBefore(currentMonth)
 
     /** Фильтр реально ограничивает счета: выбрано подмножество, а не все. */
     val isFilterActive: Boolean
@@ -98,7 +92,6 @@ class AnalysisViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(
         AnalysisUiState(
             period = restorePeriod() ?: AnalysisPeriod(month = currentMonth),
-            currentMonth = currentMonth,
             selectedAccountIds = parseAccountIds(savedStateHandle.get<String>(KEY_ACCOUNTS)),
             expanded = savedStateHandle.get<Boolean>(KEY_EXPANDED) ?: false,
         ),
@@ -120,12 +113,13 @@ class AnalysisViewModel @Inject constructor(
         reload(showScrim = false)
     }
 
-    fun shiftMonth(delta: Int) {
-        val state = _uiState.value
-        if (state.period.kind != AnalysisPeriodKind.MONTHS) return
-        val next = state.period.month.plusMonths(delta.toLong())
-        if (next.isAfter(currentMonth)) return
-        _uiState.update { it.copy(period = it.period.copy(month = next)) }
+    fun shiftPeriod(delta: Int) {
+        val period = _uiState.value.period
+        val next = period.shiftedBy(delta) ?: return
+        val now = ZonedDateTime.now(zone)
+        // Свайп дублирует клики по стрелкам, поэтому ограничение «вперёд» то же.
+        if (delta > 0 && !period.hasNext(now, zone)) return
+        _uiState.update { it.copy(period = next) }
         persistPeriod()
         reload(showScrim = false)
     }
@@ -139,10 +133,14 @@ class AnalysisViewModel @Inject constructor(
     }
 
     fun selectPeriod(value: HistoryPeriod) {
-        val next = if (value == HistoryPeriod.MONTH) {
-            AnalysisPeriod(month = currentMonth)
-        } else {
-            AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = value)
+        val next = when (value) {
+            HistoryPeriod.MONTH -> AnalysisPeriod(month = currentMonth)
+            HistoryPeriod.ALL -> AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = value)
+            else -> AnalysisPeriod(
+                kind = AnalysisPeriodKind.CALENDAR,
+                unit = value,
+                anchor = LocalDate.now(zone),
+            )
         }
         _uiState.update { it.copy(period = next, periodPickerOpen = false) }
         persistPeriod()
@@ -220,7 +218,7 @@ class AnalysisViewModel @Inject constructor(
 
     /**
      * Перезагрузка отчёта; скрим затемняет контент только при смене периода,
-     * фильтров или баланса — листание месяцев и смена типа идут без него,
+     * фильтров или баланса — листание периодов и смена типа идут без него,
      * диаграмма сама анимирует старые данные в новые.
      */
     private fun reload(showScrim: Boolean = true) {
@@ -285,11 +283,14 @@ class AnalysisViewModel @Inject constructor(
         savedStateHandle[KEY_TYPE] = snapshot.type.wire
         savedStateHandle[KEY_KIND] = when (snapshot.period.kind) {
             AnalysisPeriodKind.MONTHS -> "months"
+            AnalysisPeriodKind.CALENDAR -> "calendar"
             AnalysisPeriodKind.SLIDING -> "sliding"
             AnalysisPeriodKind.RANGE -> "range"
         }
         savedStateHandle[KEY_SLIDING] = snapshot.period.sliding.name
         savedStateHandle[KEY_MONTH] = snapshot.period.month.toString()
+        savedStateHandle[KEY_UNIT] = snapshot.period.unit.name
+        savedStateHandle[KEY_ANCHOR] = snapshot.period.anchor.toString()
         val range = snapshot.period.range
         savedStateHandle[KEY_RANGE] = range?.let { "${it.startMillis}:${it.endMillisExclusive}" } ?: ""
         savedStateHandle[KEY_ACCOUNTS] = snapshot.selectedAccountIds.orEmpty().joinToString(",")
@@ -302,6 +303,15 @@ class AnalysisViewModel @Inject constructor(
             ?: return null
         return when (savedStateHandle.get<String>(KEY_KIND)) {
             "months" -> AnalysisPeriod(month = month)
+            "calendar" -> {
+                val unit = savedStateHandle.get<String>(KEY_UNIT)
+                    ?.let { name -> HistoryPeriod.entries.firstOrNull { it.name == name } }
+                    ?: return null
+                val anchor = savedStateHandle.get<String>(KEY_ANCHOR)
+                    ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+                    ?: return null
+                AnalysisPeriod(kind = AnalysisPeriodKind.CALENDAR, unit = unit, anchor = anchor)
+            }
             "sliding" -> {
                 val sliding = savedStateHandle.get<String>(KEY_SLIDING)
                     ?.let { name -> HistoryPeriod.entries.firstOrNull { it.name == name } }
@@ -327,6 +337,8 @@ class AnalysisViewModel @Inject constructor(
         const val KEY_KIND = "analysis_period_kind"
         const val KEY_SLIDING = "analysis_period_sliding"
         const val KEY_MONTH = "analysis_period_month"
+        const val KEY_UNIT = "analysis_period_unit"
+        const val KEY_ANCHOR = "analysis_period_anchor"
         const val KEY_RANGE = "analysis_period_range"
         const val KEY_ACCOUNTS = "analysis_accounts"
         const val KEY_EXPANDED = "analysis_expanded"
