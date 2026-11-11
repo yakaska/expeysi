@@ -52,9 +52,8 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-private val reportDayFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))
+private val reportDayFormatter = DateTimeFormatter.ofPattern("d MMMM")
 private val reportTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
 @Composable
@@ -102,7 +101,7 @@ private fun CategorySelectionContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Выберите категории") },
+                title = { Text(stringResource(R.string.categoryreport_select_categories)) },
                 navigationIcon = { BackButton(onBack) },
             )
         },
@@ -114,7 +113,7 @@ private fun CategorySelectionContent(
                     .fillMaxWidth()
                     .padding(16.dp),
             ) {
-                Text("Показать операции")
+                Text(stringResource(R.string.categoryreport_show_operations))
             }
         },
     ) { innerPadding ->
@@ -129,7 +128,11 @@ private fun CategorySelectionContent(
                 if (typedCategories.isNotEmpty()) {
                     item(key = "header-${type.wire}") {
                         Text(
-                            if (type == TxType.EXPENSE) "Расходы" else "Доходы",
+                            if (type == TxType.EXPENSE) {
+                                stringResource(R.string.home_expenses)
+                            } else {
+                                stringResource(R.string.home_income)
+                            },
                             style = MaterialTheme.typography.titleSmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -171,11 +174,11 @@ private fun CategoryReportContent(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Операции по категориям") },
+                title = { Text(stringResource(R.string.categoryreport_title)) },
                 navigationIcon = { BackButton(onBack) },
                 actions = {
                     IconButton(onClick = onEditCategories) {
-                        Icon(Icons.Filled.Category, contentDescription = "Изменить категории")
+                        Icon(Icons.Filled.Category, contentDescription = stringResource(R.string.categoryreport_edit_categories_cd))
                     }
                 },
             )
@@ -211,7 +214,7 @@ private fun CategoryReportContent(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(
-                                "Баланс",
+                                stringResource(R.string.common_balance),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = MaterialTheme.colorScheme.tertiary,
                             )
@@ -237,7 +240,7 @@ private fun CategoryReportContent(
                 if (state.items.isEmpty()) {
                     item(key = "empty") {
                         Text(
-                            "Нет операций за выбранный период.",
+                            stringResource(R.string.report_empty),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 16.dp),
@@ -302,7 +305,10 @@ private fun ReportTransactionRow(
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
-            Text(item.categoryName, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                style = MaterialTheme.typography.bodyLarge,
+            )
             Text(
                 listOfNotNull(
                     item.accountName.ifBlank { null },
@@ -331,6 +337,6 @@ private fun ReportTransactionRow(
 @Composable
 private fun BackButton(onBack: () -> Unit) {
     IconButton(onClick = onBack) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
     }
 }

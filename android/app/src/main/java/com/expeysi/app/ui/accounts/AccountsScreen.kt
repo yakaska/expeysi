@@ -27,9 +27,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.domain.Money
 import com.expeysi.app.ui.icons.BalanceIcon
 import com.expeysi.app.ui.icons.CategoryIcon
@@ -47,17 +49,17 @@ fun AccountsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Счета") },
+                title = { Text(stringResource(R.string.home_accounts)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить счёт")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.home_add_account))
             }
         },
     ) { innerPadding ->
@@ -114,11 +116,8 @@ private fun LazyListScope.balanceGroupItems(
                 },
                 headlineContent = { Text(balance.account.name) },
                 supportingContent = {
-                    Text(
-                        "Начальный остаток: " +
-                            "${Money.formatAuto(balance.account.openingBalanceMinor)} " +
-                            balance.currencySymbol,
-                    )
+                    // %1$s — начальный остаток, %2$s — символ валюты.
+                    Text(stringResource(R.string.accounts_opening_balance, Money.formatAuto(balance.account.openingBalanceMinor), balance.currencySymbol))
                 },
                 trailingContent = {
                     Text(

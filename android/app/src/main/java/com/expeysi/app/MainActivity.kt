@@ -25,6 +25,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.accounts.AccountsScreen
 import com.expeysi.app.ui.accounts.EditAccountScreen
 import com.expeysi.app.ui.add.AddTransactionScreen
@@ -35,6 +36,7 @@ import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
+import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
@@ -42,7 +44,6 @@ import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.home.HomeViewModel
 import com.expeysi.app.ui.placeholder.PlaceholderScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
-import com.expeysi.app.ui.transactionreport.TransactionReportScreen
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 
@@ -86,7 +87,7 @@ private fun AppNavigation() {
 
     LaunchedEffect(importState.message) {
         importState.message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, it.asString(context), Toast.LENGTH_LONG).show()
             homeViewModel.consumeImportMessage()
         }
     }
@@ -122,13 +123,23 @@ private fun AppNavigation() {
         onExpensesReportClick = {
             scope.launch {
                 drawerState.close()
-                navController.navigate("transaction-report/expense")
+                // Как клик по карточке сводки: детализация за период выбранного баланса.
+                // Без баланса перехода нет — карточка в этом случае тоже ничего не делает.
+                homeUiState.selectedBalance?.let { balance ->
+                    navController.navigate(
+                        "history/balance/${balance.id}?type=${TxType.EXPENSE.wire}&days=${homeUiState.periodDays}",
+                    )
+                }
             }
         },
         onIncomesReportClick = {
             scope.launch {
                 drawerState.close()
-                navController.navigate("transaction-report/income")
+                homeUiState.selectedBalance?.let { balance ->
+                    navController.navigate(
+                        "history/balance/${balance.id}?type=${TxType.INCOME.wire}&days=${homeUiState.periodDays}",
+                    )
+                }
             }
         },
         onImportClick = {
@@ -255,15 +266,6 @@ private fun AppNavigation() {
                 ),
             ) {
                 CategoryOperationsScreen(
-                    onBack = { navigateBack() },
-                    onItemClick = { id -> navController.navigate("edit/$id") },
-                )
-            }
-            composable(
-                route = "transaction-report/{type}",
-                arguments = listOf(navArgument("type") { type = NavType.StringType }),
-            ) {
-                TransactionReportScreen(
                     onBack = { navigateBack() },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )

@@ -97,7 +97,7 @@ class CalculatorTest {
         val calc = Calculator()
         type(calc, "5/0")
         calc.equals()
-        assertEquals("Ошибка", calc.display)
+        assertEquals(Calculator.ERROR, calc.display)
         assertNull(calc.resultText())
         calc.clear()
         assertEquals("0", calc.display)
@@ -189,9 +189,9 @@ class CalculatorTest {
         val calc = Calculator()
         type(calc, "5/0")
         calc.equals()
-        assertEquals("Ошибка", calc.display)
+        assertEquals(Calculator.ERROR, calc.display)
         calc.backspace()
-        assertEquals("Ошибка", calc.display)
+        assertEquals(Calculator.ERROR, calc.display)
     }
 
     @Test
@@ -284,7 +284,7 @@ class CalculatorTest {
         val calc = Calculator()
         type(calc, "5/0")
         calc.equals()
-        assertEquals("Ошибка", calc.display)
+        assertEquals(Calculator.ERROR, calc.display)
         assertEquals("", calc.expression)
     }
 
@@ -296,6 +296,6 @@ class CalculatorTest {
         assertEquals("999", Calculator.groupDigits("999"))
         assertEquals("-1 234", Calculator.groupDigits("-1234"))
         assertEquals("0", Calculator.groupDigits("0"))
-        assertEquals("Ошибка", Calculator.groupDigits("Ошибка"))
+        assertEquals(Calculator.ERROR, Calculator.groupDigits(Calculator.ERROR))
     }
 }

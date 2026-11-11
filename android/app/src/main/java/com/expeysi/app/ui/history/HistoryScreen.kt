@@ -62,6 +62,7 @@ import com.expeysi.app.R
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
+import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -70,10 +71,9 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
-private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))
+private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -142,6 +142,10 @@ fun HistoryScreen(
             if (mode != state.mode) viewModel.selectMode(mode)
         }
     }
+    // Подсветка сегментов следует за страницей пейджера, а не за состоянием VM:
+    // VM обновляется по settledPage, то есть после анимации заскока, и чипы
+    // заметно запаздывают за свайпом.
+    val selectedMode = modes.getOrNull(pagerState.currentPage)?.first ?: state.mode
 
     val activeListState = if (state.detail != null) {
         detailListState
@@ -173,7 +177,7 @@ fun HistoryScreen(
                     val periodLabel = customRange?.let { rangeLabel(it) } ?: stringResource(period.labelRes())
                     Column {
                         Text(
-                            text = state.title,
+                            text = state.title.asString(),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                         )
@@ -253,7 +257,7 @@ fun HistoryScreen(
                 ) {
                     modes.forEachIndexed { index, (mode, labelRes) ->
                         SegmentedButton(
-                            selected = state.mode == mode,
+                            selected = mode == selectedMode,
                             onClick = { viewModel.selectMode(mode) },
                             shape = SegmentedButtonDefaults.itemShape(index = index, count = modes.size),
                         ) {
@@ -274,7 +278,10 @@ fun HistoryScreen(
                                 contentDescription = stringResource(R.string.history_back_groups_cd),
                             )
                         }
-                        Text(state.detailTitle, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            state.detailTitle?.asString().orEmpty(),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
                     }
                     TransactionList(state.items, onItemClick, detailListState)
                 }
@@ -347,7 +354,7 @@ private fun TransactionList(
                     incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
                     expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
                     currencySymbol = groupItems.first().currencySymbol,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
             groupItems.forEachIndexed { index, item ->
@@ -386,7 +393,10 @@ private fun HistoryRow(
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
-            Text(item.categoryName, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                style = MaterialTheme.typography.bodyLarge,
+            )
             Text(
                 listOfNotNull(
                     item.accountName.ifBlank { null },

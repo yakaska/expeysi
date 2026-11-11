@@ -2,7 +2,9 @@ package com.expeysi.app.ui.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.R
 import com.expeysi.app.data.AuthRepository
+import com.expeysi.app.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,8 +19,8 @@ class AuthViewModel @Inject constructor(
     private val _loading = MutableStateFlow(false)
     val loading: StateFlow<Boolean> = _loading.asStateFlow()
 
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    private val _error = MutableStateFlow<UiText?>(null)
+    val error: StateFlow<UiText?> = _error.asStateFlow()
 
     fun signIn(idToken: String) {
         viewModelScope.launch {
@@ -27,7 +29,7 @@ class AuthViewModel @Inject constructor(
             try {
                 authRepository.signInWithGoogle(idToken)
             } catch (e: Exception) {
-                _error.value = e.localizedMessage ?: "Не удалось выполнить вход"
+                _error.value = e.localizedMessage?.let { UiText.Plain(it) } ?: UiText.Res(R.string.auth_error_generic)
             } finally {
                 _loading.value = false
             }
@@ -35,6 +37,6 @@ class AuthViewModel @Inject constructor(
     }
 
     fun onSignInCancelled() {
-        _error.value = "Вход отменён"
+        _error.value = UiText.Res(R.string.auth_error_cancelled)
     }
 }

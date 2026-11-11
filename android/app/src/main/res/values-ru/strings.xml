@@ -39,7 +39,6 @@
     <string name="home_thirty_days">30 дней</string>
     <string name="home_balance">Всего</string>
     <string name="home_title_with_currency">%1$s · %2$s</string>
-    <string name="home_more_accounts" translatable="false">+%1$d</string>
     <string name="home_add_account">Добавить счёт</string>
     <string name="history_mode_transactions">Операции</string>
     <string name="history_mode_categories">Категории</string>
@@ -52,7 +51,7 @@
     <string name="family_leave_action">Выйти из семьи</string>
     <string name="family_leave_confirmation">Выйти из семьи? Общие данные останутся у остальных участников. Присоединиться снова можно по коду приглашения.</string>
     <string name="family_leave_error">Не удалось выйти из семьи. Проверьте подключение и попробуйте ещё раз.</string>
-    <string name="action_cancel">Отмена</string>
+    <string name="common_cancel">Отмена</string>
     <string name="common_copy">Копировать</string>
     <string name="common_back">Назад</string>
     <string name="drawer_transaction_comparison">Сравнение</string>
@@ -60,13 +59,10 @@
     <string name="drawer_incomes_report">Доходы</string>
     <string name="drawer_data_export">Экспорт</string>
     <string name="drawer_data_import">Импорт</string>
-    <string name="report_operations">Операции</string>
-    <string name="report_categories">Категории</string>
     <string name="report_total_income">Всего получено</string>
     <string name="report_total_expense">Всего потрачено</string>
     <string name="report_uncategorized">Без категории</string>
     <string name="report_empty">Нет операций за выбранный период.</string>
-    <string name="report_share_percent">%1$d%%</string>
     <string name="money_suffix_million">млн</string>
     <string name="money_suffix_billion">млрд</string>
     <string name="calc_title">Калькулятор</string>
@@ -115,10 +111,90 @@
     <string name="period_pick_cd">Выбрать период</string>
     <string name="period_selected_cd">Выбрано</string>
     <string name="common_ok">ОК</string>
+    <string name="common_balance">Баланс</string>
+    <string name="common_save">Сохранить</string>
+    <string name="common_delete">Удалить</string>
+    <string name="common_search">Поиск</string>
+    <string name="common_name">Название</string>
+    <string name="common_icon">Иконка</string>
+    <string name="common_color">Цвет</string>
+    <string name="common_account">Счёт</string>
+    <string name="common_select">Выбрать…</string>
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
+    <string name="drawer_section_reports">Отчёты</string>
+    <string name="drawer_section_data">Данные</string>
+    <string name="drawer_section_misc">Разное</string>
+    <string name="drawer_home">Главная</string>
+    <string name="drawer_import_budget">Импорт из Бюджета</string>
+    <string name="history_detail_title_parts">%1$s · %2$s</string>
+    <!-- %1$s — количество импортированных операций. -->
+    <string name="import_done">Импортировано операций: %1$d</string>
+    <string name="import_error_open">Не удалось открыть файл</string>
+    <string name="import_error_generic">Не удалось импортировать файл</string>
+    <string name="import_error_empty_file">Файл пуст</string>
+    <!-- %1$s — название колонки формата, отсутствующей в файле. -->
+    <string name="import_error_missing_column">В файле нет колонки «%1$s»</string>
+    <!-- %1$d — номер строки CSV. -->
+    <string name="import_error_too_few_columns">Строка %1$d: недостаточно колонок</string>
+    <string name="import_error_no_transactions">В файле нет операций</string>
+    <string name="import_error_empty_account">Строка %1$d: пустое название счёта</string>
+    <string name="import_error_empty_category">Строка %1$d: пустая категория</string>
+    <string name="import_error_bad_currency">Строка %1$d: некорректная валюта</string>
+    <string name="import_error_bad_amount">Строка %1$d: некорректная сумма</string>
+    <string name="import_error_zero_amount">Строка %1$d: нулевая сумма</string>
+    <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
+    <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
+    <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
+    <string name="auth_error_generic">Не удалось выполнить вход</string>
+    <string name="auth_error_cancelled">Вход отменён</string>
+    <string name="family_error_connect">Не удалось подключить семью</string>
+    <string name="family_error_not_signed_in">Пользователь не вошёл</string>
+    <string name="family_error_empty_code">Введите код семьи</string>
+    <!-- %1$d — номер строки CSV. -->
+    <string name="add_delete_title">Удалить операцию?</string>
+    <string name="add_delete_text">Запись исчезнет из списка и перестанет влиять на баланс.</string>
+    <string name="add_time">Время</string>
+    <string name="add_date">Дата</string>
+    <string name="add_category">Категория</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="add_amount_label">Сумма, %1$s</string>
+    <string name="add_note_label">Комментарий (необязательно)</string>
+    <string name="add_title_new">Новая операция</string>
+    <string name="add_title_edit">Изменить операцию</string>
+    <string name="add_category_expense">Категория расхода</string>
+    <string name="add_category_income">Категория дохода</string>
+    <string name="add_add_category_row">Добавить новую категорию</string>
+    <string name="operation_type_expense">Расход</string>
+    <string name="operation_type_income">Доход</string>
+    <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
+    <string name="accounts_opening_balance">Начальный остаток: %1$s %2$s</string>
+    <string name="account_delete_title">Удалить счёт?</string>
+    <string name="account_delete_text">Счёт исчезнет из списка, его операции останутся в истории.</string>
+    <string name="account_title_new">Новый счёт</string>
+    <string name="account_title_edit">Изменить счёт</string>
+    <string name="account_opening_balance">Начальный остаток</string>
+    <string name="balance_delete_title">Удалить баланс?</string>
+    <string name="balance_delete_text">Баланс, все его счета и операции будут удалены. Это действие нельзя отменить.</string>
+    <string name="balance_currency">Валюта</string>
+    <string name="balance_currency_title">Валюта баланса</string>
+    <!-- %1$s — код валюты, %2$s — название. -->
+    <string name="balance_currency_item">%1$s — %2$s</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="balance_symbol_label">Символ: %1$s</string>
+    <string name="balance_title_new">Новый баланс</string>
+    <string name="balance_title_edit">Изменить баланс</string>
+    <string name="categories_add_cd">Добавить категорию</string>
+    <string name="category_delete_title">Удалить категорию?</string>
+    <string name="category_delete_text">Категория исчезнет из списка, её операции останутся в истории.</string>
+    <string name="category_title_new">Новая категория</string>
+    <string name="category_title_edit">Изменить категорию</string>
+    <string name="categoryreport_title">Операции по категориям</string>
+    <string name="categoryreport_select_categories">Выберите категории</string>
+    <string name="categoryreport_show_operations">Показать операции</string>
+    <string name="categoryreport_edit_categories_cd">Изменить категории</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d операция</item>
         <item quantity="few">%1$d операции</item>

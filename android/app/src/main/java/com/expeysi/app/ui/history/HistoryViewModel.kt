@@ -3,6 +3,7 @@ package com.expeysi.app.ui.history
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.R
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
@@ -19,6 +20,7 @@ import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.common.UiText
 import com.expeysi.app.ui.home.TransactionItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,14 +41,14 @@ enum class HistoryViewMode { LIST, CATEGORIES, ACCOUNTS }
 data class HistoryDetail(val categoryId: String, val accountId: String? = null)
 
 data class HistoryUiState(
-    val title: String = "",
+    val title: UiText = UiText.Plain(""),
     val isAccountMode: Boolean = false,
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val items: List<TransactionItem> = emptyList(),
     val mode: HistoryViewMode = HistoryViewMode.LIST,
     val detail: HistoryDetail? = null,
-    val detailTitle: String = "",
+    val detailTitle: UiText? = null,
     val categoryTotals: List<CategoryTotal> = emptyList(),
     val accountTotals: List<AccountTotal> = emptyList(),
     val isIncomeOnly: Boolean = false,
@@ -153,9 +155,9 @@ class HistoryViewModel @Inject constructor(
         val symbol = balance?.let { symbols[it.currencyCode] ?: it.currencyCode } ?: ""
 
         val title = if (isAccountMode) {
-            scopeAccounts.firstOrNull()?.name ?: "Счёт"
+            scopeAccounts.firstOrNull()?.name?.let { UiText.Plain(it) } ?: UiText.Res(R.string.common_account)
         } else {
-            balance?.name ?: "Баланс"
+            balance?.name?.let { UiText.Plain(it) } ?: UiText.Res(R.string.common_balance)
         }
 
         val categoryById = data.categories.associateBy { it.id }
@@ -186,7 +188,7 @@ class HistoryViewModel @Inject constructor(
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
                     transaction = tx,
-                    categoryName = category?.name ?: "Без категории",
+                    categoryName = category?.name ?: "",
                     categoryIconKey = category?.iconKey ?: "",
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
@@ -203,10 +205,16 @@ class HistoryViewModel @Inject constructor(
             mode = mode,
             detail = detail,
             detailTitle = detail?.let { d ->
-                val categoryName = categoryById[d.categoryId]?.name ?: "Без категории"
+                val categoryName = categoryById[d.categoryId]?.name
                 val accountName = d.accountId?.let { accountById[it]?.name }
-                listOfNotNull(categoryName, accountName).joinToString(" · ")
-            } ?: "",
+                // Имя категории может отсутствовать — фолбэк «Без категории» резолвится в UI.
+                val categoryText = categoryName?.takeIf { it.isNotBlank() }?.let { UiText.Plain(it) }
+                    ?: UiText.Res(R.string.report_uncategorized)
+                when {
+                    accountName == null -> categoryText
+                    else -> UiText.Res(R.string.history_detail_title_parts, categoryText, accountName)
+                }
+            },
             categoryTotals = Aggregates.byCategory(entries),
             accountTotals = Aggregates.byAccount(entries),
             isIncomeOnly = f.types == setOf(TxType.INCOME),

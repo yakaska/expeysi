@@ -62,12 +62,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.MoneyTextField
@@ -137,18 +139,18 @@ fun AddTransactionScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Удалить операцию?") },
-            text = { Text("Запись исчезнет из списка и перестанет влиять на баланс.") },
+            title = { Text(stringResource(R.string.add_delete_title)) },
+            text = { Text(stringResource(R.string.add_delete_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteConfirm = false
                         viewModel.delete()
                     },
-                ) { Text("Удалить") }
+                ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Отмена") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -163,10 +165,10 @@ fun AddTransactionScreen(
                         pickerState.selectedDateMillis?.let(viewModel::onDatePick)
                         showDatePicker = false
                     },
-                ) { Text("ОК") }
+                ) { Text(stringResource(R.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) { Text("Отмена") }
+                TextButton(onClick = { showDatePicker = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         ) {
             DatePicker(state = pickerState)
@@ -180,7 +182,7 @@ fun AddTransactionScreen(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Время") },
+            title = { Text(stringResource(R.string.add_time)) },
             text = { TimePicker(state = pickerState) },
             confirmButton = {
                 TextButton(
@@ -188,10 +190,10 @@ fun AddTransactionScreen(
                         viewModel.onTimePick(pickerState.hour, pickerState.minute)
                         showTimePicker = false
                     },
-                ) { Text("ОК") }
+                ) { Text(stringResource(R.string.common_ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Отмена") }
+                TextButton(onClick = { showTimePicker = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -202,7 +204,7 @@ fun AddTransactionScreen(
             sheetState = rememberModalBottomSheetState(),
         ) {
             Text(
-                "Счёт",
+                stringResource(R.string.common_account),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -234,7 +236,11 @@ fun AddTransactionScreen(
             sheetGesturesEnabled = categorySheetState.currentValue == SheetValue.Expanded,
         ) {
             Text(
-                if (type == TxType.EXPENSE) "Категория расхода" else "Категория дохода",
+                if (type == TxType.EXPENSE) {
+                    stringResource(R.string.add_category_expense)
+                } else {
+                    stringResource(R.string.add_category_income)
+                },
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -259,7 +265,7 @@ fun AddTransactionScreen(
                         leadingContent = {
                             Icon(Icons.Filled.Add, contentDescription = null)
                         },
-                        headlineContent = { Text("Добавить новую категорию") },
+                        headlineContent = { Text(stringResource(R.string.add_add_category_row)) },
                         modifier = Modifier.clickable { onAddCategoryClick(type) },
                     )
                 }
@@ -278,10 +284,10 @@ fun AddTransactionScreen(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             TopAppBar(
-                title = { Text(if (viewModel.isEdit) "Изменить операцию" else "Новая операция") },
+                title = { Text(stringResource(if (viewModel.isEdit) R.string.add_title_edit else R.string.add_title_new)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -289,7 +295,7 @@ fun AddTransactionScreen(
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Удалить",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                             )
                         }
@@ -306,7 +312,7 @@ fun AddTransactionScreen(
                     .imePadding()
                     .padding(16.dp),
             ) {
-                Text("Сохранить")
+                Text(stringResource(R.string.common_save))
             }
         },
     ) { innerPadding ->
@@ -325,7 +331,13 @@ fun AddTransactionScreen(
                         onClick = { viewModel.onTypeChange(txType) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = TxType.entries.size),
                     ) {
-                        Text(if (txType == TxType.EXPENSE) "Расход" else "Доход")
+                        Text(
+                            if (txType == TxType.EXPENSE) {
+                                stringResource(R.string.operation_type_expense)
+                            } else {
+                                stringResource(R.string.operation_type_income)
+                            },
+                        )
                     }
                 }
             }
@@ -349,7 +361,7 @@ fun AddTransactionScreen(
                                 .padding(vertical = 10.dp),
                         ) {
                             Text(
-                                "Дата",
+                                stringResource(R.string.add_date),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -366,7 +378,7 @@ fun AddTransactionScreen(
                                 .padding(vertical = 10.dp),
                         ) {
                             Text(
-                                "Время",
+                                stringResource(R.string.add_time),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -378,9 +390,9 @@ fun AddTransactionScreen(
                     }
 
                     ListItem(
-                        headlineContent = { Text("Счёт") },
+                        headlineContent = { Text(stringResource(R.string.common_account)) },
                         supportingContent = {
-                            Text(selectedAccount?.name ?: "Выбрать…")
+                            Text(selectedAccount?.name ?: stringResource(R.string.common_select))
                         },
                         leadingContent = {
                             selectedAccount?.let {
@@ -394,9 +406,9 @@ fun AddTransactionScreen(
                     )
 
                     ListItem(
-                        headlineContent = { Text("Категория") },
+                        headlineContent = { Text(stringResource(R.string.add_category)) },
                         supportingContent = {
-                            Text(selectedCategory?.name ?: "Выбрать…")
+                            Text(selectedCategory?.name ?: stringResource(R.string.common_select))
                         },
                         leadingContent = {
                             selectedCategory?.let {
@@ -424,10 +436,11 @@ fun AddTransactionScreen(
                         value = amountText,
                         onValueChange = viewModel::onAmountChange,
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Сумма, $amountSymbol") },
+                        // %1$s — символ валюты.
+                        label = { Text(stringResource(R.string.add_amount_label, amountSymbol)) },
                         trailingIcon = {
                             IconButton(onClick = { showCalculator = true }) {
-                                Icon(Icons.Filled.Calculate, contentDescription = "Калькулятор")
+                                Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
                             }
                         },
                     )
@@ -445,7 +458,7 @@ fun AddTransactionScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .bringIntoViewRequester(noteBringIntoViewRequester),
-                            label = { Text("Комментарий (необязательно)") },
+                            label = { Text(stringResource(R.string.add_note_label)) },
                         )
                         DropdownMenu(
                             expanded = showNoteSuggestions && noteSuggestions.isNotEmpty(),

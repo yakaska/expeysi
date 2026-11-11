@@ -164,7 +164,7 @@ private fun RangePickerDialog(onConfirm: (LocalDate, LocalDate) -> Unit, onDismi
                         .padding(horizontal = 12.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.action_cancel)) }
+                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
                     TextButton(
                         onClick = {
                             val start = rangeState.selectedStartDateMillis

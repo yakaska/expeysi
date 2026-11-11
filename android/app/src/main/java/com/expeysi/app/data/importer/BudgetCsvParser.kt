@@ -27,21 +27,21 @@ class BudgetCsvParser @Inject constructor() {
     fun parse(input: InputStream): List<BudgetTransaction> {
         val text = input.bufferedReader(Charsets.UTF_8).use { it.readText() }.removePrefix("\uFEFF")
         val rows = parseRows(text).filter { row -> row.values.any { it.isNotBlank() } }
-        if (rows.isEmpty()) throw BudgetImportException("Файл пуст")
+        if (rows.isEmpty()) throw BudgetImportException(BudgetImportError.EMPTY_FILE)
 
         val header = rows.first().values.mapIndexed { index, name -> name.trim() to index }.toMap()
         val columns = REQUIRED_COLUMNS.mapValues { (_, name) ->
-            header[name] ?: throw BudgetImportException("В файле нет колонки «$name»")
+            header[name] ?: throw BudgetImportException(BudgetImportError.MISSING_COLUMN, column = name)
         }
         val lastColumn = columns.values.max()
 
         return rows.drop(1).map { row ->
             if (row.values.size <= lastColumn) {
-                throw BudgetImportException("Строка ${row.line}: недостаточно колонок")
+                throw BudgetImportException(BudgetImportError.TOO_FEW_COLUMNS, line = row.line)
             }
             parseTransaction(row.values, columns, row.line)
         }.also {
-            if (it.isEmpty()) throw BudgetImportException("В файле нет операций")
+            if (it.isEmpty()) throw BudgetImportException(BudgetImportError.NO_TRANSACTIONS)
         }
     }
 
@@ -55,22 +55,22 @@ class BudgetCsvParser @Inject constructor() {
         val accountName = value("account")
         val categoryName = value("category")
         val currencyCode = value("currency").uppercase()
-        if (accountName.isEmpty()) throw BudgetImportException("Строка $line: пустое название счёта")
-        if (categoryName.isEmpty()) throw BudgetImportException("Строка $line: пустая категория")
+        if (accountName.isEmpty()) throw BudgetImportException(BudgetImportError.EMPTY_ACCOUNT, line = line)
+        if (categoryName.isEmpty()) throw BudgetImportException(BudgetImportError.EMPTY_CATEGORY, line = line)
         if (!CURRENCY_REGEX.matches(currencyCode)) {
-            throw BudgetImportException("Строка $line: некорректная валюта")
+            throw BudgetImportException(BudgetImportError.BAD_CURRENCY, line = line)
         }
 
         val amount = try {
             BigDecimal(value("amount"))
         } catch (_: NumberFormatException) {
-            throw BudgetImportException("Строка $line: некорректная сумма")
+            throw BudgetImportException(BudgetImportError.BAD_AMOUNT, line = line)
         }
-        if (amount.signum() == 0) throw BudgetImportException("Строка $line: нулевая сумма")
+        if (amount.signum() == 0) throw BudgetImportException(BudgetImportError.ZERO_AMOUNT, line = line)
         val amountMinor = try {
             amount.abs().movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
         } catch (_: ArithmeticException) {
-            throw BudgetImportException("Строка $line: сумма слишком большая или имеет больше двух знаков")
+            throw BudgetImportException(BudgetImportError.AMOUNT_TOO_LARGE, line = line)
         }
 
         val date = try {
@@ -79,7 +79,7 @@ class BudgetCsvParser @Inject constructor() {
                 LocalTime.parse(value("time")),
             ).atZone(zone).toInstant().toEpochMilli()
         } catch (_: DateTimeParseException) {
-            throw BudgetImportException("Строка $line: некорректные дата или время")
+            throw BudgetImportException(BudgetImportError.BAD_DATE, line = line)
         }
 
         return BudgetTransaction(
@@ -133,7 +133,7 @@ class BudgetCsvParser @Inject constructor() {
             }
             index++
         }
-        if (inQuotes) throw BudgetImportException("Строка $rowLine: незакрытая кавычка")
+        if (inQuotes) throw BudgetImportException(BudgetImportError.UNCLOSED_QUOTE, line = rowLine)
         if (field.isNotEmpty() || row.isNotEmpty()) endRow()
         return rows
     }
@@ -154,4 +154,29 @@ class BudgetCsvParser @Inject constructor() {
     }
 }
 
-class BudgetImportException(message: String) : Exception(message)
+/** Причина ошибки импорта CSV «Бюджета»; текст показа резолвится в UI-слое. */
+enum class BudgetImportError {
+    EMPTY_FILE,
+    MISSING_COLUMN,
+    TOO_FEW_COLUMNS,
+    NO_TRANSACTIONS,
+    EMPTY_ACCOUNT,
+    EMPTY_CATEGORY,
+    BAD_CURRENCY,
+    BAD_AMOUNT,
+    ZERO_AMOUNT,
+    AMOUNT_TOO_LARGE,
+    BAD_DATE,
+    UNCLOSED_QUOTE,
+}
+
+/**
+ * Ошибка разбора файла импорта: [reason] — что именно не так,
+ * [line] — номер строки CSV, если ошибка построчная,
+ * [column] — имя ожидаемой колонки, если ошибка в заголовке.
+ */
+class BudgetImportException(
+    val reason: BudgetImportError,
+    val line: Int? = null,
+    val column: String? = null,
+) : Exception()

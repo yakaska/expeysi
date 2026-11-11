@@ -3,6 +3,7 @@ package com.expeysi.app.ui.home
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.R
 import com.expeysi.app.data.FamilyRepository
 import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.SelectedBalanceStore
@@ -16,6 +17,8 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.data.importer.BudgetImportError
+import com.expeysi.app.data.importer.BudgetImportException
 import com.expeysi.app.data.importer.BudgetImportService
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.Periods
@@ -24,6 +27,7 @@ import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
+import com.expeysi.app.ui.common.UiText
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,7 +68,7 @@ data class TransactionItem(
 
 data class ImportUiState(
     val inProgress: Boolean = false,
-    val message: String? = null,
+    val message: UiText? = null,
 )
 
 data class LeaveFamilyUiState(
@@ -157,7 +161,7 @@ class HomeViewModel @Inject constructor(
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
                     transaction = tx,
-                    categoryName = category?.name ?: "Без категории",
+                    categoryName = category?.name ?: "",
                     categoryIconKey = category?.iconKey ?: "",
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
@@ -263,20 +267,42 @@ class HomeViewModel @Inject constructor(
     fun importBudget(input: InputStream?) {
         if (_importState.value.inProgress) return
         if (input == null) {
-            _importState.update { it.copy(message = "Не удалось открыть файл") }
+            _importState.update { it.copy(message = UiText.Res(R.string.import_error_open)) }
             return
         }
         viewModelScope.launch {
             _importState.update { it.copy(inProgress = true, message = null) }
             val message = try {
                 val result = withContext(Dispatchers.IO) { budgetImportService.import(input) }
-                "Импортировано операций: ${result.transactionCount}"
+                UiText.Res(R.string.import_done, result.transactionCount)
+            } catch (e: BudgetImportException) {
+                budgetImportMessage(e)
             } catch (e: Exception) {
-                e.message ?: "Не удалось импортировать файл"
+                UiText.Res(R.string.import_error_generic)
             } finally {
                 _importState.update { it.copy(inProgress = false) }
             }
             _importState.update { it.copy(message = message) }
+        }
+    }
+
+    /** Ошибка разбора CSV → текст для показа; строка CSV подставляется аргументом. */
+    private fun budgetImportMessage(error: BudgetImportException): UiText {
+        val line = error.line ?: 0
+        return when (error.reason) {
+            BudgetImportError.EMPTY_FILE -> UiText.Res(R.string.import_error_empty_file)
+            // %1$s — название колонки формата, отсутствующей в файле.
+            BudgetImportError.MISSING_COLUMN -> UiText.Res(R.string.import_error_missing_column, error.column.orEmpty())
+            BudgetImportError.TOO_FEW_COLUMNS -> UiText.Res(R.string.import_error_too_few_columns, line)
+            BudgetImportError.NO_TRANSACTIONS -> UiText.Res(R.string.import_error_no_transactions)
+            BudgetImportError.EMPTY_ACCOUNT -> UiText.Res(R.string.import_error_empty_account, line)
+            BudgetImportError.EMPTY_CATEGORY -> UiText.Res(R.string.import_error_empty_category, line)
+            BudgetImportError.BAD_CURRENCY -> UiText.Res(R.string.import_error_bad_currency, line)
+            BudgetImportError.BAD_AMOUNT -> UiText.Res(R.string.import_error_bad_amount, line)
+            BudgetImportError.ZERO_AMOUNT -> UiText.Res(R.string.import_error_zero_amount, line)
+            BudgetImportError.AMOUNT_TOO_LARGE -> UiText.Res(R.string.import_error_amount_too_large, line)
+            BudgetImportError.BAD_DATE -> UiText.Res(R.string.import_error_bad_date, line)
+            BudgetImportError.UNCLOSED_QUOTE -> UiText.Res(R.string.import_error_unclosed_quote, line)
         }
     }
 

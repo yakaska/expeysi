@@ -42,9 +42,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
@@ -72,18 +74,18 @@ fun EditCategoryScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Удалить категорию?") },
-            text = { Text("Категория исчезнет из списка, её операции останутся в истории.") },
+            title = { Text(stringResource(R.string.category_delete_title)) },
+            text = { Text(stringResource(R.string.category_delete_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteConfirm = false
                         viewModel.delete()
                     },
-                ) { Text("Удалить") }
+                ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Отмена") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -91,10 +93,10 @@ fun EditCategoryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (viewModel.isEdit) "Изменить категорию" else "Новая категория") },
+                title = { Text(stringResource(if (viewModel.isEdit) R.string.category_title_edit else R.string.category_title_new)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -102,7 +104,7 @@ fun EditCategoryScreen(
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Удалить",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                             )
                         }
@@ -119,7 +121,7 @@ fun EditCategoryScreen(
                     .imePadding()
                     .padding(16.dp),
             ) {
-                Text("Сохранить")
+                Text(stringResource(R.string.common_save))
             }
         },
     ) { innerPadding ->
@@ -138,7 +140,13 @@ fun EditCategoryScreen(
                         onClick = { viewModel.onTypeChange(txType) },
                         shape = SegmentedButtonDefaults.itemShape(index = index, count = TxType.entries.size),
                     ) {
-                        Text(if (txType == TxType.EXPENSE) "Расход" else "Доход")
+                        Text(
+                            if (txType == TxType.EXPENSE) {
+                                stringResource(R.string.operation_type_expense)
+                            } else {
+                                stringResource(R.string.operation_type_income)
+                            },
+                        )
                     }
                 }
             }
@@ -147,13 +155,13 @@ fun EditCategoryScreen(
                 value = name,
                 onValueChange = viewModel::onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Название") },
+                label = { Text(stringResource(R.string.common_name)) },
                 singleLine = true,
             )
 
             CategoryIcon(iconKey, colorKey)
 
-            Text("Иконка", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.common_icon), style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 viewModel.availableIconKeys.forEach { key ->
                     FilterChip(
@@ -164,7 +172,7 @@ fun EditCategoryScreen(
                 }
             }
 
-            Text("Цвет", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.common_color), style = MaterialTheme.typography.titleSmall)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
