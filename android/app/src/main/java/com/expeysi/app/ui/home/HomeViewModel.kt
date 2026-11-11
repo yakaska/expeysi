@@ -221,17 +221,23 @@ class HomeViewModel @Inject constructor(
     private val topCategoriesFeed = combine(
         selection,
         periodDays,
-    ) { (_, selected), days ->
+        // Реакция на изменения транзакций: добавление, правка, удаление и синхронизация.
+        transactionDao.observeActive(),
+    ) { (_, selected), days, _ ->
         selected?.id to days
-    }.distinctUntilChanged().flatMapLatest { (balanceId, days) ->
+    }.flatMapLatest { (balanceId, days) ->
         flow {
-            val start = Periods.day(LocalDate.now(zone), zone).startMillis - (days - 1) * DAY_MILLIS
+            val today = Periods.day(LocalDate.now(zone), zone)
+            // Скользящее окно, как в сводке (Windows.sums): сегодня + дни назад.
+            val start = today.startMillis - (days - 1) * DAY_MILLIS
+            // За «сегодня» операции с датой в будущем не учитываем: сводка их не считает.
+            val end = if (days == 1) today.endMillisExclusive else null
             val categories = if (balanceId == null) {
                 emptyList()
             } else {
                 runCatching {
                     analysisRepository
-                        .categorySummary(balanceId, TxType.EXPENSE, start, null, null)
+                        .categorySummary(balanceId, TxType.EXPENSE, start, end, null)
                         .categories
                 }.getOrDefault(emptyList())
             }
