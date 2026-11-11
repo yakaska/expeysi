@@ -38,6 +38,26 @@ class AnalysisPeriodBoundsTest {
     }
 
     @Test
+    fun `скользящее окно в днях даёт границы как на главном экране`() {
+        for (days in SLIDING_DAYS) {
+            // Начало окна — начало суток дней назад, как у Windows.sums на главном экране.
+            val expectedStart = now.toLocalDate()
+                .minusDays((days - 1).toLong())
+                .atStartOfDay(zone)
+                .toInstant()
+                .toEpochMilli()
+            val expectedEnd = if (days == 1) {
+                Periods.day(now.toLocalDate(), zone).endMillisExclusive
+            } else {
+                null
+            }
+            val (start, end) = slidingDaysPeriod(days).bounds(now, zone)
+            assertEquals("окно $days дней: начало", expectedStart, start)
+            assertEquals("окно $days дней: конец", expectedEnd, end)
+        }
+    }
+
+    @Test
     fun `диапазон дат даёт обе границы`() {
         val range = DateRangeFilter.ofDays(
             LocalDate.of(2026, 4, 12),
@@ -92,6 +112,7 @@ class AnalysisPeriodBoundsTest {
             ).navigable,
         )
         assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = HistoryPeriod.ALL).navigable)
+        assertFalse(slidingDaysPeriod(7).navigable)
         assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.RANGE).navigable)
     }
 

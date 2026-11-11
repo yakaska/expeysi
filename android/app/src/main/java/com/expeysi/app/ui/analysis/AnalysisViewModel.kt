@@ -89,9 +89,16 @@ class AnalysisViewModel @Inject constructor(
     private val zone: ZoneId = ZoneId.systemDefault()
     private val currentMonth: YearMonth = YearMonth.now(zone)
 
+    /** Скользящее окно из nav-аргумента: переход с карточки «Расходы по категориям» на главном экране. */
+    private val navSlidingDays: Int? = savedStateHandle
+        .get<Int>(KEY_NAV_DAYS)
+        ?.takeIf { it in SLIDING_DAYS }
+
     private val _uiState = MutableStateFlow(
         AnalysisUiState(
-            period = restorePeriod() ?: AnalysisPeriod(month = currentMonth),
+            period = restorePeriod()
+                ?: navSlidingDays?.let(::slidingDaysPeriod)
+                ?: AnalysisPeriod(month = currentMonth),
             selectedAccountIds = parseAccountIds(savedStateHandle.get<String>(KEY_ACCOUNTS)),
             expanded = savedStateHandle.get<Boolean>(KEY_EXPANDED) ?: false,
         ),
@@ -288,6 +295,7 @@ class AnalysisViewModel @Inject constructor(
             AnalysisPeriodKind.RANGE -> "range"
         }
         savedStateHandle[KEY_SLIDING] = snapshot.period.sliding.name
+        savedStateHandle[KEY_SLIDING_DAYS] = snapshot.period.slidingDays ?: 0
         savedStateHandle[KEY_MONTH] = snapshot.period.month.toString()
         savedStateHandle[KEY_UNIT] = snapshot.period.unit.name
         savedStateHandle[KEY_ANCHOR] = snapshot.period.anchor.toString()
@@ -316,7 +324,9 @@ class AnalysisViewModel @Inject constructor(
                 val sliding = savedStateHandle.get<String>(KEY_SLIDING)
                     ?.let { name -> HistoryPeriod.entries.firstOrNull { it.name == name } }
                     ?: return null
-                AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = sliding)
+                val slidingDays = savedStateHandle.get<Int>(KEY_SLIDING_DAYS)
+                    ?.takeIf { it in SLIDING_DAYS }
+                AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = sliding, slidingDays = slidingDays)
             }
             "range" -> {
                 val raw = savedStateHandle.get<String>(KEY_RANGE) ?: return null
@@ -336,6 +346,8 @@ class AnalysisViewModel @Inject constructor(
         const val KEY_TYPE = "analysis_type"
         const val KEY_KIND = "analysis_period_kind"
         const val KEY_SLIDING = "analysis_period_sliding"
+        const val KEY_SLIDING_DAYS = "analysis_period_sliding_days"
+        const val KEY_NAV_DAYS = "days"
         const val KEY_MONTH = "analysis_period_month"
         const val KEY_UNIT = "analysis_period_unit"
         const val KEY_ANCHOR = "analysis_period_anchor"
