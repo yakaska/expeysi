@@ -41,6 +41,11 @@
     <string name="home_title_with_currency">%1$s · %2$s</string>
     <string name="home_more_accounts" translatable="false">+%1$d</string>
     <string name="home_add_account">Добавить счёт</string>
+    <string name="history_mode_transactions">Операции</string>
+    <string name="history_mode_categories">Категории</string>
+    <string name="history_mode_accounts">Счета</string>
+    <string name="history_back_groups_cd">К группам</string>
+    <string name="history_expand_cd">Развернуть</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
