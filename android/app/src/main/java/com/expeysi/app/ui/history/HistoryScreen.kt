@@ -2,9 +2,12 @@ package com.expeysi.app.ui.history
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -13,7 +16,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
@@ -22,6 +27,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -39,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -58,6 +65,7 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -81,6 +89,12 @@ fun HistoryScreen(
     val selectedTypes by viewModel.selectedTypes.collectAsStateWithLifecycle()
     var showPeriodSheet by remember { mutableStateOf(false) }
     var showChips by remember { mutableStateOf(true) }
+    var showScrollToTop by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val historyListState = rememberLazyListState()
+    val categoriesListState = rememberLazyListState()
+    val accountsListState = rememberLazyListState()
+    val detailListState = rememberLazyListState()
 
     BackHandler(enabled = state.detail != null) { viewModel.closeDetail() }
 
@@ -129,6 +143,29 @@ fun HistoryScreen(
         }
     }
 
+    val activeListState = if (state.detail != null) {
+        detailListState
+    } else {
+        when (modes.getOrNull(pagerState.currentPage)?.first) {
+            HistoryViewMode.CATEGORIES -> categoriesListState
+            HistoryViewMode.ACCOUNTS -> accountsListState
+            else -> historyListState
+        }
+    }
+    LaunchedEffect(activeListState) {
+        var previousPosition = 0 to 0
+        snapshotFlow { activeListState.firstVisibleItemIndex to activeListState.firstVisibleItemScrollOffset }
+            .collect { position ->
+                showScrollToTop = activeListState.canScrollBackward &&
+                    (
+                        position.first < previousPosition.first ||
+                            position.first == previousPosition.first &&
+                            position.second < previousPosition.second
+                        )
+                previousPosition = position
+            }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -170,10 +207,34 @@ fun HistoryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { onAddClick(selectedTypes.singleOrNull()) }) {
+            FloatingActionButton(
+                onClick = {
+                    if (showScrollToTop) {
+                        coroutineScope.launch {
+                            val visibleItems = activeListState.layoutInfo.visibleItemsInfo
+                            val averageItemStride = visibleItems.zipWithNext { first, second ->
+                                second.offset - first.offset
+                            }.average().toFloat().takeIf { it > 0f } ?: visibleItems.first().size.toFloat()
+                            val distance = activeListState.firstVisibleItemScrollOffset +
+                                activeListState.firstVisibleItemIndex * averageItemStride
+                            activeListState.animateScrollBy(
+                                -distance,
+                                animationSpec = tween(durationMillis = 450, easing = FastOutSlowInEasing),
+                            )
+                            if (activeListState.canScrollBackward) {
+                                activeListState.animateScrollToItem(0)
+                            }
+                        }
+                    } else {
+                        onAddClick(selectedTypes.singleOrNull())
+                    }
+                },
+            ) {
                 Icon(
-                    Icons.Filled.Add,
-                    contentDescription = stringResource(R.string.home_add_transaction),
+                    if (showScrollToTop) Icons.Filled.KeyboardArrowUp else Icons.Filled.Add,
+                    contentDescription = stringResource(
+                        if (showScrollToTop) R.string.home_scroll_to_top else R.string.home_add_transaction,
+                    ),
                 )
             }
         },
@@ -215,7 +276,7 @@ fun HistoryScreen(
                         }
                         Text(state.detailTitle, style = MaterialTheme.typography.titleMedium)
                     }
-                    TransactionList(state.items, onItemClick)
+                    TransactionList(state.items, onItemClick, detailListState)
                 }
                 else -> HorizontalPager(
                     state = pagerState,
@@ -225,14 +286,16 @@ fun HistoryScreen(
                         HistoryViewMode.CATEGORIES -> CategoriesView(
                             state = state,
                             onCategoryClick = { viewModel.openDetail(it) },
+                            listState = categoriesListState,
                         )
                         HistoryViewMode.ACCOUNTS -> AccountsView(
                             state = state,
                             onCategoryClick = { categoryId, accountId ->
                                 viewModel.openDetail(categoryId, accountId)
                             },
+                            listState = accountsListState,
                         )
-                        else -> TransactionList(state.items, onItemClick)
+                        else -> TransactionList(state.items, onItemClick, historyListState)
                     }
                 }
             }
@@ -251,7 +314,11 @@ fun HistoryScreen(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun TransactionList(items: List<TransactionItem>, onItemClick: (String) -> Unit) {
+private fun TransactionList(
+    items: List<TransactionItem>,
+    onItemClick: (String) -> Unit,
+    listState: LazyListState,
+) {
     if (items.isEmpty()) {
         EmptyHistoryText()
         return
@@ -262,6 +329,7 @@ private fun TransactionList(items: List<TransactionItem>, onItemClick: (String) 
         Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
     }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
     ) {
@@ -347,6 +415,7 @@ private fun HistoryRow(
 private fun CategoriesView(
     state: HistoryUiState,
     onCategoryClick: (String) -> Unit,
+    listState: LazyListState,
 ) {
     if (state.categoryTotals.isEmpty()) {
         EmptyHistoryText()
@@ -354,6 +423,7 @@ private fun CategoriesView(
     }
     val categoryById = state.categories.associateBy { it.id }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
     ) {
@@ -408,6 +478,7 @@ private fun CategoriesView(
 private fun AccountsView(
     state: HistoryUiState,
     onCategoryClick: (categoryId: String, accountId: String) -> Unit,
+    listState: LazyListState,
 ) {
     if (state.accountTotals.isEmpty()) {
         EmptyHistoryText()
@@ -417,6 +488,7 @@ private fun AccountsView(
     val accountById = state.accounts.associateBy { it.id }
     val categoryById = state.categories.associateBy { it.id }
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
     ) {
