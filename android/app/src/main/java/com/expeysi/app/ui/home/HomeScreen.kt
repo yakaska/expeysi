@@ -87,6 +87,7 @@ import com.expeysi.app.domain.CategoryShares
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
+import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.operationsLabel
 import com.expeysi.app.ui.icons.CategoryIcon
@@ -125,6 +126,7 @@ data class HomeActions(
     val onEditBalanceClick: (String) -> Unit,
     val onBalanceHistoryClick: (String) -> Unit,
     val onAccountHistoryClick: (String) -> Unit,
+    val onAddAccountClick: (String?) -> Unit = {},
     val onSummaryClick: (String, TxType, Int) -> Unit,
     val onBalanceSelected: (String) -> Unit,
     val onLoadMoreTransactions: () -> Unit,
@@ -141,6 +143,7 @@ fun HomeScreen(
     onEditBalanceClick: (String) -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
     onAccountHistoryClick: (String) -> Unit,
+    onAddAccountClick: (String?) -> Unit = {},
     onSummaryClick: (String, TxType, Int) -> Unit,
     onAnalysisClick: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
@@ -156,6 +159,7 @@ fun HomeScreen(
             onEditBalanceClick = onEditBalanceClick,
             onBalanceHistoryClick = onBalanceHistoryClick,
             onAccountHistoryClick = onAccountHistoryClick,
+            onAddAccountClick = onAddAccountClick,
             onSummaryClick = onSummaryClick,
             onBalanceSelected = viewModel::selectBalance,
             onLoadMoreTransactions = viewModel::loadMoreTransactions,
@@ -293,7 +297,7 @@ fun HomeContent(
                     .fillMaxSize(),
                 contentPadding = PaddingValues(
                     start = 16.dp,
-                    top = 16.dp,
+                    top = 4.dp,
                     end = 16.dp,
                     bottom = 88.dp,
                 ),
@@ -306,6 +310,7 @@ fun HomeContent(
                         currencySymbol = state.currencySymbol,
                         accounts = state.accounts,
                         onAccountClick = actions.onAccountHistoryClick,
+                        onAddAccountClick = { actions.onAddAccountClick(state.selectedBalance?.id) },
                         onBalanceSwitcherClick = { balanceSheetOpen = true },
                         modifier = Modifier.padding(bottom = 4.dp),
                     )
@@ -372,19 +377,20 @@ fun HomeContent(
                 state.transactions.groupBy { item ->
                     Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
                 }.forEach { (date, transactions) ->
+                    val (incomeItems, expenseItems) = transactions.partition {
+                        TxType.fromWire(it.transaction.type) == TxType.INCOME
+                    }
                     stickyHeader(key = "date-$date") {
-                        Text(
-                            text = when (date) {
+                        DayGroupHeader(
+                            dateLabel = when (date) {
                                 today -> stringResource(R.string.home_today)
                                 today.minusDays(1) -> stringResource(R.string.home_yesterday)
                                 else -> date.format(dayFormatter)
                             },
-                            style = MaterialTheme.typography.titleSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MaterialTheme.colorScheme.surface)
-                                .padding(vertical = 8.dp),
+                            incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
+                            expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
+                            currencySymbol = transactions.first().currencySymbol,
+                            modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     transactions.forEachIndexed { index, item ->
@@ -478,6 +484,7 @@ private fun HeroCard(
     currencySymbol: String,
     accounts: List<AccountBalance>,
     onAccountClick: (String) -> Unit,
+    onAddAccountClick: () -> Unit = {},
     onBalanceSwitcherClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
@@ -537,6 +544,14 @@ private fun HeroCard(
                 AccountChipsRow(
                     accounts = accounts,
                     onAccountClick = onAccountClick,
+                    onAddAccountClick = onAddAccountClick,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+            } else {
+                // Нет единственного счёта (0) или он уже показан строкой выше (1) —
+                // отдельно держим чип быстрого добавления счёта.
+                AddAccountChip(
+                    onClick = onAddAccountClick,
                     modifier = Modifier.padding(top = 8.dp),
                 )
             }
@@ -618,6 +633,7 @@ private fun SingleAccountRow(
 private fun AccountChipsRow(
     accounts: List<AccountBalance>,
     onAccountClick: (String) -> Unit,
+    onAddAccountClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val millionUnit = stringResource(R.string.money_suffix_million)
@@ -645,7 +661,35 @@ private fun AccountChipsRow(
                 )
             }
         }
+        item(key = "add-account") {
+            AddAccountChip(onClick = onAddAccountClick)
+        }
     }
+}
+
+/** Чип быстрого добавления счёта: ведёт на экран создания в выбранном балансе. */
+@Composable
+private fun AddAccountChip(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AssistChip(
+        onClick = onClick,
+        leadingIcon = {
+            Icon(
+                Icons.Filled.Add,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        label = {
+            Text(
+                text = stringResource(R.string.home_add_account),
+                style = MaterialTheme.typography.labelLarge,
+            )
+        },
+        modifier = modifier,
+    )
 }
 
 @Composable

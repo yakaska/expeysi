@@ -183,6 +183,13 @@ private fun AppNavigation() {
                     onEditBalanceClick = { id -> navController.navigate("balances/edit/$id") },
                     onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
                     onAccountHistoryClick = { id -> navController.navigate("history/account/$id") },
+                    onAddAccountClick = { balanceId ->
+                        if (balanceId == null) {
+                            navController.navigate("accounts/add")
+                        } else {
+                            navController.navigate("accounts/add?balanceId=$balanceId")
+                        }
+                    },
                     onSummaryClick = { id, type, days ->
                         navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
                     },
@@ -267,7 +274,16 @@ private fun AppNavigation() {
             composable("data-import") {
                 PlaceholderScreen(title = R.string.drawer_data_import, onBack = { navigateBack() })
             }
-            composable("add") {
+            composable(
+                route = "add?type={type}",
+                arguments = listOf(
+                    navArgument("type") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 AddTransactionScreen(
                     onClose = { navigateBack() },
                     onAddCategoryClick = { type -> navController.navigate("categories/add?type=${type.wire}") },
@@ -289,7 +305,16 @@ private fun AppNavigation() {
                     onItemClick = { id -> navController.navigate("accounts/edit/$id") },
                 )
             }
-            composable("accounts/add") {
+            composable(
+                route = "accounts/add?balanceId={balanceId}",
+                arguments = listOf(
+                    navArgument("balanceId") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 EditAccountScreen(onClose = { navigateBack() })
             }
             composable(
@@ -341,7 +366,13 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
-                    onAddClick = { navController.navigate("add") },
+                    onAddClick = { type ->
+                        if (type == null) {
+                            navController.navigate("add")
+                        } else {
+                            navController.navigate("add?type=${type.wire}")
+                        }
+                    },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
@@ -351,7 +382,13 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
-                    onAddClick = { navController.navigate("add") },
+                    onAddClick = { type ->
+                        if (type == null) {
+                            navController.navigate("add")
+                        } else {
+                            navController.navigate("add?type=${type.wire}")
+                        }
+                    },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }

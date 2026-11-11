@@ -2,7 +2,6 @@ package com.expeysi.app.ui.transactionreport
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.history.PeriodSelector
 import com.expeysi.app.ui.icons.CategoryIcon
 import java.time.Instant
@@ -203,19 +203,20 @@ private fun OperationsReport(
         state.items.groupBy { item ->
             Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
         }.forEach { (date, transactions) ->
+            val (incomeItems, expenseItems) = transactions.partition {
+                TxType.fromWire(it.transaction.type) == TxType.INCOME
+            }
             stickyHeader(key = "date-$date") {
-                Text(
-                    text = when (date) {
+                DayGroupHeader(
+                    dateLabel = when (date) {
                         today -> stringResource(R.string.home_today)
                         today.minusDays(1) -> stringResource(R.string.home_yesterday)
                         else -> date.format(reportDayFormatter)
                     },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surface)
-                        .padding(vertical = 8.dp),
+                    incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
+                    expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
+                    currencySymbol = transactions.first().currencySymbol,
+                    modifier = Modifier.padding(vertical = 8.dp),
                 )
             }
             transactions.forEachIndexed { index, item ->

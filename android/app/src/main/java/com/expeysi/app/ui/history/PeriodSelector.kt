@@ -231,7 +231,7 @@ fun PeriodSelector(
     }
 }
 
-private fun rangeLabel(range: DateRangeFilter): String {
+internal fun rangeLabel(range: DateRangeFilter): String {
     val zone = ZoneId.systemDefault()
     val start = Instant.ofEpochMilli(range.startMillis).atZone(zone).format(dayFormatter)
     val end = Instant.ofEpochMilli(range.endMillisExclusive - 1).atZone(zone).format(dayFormatter)

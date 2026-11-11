@@ -69,7 +69,11 @@ class AddTransactionViewModel @Inject constructor(
         .map { balances -> balances.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
-    private val _type = MutableStateFlow(TxType.EXPENSE)
+    // Подставленный тип операции (из истории доходов/расходов); по умолчанию — расход.
+    private val initialType: TxType =
+        savedStateHandle.get<String>("type")?.let { TxType.fromWire(it) } ?: TxType.EXPENSE
+
+    private val _type = MutableStateFlow(initialType)
     val type: StateFlow<TxType> = _type.asStateFlow()
 
     val categories: StateFlow<List<CategoryEntity>> = combine(
@@ -141,7 +145,7 @@ class AddTransactionViewModel @Inject constructor(
                 _selectedAccountId.value = selectionStore.accountId(userId)
                     ?.let { accountDao.byId(it) }
                     ?.selectableId()
-                restoreLastCategory(TxType.EXPENSE)
+                restoreLastCategory(initialType)
             }
         }
     }

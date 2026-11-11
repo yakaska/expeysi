@@ -32,6 +32,9 @@ class EditAccountViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["accountId"]
+
+    /** Баланс, выбранный до перехода (например, из hero-карточки); null — без предвыбора. */
+    private val prefilledBalanceId: String? = savedStateHandle["balanceId"]
     private var original: AccountEntity? = null
 
     val isEdit: Boolean = editId != null
@@ -80,9 +83,11 @@ class EditAccountViewModel @Inject constructor(
                 }
             }
         } else {
-            // Новый счёт по умолчанию привязываем к первому балансу.
+            // Новый счёт: предвыбранный баланс, если он есть среди активных, иначе первый активный.
             viewModelScope.launch {
-                _balanceId.value = balances.first { it.isNotEmpty() }.first().id
+                val active = balances.first { it.isNotEmpty() }
+                _balanceId.value = active.firstOrNull { it.id == prefilledBalanceId }?.id
+                    ?: active.first().id
             }
         }
     }
