@@ -19,7 +19,18 @@ import javax.inject.Inject
 
 data class AccountRow(
     val balance: AccountBalance,
+)
+
+/**
+ * Группа счетов одного баланса: заголовок с иконкой и названием баланса,
+ * под ним его счета. Безымянная группа — счета, оставшиеся без активного баланса.
+ */
+data class AccountGroup(
+    val balanceId: String?,
     val balanceName: String,
+    val iconKey: String,
+    val colorKey: String,
+    val rows: List<AccountRow>,
 )
 
 @HiltViewModel
@@ -30,28 +41,42 @@ class AccountsViewModel @Inject constructor(
     balanceDao: BalanceDao,
 ) : ViewModel() {
 
-    val accounts: StateFlow<List<AccountRow>> = combine(
+    val groups: StateFlow<List<AccountGroup>> = combine(
         accountDao.observeActive(),
         transactionDao.observeActive(),
         currencyDao.observeAll(),
-        balanceDao.observeAll(),
+        balanceDao.observeActive(),
     ) { accounts, transactions, currencies, balances ->
         val symbolByCode = currencies.associate { it.code to it.symbol }
         val balanceById = balances.associateBy { it.id }
-        accounts.map { account ->
-            val sums = transactions
-                .filter { it.accountId == account.id }
-                .map { TxSum(TxType.fromWire(it.type), it.amountMinor) }
-            val balance = balanceById[account.balanceId]
-            val symbol = balance?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
-            AccountRow(
-                balance = AccountBalance(
-                    account = account,
-                    balanceMinor = BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums),
-                    currencySymbol = symbol,
-                ),
-                balanceName = balance?.name ?: "",
+        val rowsByBalanceId = accounts
+            .map { account ->
+                val sums = transactions
+                    .filter { it.accountId == account.id }
+                    .map { TxSum(TxType.fromWire(it.type), it.amountMinor) }
+                val balance = balanceById[account.balanceId]
+                val symbol = balance?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
+                AccountRow(
+                    balance = AccountBalance(
+                        account = account,
+                        balanceMinor = BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums),
+                        currencySymbol = symbol,
+                    ),
+                )
+            }
+            .groupBy { it.balance.account.balanceId }
+        balances.map { balance ->
+            AccountGroup(
+                balanceId = balance.id,
+                balanceName = balance.name,
+                iconKey = balance.iconKey,
+                colorKey = balance.colorKey,
+                rows = rowsByBalanceId[balance.id].orEmpty(),
             )
-        }
+        } + rowsByBalanceId
+            .filterKeys { id -> balances.none { it.id == id } }
+            .map { (balanceId, rows) ->
+                AccountGroup(balanceId = balanceId, balanceName = "", iconKey = "", colorKey = "default", rows = rows)
+            }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 }

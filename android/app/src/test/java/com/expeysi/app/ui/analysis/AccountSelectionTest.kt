@@ -9,9 +9,13 @@ class AccountSelectionTest {
     private val allIds = setOf("a", "b", "c")
 
     @Test
-    fun `снятие одного счёта со всех даёт явный набор`() {
-        val updated = AccountSelection.toggle(null, allIds, "a")
-        assertEquals(setOf("b", "c"), updated)
+    fun `выбор конкретного счёта со всех счетов даёт только его`() {
+        assertEquals(setOf("a"), AccountSelection.toggle(null, allIds, "a"))
+    }
+
+    @Test
+    fun `снятие последнего выбранного счёта даёт пустой выбор`() {
+        assertEquals(emptySet<String>(), AccountSelection.toggle(setOf("a"), allIds, "a"))
     }
 
     @Test
@@ -20,12 +24,7 @@ class AccountSelectionTest {
     }
 
     @Test
-    fun `ручной выбор всех счетов сводится к все счета`() {
-        assertNull(AccountSelection.toggle(setOf("b", "c"), allIds, "a"))
-    }
-
-    @Test
-    fun `выбор конкретного счёта снимает все счета`() {
-        assertEquals(setOf("b", "c"), AccountSelection.toggle(null, allIds, "a"))
+    fun `снятие одного счёта из подмножества оставляет остальные`() {
+        assertEquals(setOf("c"), AccountSelection.toggle(setOf("b", "c"), allIds, "b"))
     }
 }

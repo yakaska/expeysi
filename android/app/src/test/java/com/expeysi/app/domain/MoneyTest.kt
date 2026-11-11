@@ -43,6 +43,17 @@ class MoneyTest {
     }
 
     @Test
+    fun `введённые нули заменяют префил а не слипаются с ним`() {
+        assertEquals("0", Money.formatInput("0"))
+        assertEquals("5", Money.formatInput("05"))
+        assertEquals("0", Money.formatInput("000"))
+        assertEquals("0,5", Money.formatInput("0,5"))
+        assertEquals("0,05", Money.formatInput("0,05"))
+        assertEquals("-5", Money.formatInput("-05"))
+        assertEquals("10 000", Money.formatInput("010000"))
+    }
+
+    @Test
     fun `некорректный ввод не перезаписывается форматированием`() {
         assertEquals("1.2.3", Money.formatInput("1.2.3"))
         assertEquals("abc", Money.formatInput("abc"))

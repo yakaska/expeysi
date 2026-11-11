@@ -30,7 +30,11 @@ object Money {
         return if (negative) -minor else minor
     }
 
-    /** Группирует разряды и заменяет десятичную точку запятой, не завершая ввод за пользователя. */
+    /**
+     * Группирует разряды и заменяет десятичную точку запятой, не завершая ввод
+     * за пользователя. Ведущие нули целой части срезаются: "05" → "5", поэтому
+     * ввод поверх префила "0" заменяет его, а не слипается с ним.
+     */
     fun formatInput(text: String): String {
         val normalized = compact(text).replace('.', ',')
         val separator = normalized.indexOf(',')
@@ -38,9 +42,10 @@ object Money {
 
         val integer = if (separator == -1) normalized else normalized.substring(0, separator)
         val fraction = if (separator == -1) "" else normalized.substring(separator)
-        val digits = integer.removePrefix("-")
-        if (digits.any { !it.isDigit() }) return text
+        val rawDigits = integer.removePrefix("-")
+        if (rawDigits.any { !it.isDigit() }) return text
 
+        val digits = if (rawDigits.isEmpty()) "" else rawDigits.trimStart('0').ifEmpty { "0" }
         val grouped = digits.reversed().chunked(3).joinToString(" ").reversed()
         val sign = if (integer.startsWith("-")) "-" else ""
         return sign + grouped + fraction
