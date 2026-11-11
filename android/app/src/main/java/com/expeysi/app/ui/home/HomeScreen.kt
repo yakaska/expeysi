@@ -204,11 +204,26 @@ fun HomeContent(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        state.selectedBalance?.name
-                            ?: stringResource(R.string.app_name),
-                        style = MaterialTheme.typography.titleLarge,
-                    )
+                    if (state.selectedBalance == null) {
+                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .clip(MaterialTheme.shapes.small)
+                                .clickable { balanceSheetOpen = true },
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                state.selectedBalance.name,
+                                style = MaterialTheme.typography.titleLarge,
+                            )
+                            Icon(
+                                Icons.Filled.ArrowDropDown,
+                                contentDescription = stringResource(R.string.home_select_balance),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = actions.onMenuClick) {

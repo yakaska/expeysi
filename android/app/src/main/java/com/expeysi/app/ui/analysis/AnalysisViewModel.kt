@@ -67,10 +67,13 @@ data class AnalysisUiState(
 /** Семантика выбора счетов: null означает «все счета». */
 object AccountSelection {
 
-    /** Переключение одного счёта; выбор всех счетов вручную сводится к «все счета». */
+    /**
+     * Переключение одного счёта. Со «всех счетов» первый тап выбирает только его;
+     * ручной выбор всех счетов сводится к «все счета».
+     */
     fun toggle(current: Set<String>?, allIds: Set<String>, id: String): Set<String>? {
-        val base = current ?: allIds
-        val updated = if (id in base) base - id else base + id
+        if (current == null) return setOf(id)
+        val updated = if (id in current) current - id else current + id
         return if (updated == allIds) null else updated
     }
 }

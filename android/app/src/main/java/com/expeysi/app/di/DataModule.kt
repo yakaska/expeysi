@@ -19,6 +19,7 @@ import com.expeysi.app.data.db.MIGRATION_3_4
 import com.expeysi.app.data.db.MIGRATION_4_5
 import com.expeysi.app.data.db.MIGRATION_5_6
 import com.expeysi.app.data.db.MIGRATION_6_7
+import com.expeysi.app.data.db.MIGRATION_7_8
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
@@ -46,7 +47,15 @@ object DataModule {
     ): AppDatabase {
         val seedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         return Room.databaseBuilder(context, AppDatabase::class.java, "expeysi.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+            )
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     // Посев предзаписанных данных — только при создании БД,
