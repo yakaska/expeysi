@@ -12,9 +12,9 @@ data class FinanceColors(
 )
 
 /*
- * Светлая тема: тёмные тона, контраст с surface (#FEF7FF, 0.948)
- * и surfaceContainer (#F3EDF7, 0.863) — 7.5:1 / 6.8:1 для доходов,
- * 6.2:1 / 5.7:1 для расходов.
+ * Светлая тема: тёмные тона, контраст с surface (#FAFAFB)
+ * и surfaceContainer (#EFEFF1) — 7.5:1 / 6.9:1 для доходов,
+ * 6.3:1 / 5.7:1 для расходов.
  */
 val LightFinanceColors = FinanceColors(
     income = Color(0xFF1B5E20),
@@ -22,9 +22,9 @@ val LightFinanceColors = FinanceColors(
 )
 
 /*
- * Тёмная тема: светлые тона, контраст с surface (#141218, 0.0065)
- * и surfaceContainer (#211F26, 0.0144) — 7.9:1 / 6.9:1 для доходов,
- * 7.8:1 / 6.8:1 для расходов.
+ * Тёмная тема: светлые тона, контраст с surface (#111111)
+ * и surfaceContainer (#1E1E1E) — 8.0:1 / 7.1:1 для доходов,
+ * 7.9:1 / 7.0:1 для расходов.
  */
 val DarkFinanceColors = FinanceColors(
     income = Color(0xFF66BB6A),

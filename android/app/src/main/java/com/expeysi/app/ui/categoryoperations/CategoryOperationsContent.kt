@@ -26,10 +26,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -38,20 +38,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expeysi.app.R
 import com.expeysi.app.data.analysis.Operation
-import com.expeysi.app.ui.analysis.AnalysisCategoryBadge
-import com.expeysi.app.ui.analysis.AnalysisColors
 import com.expeysi.app.ui.analysis.ErrorState
 import com.expeysi.app.ui.analysis.SkeletonBar
 import com.expeysi.app.ui.common.AmountFormat
 import com.expeysi.app.ui.common.RuDates
+import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.ExpeysiTheme
+import com.expeysi.app.ui.theme.LocalFinanceColors
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -71,7 +69,7 @@ internal fun CategoryOperationsContent(
     actions: CategoryOperationsActions,
 ) {
     Scaffold(
-        containerColor = AnalysisColors.Background,
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -80,8 +78,7 @@ internal fun CategoryOperationsContent(
                             text = state.categoryName.ifBlank {
                                 stringResource(R.string.report_uncategorized)
                             },
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -91,8 +88,8 @@ internal fun CategoryOperationsContent(
                                 state.periodLabel,
                                 AmountFormat.withCurrency(state.totalMinor, state.currencySymbol),
                             ),
-                            fontSize = 12.sp,
-                            color = AnalysisColors.TextSecondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                 },
@@ -104,11 +101,6 @@ internal fun CategoryOperationsContent(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = AnalysisColors.Background,
-                    titleContentColor = AnalysisColors.TextPrimary,
-                    navigationIconContentColor = AnalysisColors.TextPrimary,
-                ),
             )
         },
     ) { padding ->
@@ -122,8 +114,8 @@ internal fun CategoryOperationsContent(
                 state.isLoading -> OperationsSkeleton()
                 state.groups.isEmpty() -> Text(
                     text = stringResource(R.string.categoryops_empty),
-                    color = AnalysisColors.TextSecondary,
-                    fontSize = 15.sp,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(vertical = 48.dp, horizontal = 16.dp),
@@ -165,11 +157,11 @@ private fun OperationsList(
             stickyHeader(key = "date-${group.date}") {
                 Text(
                     text = RuDates.dayHeader(group.date),
-                    color = AnalysisColors.TextSecondary,
-                    fontSize = 14.sp,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(AnalysisColors.Background)
+                        .background(MaterialTheme.colorScheme.surface)
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 )
             }
@@ -190,7 +182,7 @@ private fun OperationsList(
                     contentAlignment = Alignment.Center,
                 ) {
                     CircularProgressIndicator(
-                        color = AnalysisColors.TextSecondary,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(24.dp),
                     )
@@ -214,19 +206,18 @@ private fun OperationRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AnalysisCategoryBadge(iconKey = operation.iconKey, colorKey = operation.colorKey)
+        CategoryIcon(iconKey = operation.iconKey, colorKey = operation.colorKey)
         Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
             Text(
                 text = operation.title.ifBlank { stringResource(R.string.report_uncategorized) },
-                color = AnalysisColors.TextPrimary,
-                fontSize = 16.sp,
+                style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
                 text = operation.subtitle,
-                color = AnalysisColors.TextSecondary,
-                fontSize = 14.sp,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -234,9 +225,12 @@ private fun OperationRow(
         Text(
             text = (if (operation.isIncome) "+" else "") +
                 AmountFormat.withCurrency(operation.amountMinor, currencySymbol),
-            color = if (operation.isIncome) AnalysisColors.Accent else AnalysisColors.TextPrimary,
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.titleMedium,
+            color = if (operation.isIncome) {
+                LocalFinanceColors.current.income
+            } else {
+                MaterialTheme.colorScheme.onSurface
+            },
             softWrap = false,
         )
     }
@@ -263,7 +257,7 @@ private fun OperationsSkeleton() {
                     Box(
                         modifier = Modifier
                             .size(40.dp)
-                            .background(AnalysisColors.Skeleton, CircleShape),
+                            .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
                     )
                     Column(
                         modifier = Modifier

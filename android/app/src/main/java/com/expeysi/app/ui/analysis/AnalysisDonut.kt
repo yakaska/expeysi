@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -34,7 +35,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.expeysi.app.R
 import kotlin.math.min
 import androidx.compose.ui.graphics.lerp as lerpColor
@@ -67,6 +67,8 @@ internal fun AnalysisDonut(
     modifier: Modifier = Modifier,
 ) {
     val strokePx = with(LocalDensity.current) { donutStroke.toPx() }
+    val trackColor = MaterialTheme.colorScheme.surfaceContainerHighest
+    val onSurface = MaterialTheme.colorScheme.onSurface
 
     val previousShares = remember { mutableStateOf(shares) }
     val previousColors = remember { mutableStateOf(colors) }
@@ -91,7 +93,7 @@ internal fun AnalysisDonut(
                 } else {
                     null
                 },
-                tint = if (previousVisible) AnalysisColors.TextPrimary else Color.Transparent,
+                tint = if (previousVisible) onSurface else Color.Transparent,
             )
         }
         Box(
@@ -146,18 +148,18 @@ internal fun AnalysisDonut(
                 val innerRadius = radius - strokePx / 2f
                 if (shares.sum() <= 0f) {
                     drawCircle(
-                        color = AnalysisColors.DonutEmpty,
+                        color = trackColor,
                         radius = innerRadius,
                         center = center,
                         style = Stroke(width = strokePx),
                     )
                 } else {
                     val blendedShares = blendShares(shares, previousShares.value, progress.value)
-                    val blendedColors = blendColors(colors, previousColors.value, progress.value)
+                    val blendedColors = blendColors(colors, previousColors.value, progress.value, trackColor)
                     DonutGeometry.segments(blendedShares, DONUT_GAP_DEGREES)
                         .forEachIndexed { index, segment ->
                             drawArc(
-                                color = blendedColors.getOrElse(index) { AnalysisColors.DonutEmpty },
+                                color = blendedColors.getOrElse(index) { trackColor },
                                 startAngle = DonutGeometry.START_ANGLE + segment.startAngle,
                                 sweepAngle = segment.sweep,
                                 useCenter = false,
@@ -172,8 +174,8 @@ internal fun AnalysisDonut(
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text(
                         text = label,
-                        color = AnalysisColors.TextSecondary,
-                        fontSize = 16.sp,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -187,7 +189,7 @@ internal fun AnalysisDonut(
                 } else {
                     null
                 },
-                tint = if (nextVisible) AnalysisColors.TextPrimary else Color.Transparent,
+                tint = if (nextVisible) onSurface else Color.Transparent,
             )
         }
     }
@@ -197,8 +199,8 @@ private fun blendShares(target: List<Float>, from: List<Float>, fraction: Float)
     lerpFloat(from.getOrElse(index) { 0f }, target.getOrElse(index) { 0f }, fraction)
 }
 
-private fun blendColors(target: List<Color>, from: List<Color>, fraction: Float): List<Color> = List(maxOf(target.size, from.size)) { index ->
-    val newColor = target.getOrElse(index) { target.lastOrNull() ?: AnalysisColors.DonutEmpty }
+private fun blendColors(target: List<Color>, from: List<Color>, fraction: Float, fallback: Color): List<Color> = List(maxOf(target.size, from.size)) { index ->
+    val newColor = target.getOrElse(index) { target.lastOrNull() ?: fallback }
     val oldColor = from.getOrElse(index) { newColor }
     lerpColor(oldColor, newColor, fraction)
 }
