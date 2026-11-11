@@ -1,23 +1,32 @@
 package com.expeysi.app.ui.balances
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
@@ -35,11 +44,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.ui.icons.BalanceIcon
+import com.expeysi.app.ui.icons.CategoryPalette
+import com.expeysi.app.ui.icons.IconCatalog
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditBalanceScreen(
     onClose: () -> Unit,
@@ -48,6 +61,8 @@ fun EditBalanceScreen(
     val name by viewModel.name.collectAsStateWithLifecycle()
     val currencyCode by viewModel.currencyCode.collectAsStateWithLifecycle()
     val currencies by viewModel.currencies.collectAsStateWithLifecycle()
+    val iconKey by viewModel.iconKey.collectAsStateWithLifecycle()
+    val colorKey by viewModel.colorKey.collectAsStateWithLifecycle()
     val saved by viewModel.saved.collectAsStateWithLifecycle()
     val canSave by viewModel.canSave.collectAsStateWithLifecycle()
 
@@ -188,6 +203,47 @@ fun EditBalanceScreen(
             ) {
                 val current = currencies.firstOrNull { it.code == currencyCode }
                 Text(if (current != null) "${current.code} — ${current.name}" else currencyCode)
+            }
+
+            BalanceIcon(name = name, iconKey = iconKey, colorKey = colorKey)
+
+            Text("Иконка", style = MaterialTheme.typography.titleSmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = iconKey.isBlank(),
+                    onClick = { viewModel.onIconSelect("") },
+                    label = { Icon(Icons.Filled.MoreHoriz, contentDescription = null) },
+                )
+                viewModel.availableIconKeys.forEach { key ->
+                    FilterChip(
+                        selected = iconKey == key,
+                        onClick = { viewModel.onIconSelect(key) },
+                        label = { Icon(IconCatalog.icon(key), contentDescription = key) },
+                    )
+                }
+            }
+
+            Text("Цвет", style = MaterialTheme.typography.titleSmall)
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                CategoryPalette.availableKeys.forEach { key ->
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(CategoryPalette.color(key))
+                            .clickable { viewModel.onColorSelect(key) }
+                            .then(
+                                if (colorKey == key) {
+                                    Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                    )
+                }
             }
         }
     }

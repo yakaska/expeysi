@@ -13,6 +13,8 @@ import com.expeysi.app.data.db.CurrencyEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Currency
+import com.expeysi.app.ui.icons.CategoryPalette
+import com.expeysi.app.ui.icons.IconCatalog
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -49,8 +51,17 @@ class EditBalanceViewModel @Inject constructor(
     private val _currencyCode = MutableStateFlow(Currency.DEFAULT)
     val currencyCode: StateFlow<String> = _currencyCode.asStateFlow()
 
+    /** Ключ иконки баланса; пустой — круг с первой буквой названия. */
+    private val _iconKey = MutableStateFlow("")
+    val iconKey: StateFlow<String> = _iconKey.asStateFlow()
+
+    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    val colorKey: StateFlow<String> = _colorKey.asStateFlow()
+
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
+
+    val availableIconKeys: List<String> = IconCatalog.availableKeys
 
     val canSave: StateFlow<Boolean> = _name
         .map { it.isNotBlank() }
@@ -63,6 +74,8 @@ class EditBalanceViewModel @Inject constructor(
                     original = balance
                     _name.value = balance.name
                     _currencyCode.value = balance.currencyCode
+                    _iconKey.value = balance.iconKey
+                    _colorKey.value = balance.colorKey
                 }
             }
         }
@@ -76,6 +89,14 @@ class EditBalanceViewModel @Inject constructor(
         _currencyCode.value = code
     }
 
+    fun onIconSelect(key: String) {
+        _iconKey.value = key
+    }
+
+    fun onColorSelect(key: String) {
+        _colorKey.value = key
+    }
+
     fun save() {
         if (!canSave.value) return
         viewModelScope.launch {
@@ -83,6 +104,8 @@ class EditBalanceViewModel @Inject constructor(
                 id = editId ?: UUID.randomUUID().toString(),
                 name = _name.value.trim(),
                 currencyCode = _currencyCode.value,
+                iconKey = _iconKey.value,
+                colorKey = _colorKey.value,
                 updatedAt = System.currentTimeMillis(),
             )
             balanceDao.upsert(balance)

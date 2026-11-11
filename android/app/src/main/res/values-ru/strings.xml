@@ -18,7 +18,11 @@
     <string name="home_select_balance">Выбрать баланс</string>
     <string name="home_edit_balance">Изменить баланс…</string>
     <string name="home_new_balance">Новый баланс…</string>
+    <string name="home_budgets_title">Балансы</string>
+    <string name="home_budgets_edit">Изменить</string>
+    <string name="home_select_balance_current">Выбрать баланс, текущий: %1$s</string>
     <string name="home_family_code">Код семьи: %1$s</string>
+    <string name="home_family_code_copy_cd">Скопировать код семьи</string>
     <string name="home_family_code_copied">Код семьи скопирован</string>
     <string name="home_open_menu">Открыть меню</string>
     <string name="home_transaction_history">История операций</string>
@@ -33,7 +37,7 @@
     <string name="home_yesterday">Вчера</string>
     <string name="home_seven_days">7 дней</string>
     <string name="home_thirty_days">30 дней</string>
-    <string name="home_balance">Баланс</string>
+    <string name="home_balance">Всего</string>
     <string name="home_title_with_currency">%1$s · %2$s</string>
     <string name="home_more_accounts" translatable="false">+%1$d</string>
     <string name="home_top_categories">Расходы по категориям</string>
@@ -43,6 +47,7 @@
     <string name="family_leave_confirmation">Выйти из семьи? Общие данные останутся у остальных участников. Присоединиться снова можно по коду приглашения.</string>
     <string name="family_leave_error">Не удалось выйти из семьи. Проверьте подключение и попробуйте ещё раз.</string>
     <string name="action_cancel">Отмена</string>
+    <string name="common_copy">Копировать</string>
     <string name="common_back">Назад</string>
     <string name="drawer_transaction_comparison">Сравнение</string>
     <string name="drawer_expenses_report">Расходы</string>

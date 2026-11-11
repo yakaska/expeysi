@@ -1,6 +1,8 @@
 package com.expeysi.app.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -42,10 +44,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.expeysi.app.R
+import com.expeysi.app.ui.common.rememberClipboardCopy
 
 @Composable
 fun HomeNavigationDrawer(
@@ -63,9 +67,14 @@ fun HomeNavigationDrawer(
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
     onLeaveFamilyClick: () -> Unit,
+    familyCode: String? = null,
     content: @Composable () -> Unit,
 ) {
     var showLeaveConfirmation by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val copiedMessage = stringResource(R.string.home_family_code_copied)
+    val copyLabel = stringResource(R.string.common_copy)
+    val copyToClipboard = rememberClipboardCopy()
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -88,7 +97,24 @@ fun HomeNavigationDrawer(
                                     .clip(CircleShape),
                             )
                             Spacer(Modifier.size(12.dp))
-                            Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall)
+                            Column {
+                                Text(
+                                    stringResource(R.string.app_name),
+                                    style = MaterialTheme.typography.headlineSmall,
+                                )
+                                familyCode?.let { code ->
+                                    Text(
+                                        stringResource(R.string.home_family_code, code),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.clickable(
+                                            onClickLabel = copyLabel,
+                                        ) {
+                                            copyToClipboard("family code", code)
+                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                        },
+                                    )
+                                }
+                            }
                         }
                     }
                     DrawerSection("Отчёты")

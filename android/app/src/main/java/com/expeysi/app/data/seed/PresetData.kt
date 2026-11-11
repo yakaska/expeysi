@@ -19,7 +19,13 @@ object PresetData {
     const val ACCOUNT_CASH_ID = "00000000-0000-4000-8000-000000000001"
     const val ACCOUNT_CARD_ID = "00000000-0000-4000-8000-000000000002"
 
-    data class PresetBalance(val id: String, val name: String, val currencyCode: String)
+    data class PresetBalance(
+        val id: String,
+        val name: String,
+        val iconKey: String,
+        val colorKey: String,
+        val currencyCode: String,
+    )
 
     data class PresetAccount(val id: String, val name: String, val iconKey: String, val colorKey: String)
 
@@ -32,7 +38,7 @@ object PresetData {
     )
 
     val balances: List<PresetBalance> = listOf(
-        PresetBalance(BALANCE_MAIN_ID, "Основной", Currency.DEFAULT),
+        PresetBalance(BALANCE_MAIN_ID, "Основной", "payments", "blue", Currency.DEFAULT),
     )
 
     val accounts: List<PresetAccount> = listOf(
@@ -60,6 +66,8 @@ object PresetData {
             id = it.id,
             name = it.name,
             currencyCode = it.currencyCode,
+            iconKey = it.iconKey,
+            colorKey = it.colorKey,
             updatedAt = nowMillis,
         )
     }

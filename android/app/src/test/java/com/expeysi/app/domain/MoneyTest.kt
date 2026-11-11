@@ -52,7 +52,7 @@ class MoneyTest {
     fun `компактное форматирование без копеек`() {
         val below = Money.compact(1_234_500L)
         assertEquals(Money.Scale.NONE, below.scale)
-        assertEquals("12 345", below.digits)
+        assertEquals("12\u00A0345", below.digits)
     }
 
     @Test
@@ -158,11 +158,14 @@ class MoneyTest {
         val million = "млн"
         val billion = "млрд"
         assertEquals("0", Money.formatCompact(0, million, billion))
-        assertEquals("9", Money.formatCompact(999, million, billion))
-        assertEquals("9\u00A0999", Money.formatCompact(999_999, million, billion))
+        assertEquals("9,99", Money.formatCompact(999, million, billion))
+        // У дробных значений format() группирует разряды обычным пробелом.
+        assertEquals("9 999,99", Money.formatCompact(999_999, million, billion))
         assertEquals("10\u00A0000", Money.formatCompact(1_000_000, million, billion))
-        assertEquals("455\u00A0841", Money.formatCompact(45_584_137, million, billion))
-        assertEquals("-455\u00A0841", Money.formatCompact(-45_584_137, million, billion))
+        assertEquals("455 841,37", Money.formatCompact(45_584_137, million, billion))
+        assertEquals("-455 841,37", Money.formatCompact(-45_584_137, million, billion))
+        assertEquals("48 750,25", Money.formatCompact(4_875_025, million, billion))
+        assertEquals("-0,99", Money.formatCompact(-99, million, billion))
     }
 
     @Test
@@ -189,6 +192,6 @@ class MoneyTest {
         Money.formatCompact(Long.MAX_VALUE, "млн", "млрд")
         Money.compact(Long.MAX_VALUE)
         Money.compact(Long.MIN_VALUE)
-        assertEquals("92\u00A0233\u00A0720\u00A0368\u00A0547\u00A0758", Money.formatCompact(Long.MAX_VALUE, "млн", "млрд"))
+        assertEquals("92 233 720 368 547 758,07", Money.formatCompact(Long.MAX_VALUE, "млн", "млрд"))
     }
 }

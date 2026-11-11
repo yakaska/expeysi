@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
 private fun AppNavigation() {
     val navController = rememberNavController()
     val homeViewModel: HomeViewModel = hiltViewModel()
+    val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val importState by homeViewModel.importState.collectAsStateWithLifecycle()
     val leaveState by homeViewModel.leaveState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -163,6 +164,7 @@ private fun AppNavigation() {
             }
         },
         onLeaveFamilyClick = homeViewModel::leaveFamily,
+        familyCode = homeUiState.familyId,
     ) {
         NavHost(
             navController = navController,

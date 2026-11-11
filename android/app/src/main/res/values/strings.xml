@@ -18,7 +18,11 @@
     <string name="home_select_balance">Select balance</string>
     <string name="home_edit_balance">Edit balance…</string>
     <string name="home_new_balance">New balance…</string>
+    <string name="home_budgets_title">Balances</string>
+    <string name="home_budgets_edit">Edit</string>
+    <string name="home_select_balance_current">Select balance, current: %1$s</string>
     <string name="home_family_code">Family code: %1$s</string>
+    <string name="home_family_code_copy_cd">Copy family code</string>
     <string name="home_family_code_copied">Family code copied</string>
     <string name="home_open_menu">Open menu</string>
     <string name="home_transaction_history">Transaction history</string>
@@ -33,7 +37,7 @@
     <string name="home_yesterday">Yesterday</string>
     <string name="home_seven_days">7 days</string>
     <string name="home_thirty_days">30 days</string>
-    <string name="home_balance">Balance</string>
+    <string name="home_balance">Total</string>
     <string name="home_title_with_currency">%1$s · %2$s</string>
     <string name="home_more_accounts" translatable="false">+%1$d</string>
     <string name="home_top_categories">Expenses by category</string>
@@ -43,6 +47,7 @@
     <string name="family_leave_confirmation">Leave this family? Shared data will remain available to other members. You can rejoin later with an invitation code.</string>
     <string name="family_leave_error">Couldn’t leave the family. Check your connection and try again.</string>
     <string name="action_cancel">Cancel</string>
+    <string name="common_copy">Copy</string>
     <string name="common_back">Назад</string>
     <string name="drawer_transaction_comparison">Сравнение</string>
     <string name="drawer_expenses_report">Расходы</string>
