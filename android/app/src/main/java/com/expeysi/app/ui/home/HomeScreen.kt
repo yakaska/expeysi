@@ -130,7 +130,7 @@ data class HomeActions(
     val onSummaryClick: (String, TxType, Int) -> Unit,
     val onBalanceSelected: (String) -> Unit,
     val onLoadMoreTransactions: () -> Unit,
-    val onAnalysisClick: () -> Unit = {},
+    val onAnalysisClick: (Int) -> Unit = {},
     val onPeriodSelected: (Int) -> Unit = {},
 )
 
@@ -145,7 +145,7 @@ fun HomeScreen(
     onAccountHistoryClick: (String) -> Unit,
     onAddAccountClick: (String?) -> Unit = {},
     onSummaryClick: (String, TxType, Int) -> Unit,
-    onAnalysisClick: () -> Unit,
+    onAnalysisClick: (Int) -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -332,7 +332,7 @@ fun HomeContent(
                     item {
                         TopExpensesCard(
                             categories = state.topCategories,
-                            onAnalysisClick = actions.onAnalysisClick,
+                            onAnalysisClick = { actions.onAnalysisClick(state.periodDays) },
                             modifier = Modifier.padding(bottom = 4.dp),
                         )
                     }
@@ -1018,7 +1018,7 @@ private val previewHomeActions = HomeActions(
     onSummaryClick = { _, _, _ -> },
     onBalanceSelected = {},
     onLoadMoreTransactions = {},
-    onAnalysisClick = {},
+    onAnalysisClick = { _ -> },
     onPeriodSelected = {},
 )
 

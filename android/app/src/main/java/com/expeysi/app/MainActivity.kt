@@ -204,7 +204,7 @@ private fun AppNavigation() {
                     onSummaryClick = { id, type, days ->
                         navController.navigate("history/balance/$id?type=${type.wire}&days=$days")
                     },
-                    onAnalysisClick = { navController.navigate("analysis") },
+                    onAnalysisClick = { days -> navController.navigate("analysis?days=$days") },
                     viewModel = homeViewModel,
                 )
             }
@@ -214,7 +214,15 @@ private fun AppNavigation() {
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
-            composable("analysis") {
+            composable(
+                route = "analysis?days={days}",
+                arguments = listOf(
+                    navArgument("days") {
+                        type = NavType.IntType
+                        defaultValue = 0
+                    },
+                ),
+            ) {
                 AnalysisScreen(
                     onBack = { navigateBack() },
                     onOpenCategory = { request ->

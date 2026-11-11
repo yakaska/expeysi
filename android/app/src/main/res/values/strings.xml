@@ -100,6 +100,8 @@
     <string name="analysis_range_year">за год</string>
     <string name="analysis_range_all">за всё время</string>
     <string name="analysis_range_custom">за выбранный период</string>
+    <string name="analysis_range_today">за сегодня</string>
+    <string name="analysis_range_last_days">за %1$d дней</string>
     <string name="period_title">Период</string>
     <string name="period_day">День</string>
     <string name="period_week">Неделя</string>

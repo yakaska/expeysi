@@ -18,6 +18,25 @@ enum class AnalysisPeriodKind { MONTHS, CALENDAR, SLIDING, RANGE }
 
 private val shortRangeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM")
 
+private const val DAY_MILLIS = 86_400_000L
+
+/** Скользящие окна в днях; границы как у чипсов на главном экране. */
+internal val SLIDING_DAYS = setOf(1, 7, 30)
+
+/** Скользящему окну соответствует единица истории: для подсветки в шторке выбора. */
+internal fun Int.slidingUnit(): HistoryPeriod = when (this) {
+    1 -> HistoryPeriod.DAY
+    7 -> HistoryPeriod.WEEK
+    else -> HistoryPeriod.MONTH
+}
+
+/** Период анализа как скользящее окно в днях (например, переход с главного экрана). */
+internal fun slidingDaysPeriod(days: Int): AnalysisPeriod = AnalysisPeriod(
+    kind = AnalysisPeriodKind.SLIDING,
+    sliding = days.slidingUnit(),
+    slidingDays = days,
+)
+
 /**
  * Период анализа. MONTHS — календарные месяцы, CALENDAR — календарные дни,
  * недели, кварталы, полугодия и годы; оба листаются по стрелкам. SLIDING и
@@ -33,6 +52,8 @@ data class AnalysisPeriod(
     val anchor: LocalDate = LocalDate.now(),
     /** Скользящий период из пикера для режима SLIDING. */
     val sliding: HistoryPeriod = HistoryPeriod.MONTH,
+    /** Скользящее окно в днях (1, 7 или 30); границы считаются от начала суток, как на главном экране. */
+    val slidingDays: Int? = null,
     /** Произвольный диапазон для режима RANGE. */
     val range: DateRangeFilter? = null,
 ) {
@@ -46,7 +67,13 @@ data class AnalysisPeriod(
             val bounds = Periods.unit(unit, anchor, zone)
             bounds.startMillis to bounds.endMillisExclusive
         }
-        AnalysisPeriodKind.SLIDING -> sliding.startMillis(now) to null
+        AnalysisPeriodKind.SLIDING -> slidingDays?.let { days ->
+            val today = Periods.day(now.toLocalDate(), zone)
+            val start = today.startMillis - (days - 1L) * DAY_MILLIS
+            // Как в сводке главного экрана: за «сегодня» будущее не учитываем, за недели — без верхней границы.
+            val end = if (days == 1) today.endMillisExclusive else null
+            start to end
+        } ?: (sliding.startMillis(now) to null)
         AnalysisPeriodKind.RANGE -> {
             if (range == null) {
                 null to null
@@ -107,9 +134,18 @@ private fun HistoryPeriod.shiftAnchor(anchor: LocalDate, delta: Int): LocalDate 
 internal fun AnalysisPeriod.centerLabel(zone: ZoneId): String = when (kind) {
     AnalysisPeriodKind.MONTHS -> RuDates.monthLabel(month, currentYear = YearMonth.now().year)
     AnalysisPeriodKind.CALENDAR -> calendarLabel(zone)
-    AnalysisPeriodKind.SLIDING -> stringResource(sliding.labelRes())
+    AnalysisPeriodKind.SLIDING -> slidingDaysLabel() ?: stringResource(sliding.labelRes())
     AnalysisPeriodKind.RANGE -> range?.let { RuDates.shortRangeLabel(it, zone) }
         ?: stringResource(HistoryPeriod.ALL.labelRes())
+}
+
+/** Метка скользящего окна в днях: «Сегодня», «7 дней», «30 дней» — те же строки, что у чипсов главной. */
+@Composable
+private fun AnalysisPeriod.slidingDaysLabel(): String? = when (slidingDays) {
+    1 -> stringResource(R.string.home_today)
+    7 -> stringResource(R.string.home_seven_days)
+    30 -> stringResource(R.string.home_thirty_days)
+    else -> null
 }
 
 /** Метка календарной единицы: «11 ноября», «9.11–15.11», «1-й квартал 2026»… */
@@ -141,7 +177,7 @@ private fun AnalysisPeriod.calendarRangeLabel(zone: ZoneId): String {
 internal fun AnalysisPeriod.linkLabel(zone: ZoneId): String = when (kind) {
     AnalysisPeriodKind.MONTHS -> RuDates.monthLabel(month, currentYear = YearMonth.now().year)
     AnalysisPeriodKind.CALENDAR -> calendarLabel(zone)
-    AnalysisPeriodKind.SLIDING -> stringResource(sliding.labelRes())
+    AnalysisPeriodKind.SLIDING -> slidingDaysLabel() ?: stringResource(sliding.labelRes())
     AnalysisPeriodKind.RANGE -> range?.let { RuDates.shortRangeLabel(it, zone) }
         ?: stringResource(HistoryPeriod.ALL.labelRes())
 }
@@ -150,9 +186,21 @@ internal fun AnalysisPeriod.linkLabel(zone: ZoneId): String = when (kind) {
 @Composable
 internal fun AnalysisPeriod.sinceLabel(): String = when (kind) {
     AnalysisPeriodKind.MONTHS -> RuDates.monthName(month)
-    AnalysisPeriodKind.SLIDING -> stringResource(sliding.sinceRes())
+    AnalysisPeriodKind.SLIDING -> slidingDaysSinceLabel()
+        ?: stringResource(sliding.sinceRes())
     AnalysisPeriodKind.CALENDAR -> stringResource(unit.sinceRes())
     AnalysisPeriodKind.RANGE -> stringResource(R.string.analysis_range_custom)
+}
+
+/** Часть описания доступности для скользящего окна: «за сегодня», «за 7 дней»… */
+@Composable
+private fun AnalysisPeriod.slidingDaysSinceLabel(): String? {
+    val days = slidingDays ?: return null
+    return when (days) {
+        1 -> stringResource(R.string.analysis_range_today)
+        in SLIDING_DAYS -> stringResource(R.string.analysis_range_last_days, days)
+        else -> null
+    }
 }
 
 private fun HistoryPeriod.sinceRes(): Int = when (this) {
