@@ -26,6 +26,9 @@ object RuDates {
         return if (month.year == currentYear) name else "$name ${month.year}"
     }
 
+    /** Метка дня для центра диаграммы: «11 ноября». */
+    fun dayLabel(date: LocalDate, locale: Locale = RU): String = date.format(DateTimeFormatter.ofPattern("d MMMM", locale))
+
     /** Короткий диапазон для центра диаграммы: «12.04–18.04». */
     fun shortRangeLabel(range: DateRangeFilter, zone: ZoneId, locale: Locale = RU): String {
         val start = epochTo(range.startMillis, zone, locale)

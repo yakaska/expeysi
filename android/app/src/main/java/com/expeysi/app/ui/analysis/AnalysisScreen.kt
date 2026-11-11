@@ -2,7 +2,6 @@ package com.expeysi.app.ui.analysis
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.domain.TxType
@@ -31,8 +30,7 @@ fun AnalysisScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val zone = ZoneId.systemDefault()
-    val context = LocalContext.current
-    val getString = { resource: Int -> context.getString(resource) }
+    val periodLabel = state.period.linkLabel(zone)
     AnalysisContent(
         state = state,
         actions = AnalysisActions(
@@ -41,8 +39,8 @@ fun AnalysisScreen(
             onFiltersClick = viewModel::openFilters,
             onFiltersDismiss = viewModel::closeFilters,
             onTypeSelect = viewModel::selectType,
-            onPreviousMonth = { viewModel.shiftMonth(-1) },
-            onNextMonth = { viewModel.shiftMonth(1) },
+            onPreviousPeriod = { viewModel.shiftPeriod(-1) },
+            onNextPeriod = { viewModel.shiftPeriod(1) },
             onCenterClick = viewModel::openPeriodPicker,
             onPeriodSelected = viewModel::selectPeriod,
             onRangeSelected = viewModel::selectRange,
@@ -56,7 +54,7 @@ fun AnalysisScreen(
                         type = state.type,
                         startMillis = startMillis,
                         endMillisExclusive = endMillisExclusive,
-                        periodLabel = state.period.linkLabel(zone, getString),
+                        periodLabel = periodLabel,
                         accountIds = state.selectedAccountIds,
                     ),
                 )

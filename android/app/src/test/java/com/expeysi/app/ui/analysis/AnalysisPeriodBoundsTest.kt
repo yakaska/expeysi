@@ -60,10 +60,84 @@ class AnalysisPeriodBoundsTest {
     }
 
     @Test
-    fun `листать можно только в календарных месяцах`() {
-        assertTrue(AnalysisPeriod(month = YearMonth.of(2026, 4)).monthsNavigable)
-        assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = HistoryPeriod.ALL).monthsNavigable)
-        assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.RANGE).monthsNavigable)
+    fun `календарные единицы дают границы содержащего периода`() {
+        val anchor = LocalDate.of(2026, 11, 11)
+        val units = listOf(
+            HistoryPeriod.DAY,
+            HistoryPeriod.WEEK,
+            HistoryPeriod.QUARTER,
+            HistoryPeriod.HALF_YEAR,
+            HistoryPeriod.YEAR,
+        )
+        for (unit in units) {
+            val expected = Periods.unit(unit, anchor, zone)
+            val (start, end) = AnalysisPeriod(
+                kind = AnalysisPeriodKind.CALENDAR,
+                unit = unit,
+                anchor = anchor,
+            ).bounds(now, zone)
+            assertEquals(unit.name, expected.startMillis, start)
+            assertEquals(unit.name, expected.endMillisExclusive, end)
+        }
+    }
+
+    @Test
+    fun `листать можно только в календарных режимах`() {
+        assertTrue(AnalysisPeriod(month = YearMonth.of(2026, 4)).navigable)
+        assertTrue(
+            AnalysisPeriod(
+                kind = AnalysisPeriodKind.CALENDAR,
+                unit = HistoryPeriod.WEEK,
+                anchor = LocalDate.of(2026, 4, 12),
+            ).navigable,
+        )
+        assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.SLIDING, sliding = HistoryPeriod.ALL).navigable)
+        assertFalse(AnalysisPeriod(kind = AnalysisPeriodKind.RANGE).navigable)
+    }
+
+    @Test
+    fun `сдвиг квартала двигает опорную дату на квартал`() {
+        val period = AnalysisPeriod(
+            kind = AnalysisPeriodKind.CALENDAR,
+            unit = HistoryPeriod.QUARTER,
+            anchor = LocalDate.of(2026, 2, 15),
+        )
+        val shifted = period.shiftedBy(1)!!
+        assertEquals(LocalDate.of(2026, 5, 15), shifted.anchor)
+        val expected = Periods.quarter(LocalDate.of(2026, 5, 15), zone)
+        assertEquals(expected.startMillis, shifted.bounds(now, zone).first)
+    }
+
+    @Test
+    fun `сдвиг недели пересекает год`() {
+        val period = AnalysisPeriod(
+            kind = AnalysisPeriodKind.CALENDAR,
+            unit = HistoryPeriod.WEEK,
+            anchor = LocalDate.of(2026, 1, 1),
+        )
+        val shifted = period.shiftedBy(-1)!!
+        val expected = Periods.week(LocalDate.of(2025, 12, 25), zone)
+        assertEquals(expected.startMillis, shifted.bounds(now, zone).first)
+    }
+
+    @Test
+    fun `вперёд недоступно в текущем периоде и доступно в прошлом`() {
+        val today = LocalDate.from(now)
+        val current = AnalysisPeriod(
+            kind = AnalysisPeriodKind.CALENDAR,
+            unit = HistoryPeriod.QUARTER,
+            anchor = today,
+        )
+        assertFalse(current.hasNext(now, zone))
+        val past = current.shiftedBy(-2)!!
+        assertTrue(past.hasNext(now, zone))
+    }
+
+    @Test
+    fun `вперёд для месяцев не выходит за текущий месяц`() {
+        val currentMonth = YearMonth.from(now)
+        assertFalse(AnalysisPeriod(month = currentMonth).hasNext(now, zone))
+        assertTrue(AnalysisPeriod(month = currentMonth.minusMonths(1)).hasNext(now, zone))
     }
 
     @Test
@@ -73,21 +147,36 @@ class AnalysisPeriodBoundsTest {
             .atZone(zone)
             .toInstant()
             .toEpochMilli()
-        assertTrue(hasOperationsInPreviousMonth(YearMonth.of(2026, 4), earliest, zone))
+        assertTrue(AnalysisPeriod(month = YearMonth.of(2026, 4)).hasPrevious(now, zone, earliest))
     }
 
     @Test
-    fun `операции внутри опорного месяца не дают стрелку назад`() {
-        val earliest = LocalDate.of(2026, 4, 1)
+    fun `операции внутри опорного периода не дают стрелку назад`() {
+        // 8 ноября 2026 — воскресенье; его неделя — со 2 по 8 ноября.
+        val anchor = LocalDate.of(2026, 11, 8)
+        val period = AnalysisPeriod(
+            kind = AnalysisPeriodKind.CALENDAR,
+            unit = HistoryPeriod.WEEK,
+            anchor = anchor,
+        )
+        val insideWeek = anchor
+            .minusDays(3)
             .atTime(12, 0)
             .atZone(zone)
             .toInstant()
             .toEpochMilli()
-        assertFalse(hasOperationsInPreviousMonth(YearMonth.of(2026, 4), earliest, zone))
+        assertFalse(period.hasPrevious(now, zone, insideWeek))
+        val previousWeek = anchor
+            .minusDays(8)
+            .atTime(12, 0)
+            .atZone(zone)
+            .toInstant()
+            .toEpochMilli()
+        assertTrue(period.hasPrevious(now, zone, previousWeek))
     }
 
     @Test
     fun `без операций стрелка назад недоступна`() {
-        assertFalse(hasOperationsInPreviousMonth(YearMonth.of(2026, 4), null, zone))
+        assertFalse(AnalysisPeriod(month = YearMonth.of(2026, 4)).hasPrevious(now, zone, null))
     }
 }

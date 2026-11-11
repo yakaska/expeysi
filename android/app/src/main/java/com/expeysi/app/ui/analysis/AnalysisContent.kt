@@ -60,6 +60,7 @@ import com.expeysi.app.ui.theme.TopCardShape
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 private const val VISIBLE_CATEGORIES = 4
 
@@ -70,8 +71,8 @@ data class AnalysisActions(
     val onFiltersClick: () -> Unit = {},
     val onFiltersDismiss: () -> Unit = {},
     val onTypeSelect: (TxType) -> Unit = {},
-    val onPreviousMonth: () -> Unit = {},
-    val onNextMonth: () -> Unit = {},
+    val onPreviousPeriod: () -> Unit = {},
+    val onNextPeriod: () -> Unit = {},
     val onCenterClick: () -> Unit = {},
     val onPeriodSelected: (HistoryPeriod) -> Unit = {},
     val onRangeSelected: (LocalDate, LocalDate) -> Unit = { _, _ -> },
@@ -123,8 +124,8 @@ internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
                                     state = state,
                                     summary = summary,
                                     onCenterClick = actions.onCenterClick,
-                                    onPreviousMonth = actions.onPreviousMonth,
-                                    onNextMonth = actions.onNextMonth,
+                                    onPreviousPeriod = actions.onPreviousPeriod,
+                                    onNextPeriod = actions.onNextPeriod,
                                     onSegmentClick = { index ->
                                         summary.categories.getOrNull(index)?.let(actions.onCategoryClick)
                                     },
@@ -165,6 +166,7 @@ internal fun AnalysisContent(state: AnalysisUiState, actions: AnalysisActions) {
             PeriodPickerSheet(
                 period = when (state.period.kind) {
                     AnalysisPeriodKind.MONTHS -> HistoryPeriod.MONTH
+                    AnalysisPeriodKind.CALENDAR -> state.period.unit
                     AnalysisPeriodKind.SLIDING -> state.period.sliding
                     AnalysisPeriodKind.RANGE -> HistoryPeriod.ALL
                 },
@@ -328,11 +330,12 @@ private fun DonutBlock(
     state: AnalysisUiState,
     summary: CategorySummary,
     onCenterClick: () -> Unit,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit,
+    onPreviousPeriod: () -> Unit,
+    onNextPeriod: () -> Unit,
     onSegmentClick: (Int) -> Unit,
 ) {
     val zone = ZoneId.systemDefault()
+    val now = ZonedDateTime.now(zone)
     val total = summary.totalMinor
     val shares = if (total <= 0L) {
         emptyList()
@@ -357,13 +360,12 @@ private fun DonutBlock(
         colors = summary.categories.map { CategoryPalette.color(it.colorKey) },
         centerLabel = state.period.centerLabel(zone),
         description = description,
-        previousVisible = state.period.kind == AnalysisPeriodKind.MONTHS &&
-            hasOperationsInPreviousMonth(state.period.month, state.earliestMillis, zone),
-        nextVisible = state.nextMonthVisible,
-        swipeEnabled = state.period.monthsNavigable,
+        previousVisible = state.period.hasPrevious(now, zone, state.earliestMillis),
+        nextVisible = state.period.hasNext(now, zone),
+        swipeEnabled = state.period.navigable,
         onSegmentClick = onSegmentClick,
-        onPrevious = onPreviousMonth,
-        onNext = onNextMonth,
+        onPrevious = onPreviousPeriod,
+        onNext = onNextPeriod,
         onCenterClick = onCenterClick,
         modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
     )
@@ -607,7 +609,6 @@ private fun analysisPreviewState(
     balanceId = "main",
     type = type,
     period = AnalysisPeriod(month = previewMonth),
-    currentMonth = previewMonth,
     accounts = previewAccounts,
     summary = summary,
 )
