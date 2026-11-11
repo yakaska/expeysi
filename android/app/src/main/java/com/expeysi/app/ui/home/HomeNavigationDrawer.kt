@@ -117,9 +117,9 @@ fun HomeNavigationDrawer(
                             }
                         }
                     }
-                    DrawerSection("Отчёты")
+                    DrawerSection(stringResource(R.string.drawer_section_reports))
                     NavigationDrawerItem(
-                        label = { Text("Главная") },
+                        label = { Text(stringResource(R.string.drawer_home)) },
                         selected = true,
                         icon = { Icon(Icons.Filled.Home, contentDescription = null) },
                         onClick = onHomeClick,
@@ -153,7 +153,7 @@ fun HomeNavigationDrawer(
                         onClick = onIncomesReportClick,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
-                    DrawerSection("Данные")
+                    DrawerSection(stringResource(R.string.drawer_section_data))
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.drawer_data_export)) },
                         selected = false,
@@ -169,7 +169,7 @@ fun HomeNavigationDrawer(
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Импорт из Бюджета") },
+                        label = { Text(stringResource(R.string.drawer_import_budget)) },
                         selected = false,
                         icon = {
                             if (importing) {
@@ -181,16 +181,16 @@ fun HomeNavigationDrawer(
                         onClick = { if (!importing) onImportClick() },
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
-                    DrawerSection("Разное")
+                    DrawerSection(stringResource(R.string.drawer_section_misc))
                     NavigationDrawerItem(
-                        label = { Text("Категории") },
+                        label = { Text(stringResource(R.string.history_mode_categories)) },
                         selected = false,
                         icon = { Icon(Icons.Filled.Category, contentDescription = null) },
                         onClick = onCategoriesClick,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     NavigationDrawerItem(
-                        label = { Text("Счета") },
+                        label = { Text(stringResource(R.string.home_accounts)) },
                         selected = false,
                         icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
                         onClick = onAccountsClick,
@@ -235,7 +235,7 @@ fun HomeNavigationDrawer(
                     onClick = { showLeaveConfirmation = false },
                     enabled = !leavingFamily,
                 ) {
-                    Text(stringResource(R.string.action_cancel))
+                    Text(stringResource(R.string.common_cancel))
                 }
             },
         )

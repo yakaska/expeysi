@@ -128,7 +128,7 @@ class CategoryReportViewModel @Inject constructor(
             val category = categoryById[transaction.categoryId]
             TransactionItem(
                 transaction = transaction,
-                categoryName = category?.name ?: "Без категории",
+                categoryName = category?.name ?: "",
                 categoryIconKey = category?.iconKey ?: "",
                 categoryColorKey = category?.colorKey ?: "default",
                 accountName = accountById[transaction.accountId]?.name ?: "",

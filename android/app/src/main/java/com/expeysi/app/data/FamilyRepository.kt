@@ -16,7 +16,7 @@ class FamilyRepository @Inject constructor(
     private val database: AppDatabase,
 ) {
     suspend fun createFamily() {
-        val uid = authRepository.userId ?: error("Пользователь не вошёл")
+        val uid = checkSignedIn()
         val family = firestore.collection("families").document()
         firestore.runBatch { batch ->
             batch.set(
@@ -33,9 +33,9 @@ class FamilyRepository @Inject constructor(
     }
 
     suspend fun joinFamily(code: String) {
-        val uid = authRepository.userId ?: error("Пользователь не вошёл")
+        val uid = checkSignedIn()
         val familyId = code.trim()
-        require(familyId.isNotEmpty()) { "Введите код семьи" }
+        if (familyId.isEmpty()) throw FamilyCodeEmptyException()
         firestore.collection("families").document(familyId)
             .collection("members").document(uid)
             .set(memberData(uid))
@@ -49,7 +49,7 @@ class FamilyRepository @Inject constructor(
     }
 
     suspend fun leaveFamily() {
-        val uid = authRepository.userId ?: error("Пользователь не вошёл")
+        val uid = checkSignedIn()
         val familyId = familyStore.familyId.value ?: return
         firestore.collection("families").document(familyId)
             .collection("members").document(uid)
@@ -69,4 +69,15 @@ class FamilyRepository @Inject constructor(
         "joinedAt" to FieldValue.serverTimestamp(),
         "uid" to uid,
     )
+
+    private fun checkSignedIn(): String {
+        val uid = authRepository.userId ?: throw FamilyNotSignedInException()
+        return uid
+    }
 }
+
+/** Вызывается без входа в аккаунт; текст показа резолвится в UI-слое. */
+class FamilyNotSignedInException : Exception()
+
+/** Вызован вход в семью с пустым кодом; текст показа резолвится в UI-слое. */
+class FamilyCodeEmptyException : Exception()

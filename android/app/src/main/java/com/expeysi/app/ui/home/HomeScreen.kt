@@ -101,11 +101,10 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
 import kotlin.math.abs
 
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
-private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM", Locale.forLanguageTag("ru"))
+private val dayFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM")
 
 private const val MINUS_SIGN = "\u2212"
 
@@ -414,7 +413,10 @@ fun HomeContent(
                                             .weight(1f)
                                             .padding(horizontal = 16.dp),
                                     ) {
-                                        Text(item.categoryName, style = MaterialTheme.typography.bodyLarge)
+                                        Text(
+                                            item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                                            style = MaterialTheme.typography.bodyLarge,
+                                        )
                                         Text(
                                             listOfNotNull(
                                                 if (showAccountName) item.accountName.ifBlank { null } else null,

@@ -36,6 +36,7 @@ import com.expeysi.app.ui.categories.CategoriesScreen
 import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
+import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
@@ -86,7 +87,7 @@ private fun AppNavigation() {
 
     LaunchedEffect(importState.message) {
         importState.message?.let {
-            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            Toast.makeText(context, it.asString(context), Toast.LENGTH_LONG).show()
             homeViewModel.consumeImportMessage()
         }
     }

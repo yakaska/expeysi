@@ -45,9 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.ui.icons.BalanceIcon
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -77,18 +79,18 @@ fun EditBalanceScreen(
     if (showDeleteConfirm) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("Удалить баланс?") },
-            text = { Text("Баланс, все его счета и операции будут удалены. Это действие нельзя отменить.") },
+            title = { Text(stringResource(R.string.balance_delete_title)) },
+            text = { Text(stringResource(R.string.balance_delete_text)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         showDeleteConfirm = false
                         viewModel.delete()
                     },
-                ) { Text("Удалить") }
+                ) { Text(stringResource(R.string.common_delete)) }
             },
             dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("Отмена") }
+                TextButton(onClick = { showDeleteConfirm = false }) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -104,14 +106,14 @@ fun EditBalanceScreen(
                 showCurrencyPicker = false
                 currencyQuery = ""
             },
-            title = { Text("Валюта баланса") },
+            title = { Text(stringResource(R.string.balance_currency_title)) },
             text = {
                 Column {
                     OutlinedTextField(
                         value = currencyQuery,
                         onValueChange = { currencyQuery = it },
                         modifier = Modifier.fillMaxWidth(),
-                        label = { Text("Поиск") },
+                        label = { Text(stringResource(R.string.common_search)) },
                         singleLine = true,
                     )
                     LazyColumn(
@@ -122,8 +124,10 @@ fun EditBalanceScreen(
                     ) {
                         items(filtered, key = { it.code }) { currency ->
                             ListItem(
-                                headlineContent = { Text("${currency.code} — ${currency.name}") },
-                                supportingContent = { Text("Символ: ${currency.symbol}") },
+                                headlineContent = {
+                                    Text(stringResource(R.string.balance_currency_item, currency.code, currency.name))
+                                },
+                                supportingContent = { Text(stringResource(R.string.balance_symbol_label, currency.symbol)) },
                                 modifier = Modifier.clickable {
                                     viewModel.onCurrencySelect(currency.code)
                                     showCurrencyPicker = false
@@ -140,7 +144,7 @@ fun EditBalanceScreen(
                         showCurrencyPicker = false
                         currencyQuery = ""
                     },
-                ) { Text("Отмена") }
+                ) { Text(stringResource(R.string.common_cancel)) }
             },
         )
     }
@@ -148,10 +152,10 @@ fun EditBalanceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (viewModel.isEdit) "Изменить баланс" else "Новый баланс") },
+                title = { Text(stringResource(if (viewModel.isEdit) R.string.balance_title_edit else R.string.balance_title_new)) },
                 navigationIcon = {
                     IconButton(onClick = onClose) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
                 actions = {
@@ -159,7 +163,7 @@ fun EditBalanceScreen(
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 Icons.Filled.Delete,
-                                contentDescription = "Удалить",
+                                contentDescription = stringResource(R.string.common_delete),
                                 tint = MaterialTheme.colorScheme.error,
                             )
                         }
@@ -176,7 +180,7 @@ fun EditBalanceScreen(
                     .imePadding()
                     .padding(16.dp),
             ) {
-                Text("Сохранить")
+                Text(stringResource(R.string.common_save))
             }
         },
     ) { innerPadding ->
@@ -192,22 +196,26 @@ fun EditBalanceScreen(
                 value = name,
                 onValueChange = viewModel::onNameChange,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Название") },
+                label = { Text(stringResource(R.string.common_name)) },
                 singleLine = true,
             )
 
-            Text("Валюта", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.balance_currency), style = MaterialTheme.typography.titleSmall)
             OutlinedButton(
                 onClick = { showCurrencyPicker = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 val current = currencies.firstOrNull { it.code == currencyCode }
-                Text(if (current != null) "${current.code} — ${current.name}" else currencyCode)
+                Text(
+                    current?.let {
+                        stringResource(R.string.balance_currency_item, it.code, it.name)
+                    } ?: currencyCode,
+                )
             }
 
             BalanceIcon(name = name, iconKey = iconKey, colorKey = colorKey)
 
-            Text("Иконка", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.common_icon), style = MaterialTheme.typography.titleSmall)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = iconKey.isBlank(),
@@ -223,7 +231,7 @@ fun EditBalanceScreen(
                 }
             }
 
-            Text("Цвет", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.common_color), style = MaterialTheme.typography.titleSmall)
             FlowRow(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),

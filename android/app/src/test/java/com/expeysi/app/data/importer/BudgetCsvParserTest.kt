@@ -62,14 +62,17 @@ class BudgetCsvParserTest {
         val error = assertThrows(BudgetImportException::class.java) {
             parse(HEADER + "2026-01-02;03:04;Наличные;Еда;abc;VND;\n")
         }
-        assertEquals("Строка 2: некорректная сумма", error.message)
+        assertEquals(BudgetImportError.BAD_AMOUNT, error.reason)
+        assertEquals(2, error.line)
     }
 
     @Test
     fun `незакрытая кавычка отклоняет файл`() {
-        assertThrows(BudgetImportException::class.java) {
+        val error = assertThrows(BudgetImportException::class.java) {
             parse(HEADER + "2026-01-02;03:04;Наличные;Еда;-100;VND;\"комментарий\n")
         }
+        assertEquals(BudgetImportError.UNCLOSED_QUOTE, error.reason)
+        assertEquals(2, error.line)
     }
 
     private fun parse(text: String) = parser.parse(ByteArrayInputStream(text.toByteArray()))

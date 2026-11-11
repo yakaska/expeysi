@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import kotlinx.coroutines.launch
 
@@ -60,7 +61,8 @@ private enum class Pending {
 @Composable
 fun FamilyScreen(viewModel: FamilyViewModel = hiltViewModel()) {
     val loading by viewModel.loading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
+    val errorText by viewModel.error.collectAsStateWithLifecycle()
+    val error = errorText?.asString()
     var code by remember { mutableStateOf("") }
 
     FamilyContent(

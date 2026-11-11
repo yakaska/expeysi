@@ -23,9 +23,11 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.R
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.ui.icons.CategoryIcon
 
@@ -42,17 +44,17 @@ fun CategoriesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Категории") },
+                title = { Text(stringResource(R.string.history_mode_categories)) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
             )
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddClick) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить категорию")
+                Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.categories_add_cd))
             }
         },
     ) { innerPadding ->
@@ -63,13 +65,13 @@ fun CategoriesScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item { Text("Расходы", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.home_expenses), style = MaterialTheme.typography.titleMedium) }
             items(state.expense, key = { it.id }) { category ->
                 CategoryCard(category, onItemClick)
             }
             item {
                 Text(
-                    "Доходы",
+                    stringResource(R.string.home_income),
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp),
                 )

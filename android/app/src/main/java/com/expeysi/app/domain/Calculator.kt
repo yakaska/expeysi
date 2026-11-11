@@ -156,7 +156,8 @@ class Calculator {
     private fun format(value: Double): String = BigDecimal(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
     companion object {
-        private const val ERROR = "Ошибка"
+        /** Технический маркер ошибки в display; локализованный текст рисует UI из ресурсов (calc_error). */
+        const val ERROR = "error"
         private const val RESULT = "="
         private val OP_GLYPHS = setOf("+", "−", "×", "÷")
 

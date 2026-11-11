@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
@@ -47,7 +48,8 @@ import com.google.android.gms.common.api.ApiException
 fun AuthScreen(viewModel: AuthViewModel = hiltViewModel()) {
     val context = LocalContext.current
     val loading by viewModel.loading.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
+    val errorText by viewModel.error.collectAsStateWithLifecycle()
+    val error = errorText?.asString()
     val signInClient = remember {
         GoogleSignIn.getClient(
             context,
