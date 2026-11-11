@@ -32,6 +32,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,9 +48,14 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import com.expeysi.app.R
 import com.expeysi.app.ui.common.rememberClipboardCopy
+
+/** Дисплейный шрифт со стилизацией «под иврит» для имени приложения в шапке drawer. */
+private val SholomFontFamily = FontFamily(Font(R.font.sholom))
 
 @Composable
 fun HomeNavigationDrawer(
@@ -100,7 +106,8 @@ fun HomeNavigationDrawer(
                             Column {
                                 Text(
                                     stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.headlineSmall,
+                                    style = MaterialTheme.typography.headlineSmall
+                                        .copy(fontFamily = SholomFontFamily),
                                 )
                                 familyCode?.let { code ->
                                     Text(
@@ -207,6 +214,10 @@ fun HomeNavigationDrawer(
                             }
                         },
                         onClick = { if (!leavingFamily) showLeaveConfirmation = true },
+                        colors = NavigationDrawerItemDefaults.colors(
+                            unselectedTextColor = MaterialTheme.colorScheme.error,
+                            unselectedIconColor = MaterialTheme.colorScheme.error,
+                        ),
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                 }

@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ЭксПейсы</string>
     <string name="auth_title">Expeysi</string>
     <string name="auth_subtitle">Войдите, чтобы синхронизировать общие доходы и расходы</string>
     <string name="auth_google_sign_in">Войти через Google</string>

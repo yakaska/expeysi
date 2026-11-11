@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Expeysi</string>
+    <string name="app_name" translatable="false">Expeysi</string>
     <string name="auth_title">Expeysi</string>
     <string name="auth_subtitle">Sign in to sync shared income and expenses</string>
     <string name="auth_google_sign_in">Sign in with Google</string>
