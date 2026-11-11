@@ -133,6 +133,162 @@ class CalculatorTest {
     }
 
     @Test
+    fun `удаление последнего символа при вводе`() {
+        val calc = Calculator()
+        type(calc, "125")
+        calc.backspace()
+        assertEquals("12", calc.display)
+    }
+
+    @Test
+    fun `удаление точки при вводе`() {
+        val calc = Calculator()
+        type(calc, "12.")
+        calc.backspace()
+        assertEquals("12", calc.display)
+        calc.inputDot()
+        assertEquals("12.", calc.display)
+    }
+
+    @Test
+    fun `удаление до нуля и дальше`() {
+        val calc = Calculator()
+        type(calc, "5")
+        calc.backspace()
+        assertEquals("0", calc.display)
+        calc.backspace()
+        assertEquals("0", calc.display)
+        type(calc, "7")
+        assertEquals("7", calc.display)
+    }
+
+    @Test
+    fun `удаление не действует после операции`() {
+        val calc = Calculator()
+        type(calc, "100+")
+        assertEquals("100", calc.display)
+        calc.backspace()
+        assertEquals("100", calc.display)
+        type(calc, "5")
+        calc.backspace()
+        assertEquals("0", calc.display)
+    }
+
+    @Test
+    fun `удаление не действует после равно`() {
+        val calc = Calculator()
+        type(calc, "12+30")
+        calc.equals()
+        assertEquals("42", calc.display)
+        calc.backspace()
+        assertEquals("42", calc.display)
+    }
+
+    @Test
+    fun `удаление не действует при ошибке`() {
+        val calc = Calculator()
+        type(calc, "5/0")
+        calc.equals()
+        assertEquals("Ошибка", calc.display)
+        calc.backspace()
+        assertEquals("Ошибка", calc.display)
+    }
+
+    @Test
+    fun `предзаполненное значение можно править и считать дальше`() {
+        val calc = Calculator()
+        calc.setValue("125")
+        calc.backspace()
+        assertEquals("12", calc.display)
+        calc.inputDigit('3')
+        assertEquals("123", calc.display)
+        calc.inputOp('+')
+        calc.inputDigit('2')
+        calc.equals()
+        assertEquals("125", calc.display)
+    }
+
+    @Test
+    fun `история накапливается по ходу вычисления`() {
+        val calc = Calculator()
+        type(calc, "100-40+")
+        assertEquals("100 − 40 +", calc.expression)
+        type(calc, "10")
+        calc.equals()
+        assertEquals("100 − 40 + 10 =", calc.expression)
+        assertEquals("70", calc.display)
+    }
+
+    @Test
+    fun `история пуста до первой операции`() {
+        val calc = Calculator()
+        type(calc, "125")
+        assertEquals("", calc.expression)
+    }
+
+    @Test
+    fun `история сбрасывается при вводе нового числа после равно`() {
+        val calc = Calculator()
+        type(calc, "12+30")
+        calc.equals()
+        assertEquals("12 + 30 =", calc.expression)
+        type(calc, "5")
+        assertEquals("", calc.expression)
+    }
+
+    @Test
+    fun `повторная операция меняет знак в истории`() {
+        val calc = Calculator()
+        type(calc, "100+")
+        assertEquals("100 +", calc.expression)
+        calc.inputOp('*')
+        assertEquals("100 ×", calc.expression)
+    }
+
+    @Test
+    fun `операция после равно начинает новую строку`() {
+        val calc = Calculator()
+        type(calc, "12+30")
+        calc.equals()
+        assertEquals("12 + 30 =", calc.expression)
+        calc.inputOp('-')
+        assertEquals("42 −", calc.expression)
+        type(calc, "8")
+        calc.equals()
+        assertEquals("42 − 8 =", calc.expression)
+        assertEquals("34", calc.display)
+    }
+
+    @Test
+    fun `история очищается сбросом и новой подстановкой`() {
+        val calc = Calculator()
+        type(calc, "5*")
+        assertEquals("5 ×", calc.expression)
+        calc.clear()
+        assertEquals("", calc.expression)
+        calc.setValue("7")
+        calc.inputOp('+')
+        assertEquals("7 +", calc.expression)
+    }
+
+    @Test
+    fun `числа в истории группируются разрядами`() {
+        val calc = Calculator()
+        calc.setValue("1250.5")
+        calc.inputOp('+')
+        assertEquals("1 250,5 +", calc.expression)
+    }
+
+    @Test
+    fun `история пуста при ошибке`() {
+        val calc = Calculator()
+        type(calc, "5/0")
+        calc.equals()
+        assertEquals("Ошибка", calc.display)
+        assertEquals("", calc.expression)
+    }
+
+    @Test
     fun `группировка разрядов`() {
         assertEquals("1 234 567", Calculator.groupDigits("1234567"))
         assertEquals("1 234 567,89", Calculator.groupDigits("1234567.89"))
