@@ -82,7 +82,8 @@ internal fun AnalysisFiltersSheet(
                     iconColor = MaterialTheme.colorScheme.outlineVariant,
                     title = stringResource(R.string.analysis_all_accounts),
                     subtitle = "",
-                    selected = draft == null,
+                    // Индикатор: горит и при ручном выборе всех счетов, не меняя сам выбор.
+                    selected = draft == null || accounts.all { it.id in draft },
                     onToggle = onAllAccounts,
                 )
                 accounts.forEach { account ->

@@ -219,7 +219,7 @@ private fun ControlRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         FilterButton(
-            active = state.selectedAccountIds != null,
+            active = state.isFilterActive,
             onClick = onFiltersClick,
         )
         Spacer(modifier = Modifier.width(10.dp))
