@@ -22,6 +22,41 @@ class CurrencySeedTest {
     }
 
     @Test
+    fun `коды из карты тиров есть в справочнике`() {
+        CurrencySeed.tiers.forEach { (code, _) ->
+            assertTrue("нет в справочнике: $code", CurrencySeed.all.any { it.code == code })
+        }
+    }
+
+    @Test
+    fun `тиры ядро и распространённые не устаревшие`() {
+        CurrencySeed.all.filter { row ->
+            val tier = CurrencySeed.tiers[row.code]
+            tier == CurrencyTier.CORE || tier == CurrencyTier.COMMON
+        }.forEach { row ->
+            assertTrue("CORE/COMMON устаревшая: ${row.code}", !CurrencySeed.isDeprecated(row))
+        }
+    }
+
+    @Test
+    fun `ядро популярных в фиксированном порядке`() {
+        val core = CurrencySeed.tiers.filterValues { it == CurrencyTier.CORE }.keys.toList()
+        assertEquals(listOf("RUB", "USD", "EUR", "VND", "CNY", "KZT"), core)
+    }
+
+    @Test
+    fun `тиры скрытых валют`() {
+        assertEquals(CurrencyTier.HIDDEN, CurrencySeed.tierOf("ADP")) // отменённая
+        assertEquals(CurrencyTier.HIDDEN, CurrencySeed.tierOf("ZWL")) // годы в названии
+        assertEquals(CurrencyTier.HIDDEN, CurrencySeed.tierOf("XAU")) // металл
+        assertEquals(CurrencyTier.HIDDEN, CurrencySeed.tierOf("XTS")) // тестовый код
+        assertEquals(CurrencyTier.CORE, CurrencySeed.tierOf("RUB"))
+        assertEquals(CurrencyTier.COMMON, CurrencySeed.tierOf("GBP"))
+        assertEquals(CurrencyTier.EXOTIC, CurrencySeed.tierOf("AFN"))
+        assertEquals(CurrencyTier.EXOTIC, CurrencySeed.tierOf("XOF")) // реальная CFA-валюта
+    }
+
+    @Test
     fun `основные валюты присутствуют`() {
         val codes = CurrencySeed.all.map { it.code }.toSet()
         assertTrue(codes.containsAll(listOf("RUB", "USD", "EUR", "KZT", "GEL", "AMD")))

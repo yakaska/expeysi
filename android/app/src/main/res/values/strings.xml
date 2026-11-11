@@ -119,6 +119,7 @@
     <string name="common_delete">Удалить</string>
     <string name="common_search">Поиск</string>
     <string name="common_name">Название</string>
+    <string name="common_name_error">Введите название</string>
     <string name="common_icon">Иконка</string>
     <string name="common_color">Цвет</string>
     <string name="common_account">Счёт</string>
@@ -183,10 +184,12 @@
     <string name="balance_delete_text">Баланс, все его счета и операции будут удалены. Это действие нельзя отменить.</string>
     <string name="balance_currency">Валюта</string>
     <string name="balance_currency_title">Валюта баланса</string>
-    <!-- %1$s — код валюты, %2$s — название. -->
-    <string name="balance_currency_item">%1$s — %2$s</string>
-    <!-- %1$s — символ валюты. -->
-    <string name="balance_symbol_label">Символ: %1$s</string>
+    <string name="balance_currency_recent">Недавние</string>
+    <string name="balance_currency_used">Используемые</string>
+    <string name="balance_currency_popular">Популярные</string>
+    <string name="balance_currency_rest">Остальные</string>
+    <string name="balance_currency_current">Текущая</string>
+    <string name="balance_currency_show_all">Все валюты</string>
     <string name="balance_title_new">Новый баланс</string>
     <string name="balance_title_edit">Изменить баланс</string>
     <string name="categories_add_cd">Добавить категорию</string>
