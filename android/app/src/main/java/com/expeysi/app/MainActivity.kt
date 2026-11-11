@@ -247,7 +247,10 @@ private fun AppNavigation() {
                     },
                 ),
             ) {
-                CategoryOperationsScreen(onBack = { navigateBack() })
+                CategoryOperationsScreen(
+                    onBack = { navigateBack() },
+                    onItemClick = { id -> navController.navigate("edit/$id") },
+                )
             }
             composable(
                 route = "transaction-report/{type}",

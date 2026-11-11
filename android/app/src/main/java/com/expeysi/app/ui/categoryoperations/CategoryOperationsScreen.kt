@@ -8,6 +8,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun CategoryOperationsScreen(
     onBack: () -> Unit,
+    onItemClick: (String) -> Unit = {},
     viewModel: CategoryOperationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -15,7 +16,7 @@ fun CategoryOperationsScreen(
         state = state,
         actions = CategoryOperationsActions(
             onBack = onBack,
-            onOperationClick = {},
+            onOperationClick = { operation -> onItemClick(operation.id) },
             onRetry = viewModel::reload,
             onLoadNext = viewModel::loadNext,
         ),
