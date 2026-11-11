@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.ui.graphics.vector.ImageVector
 
@@ -30,6 +31,7 @@ object IconCatalog {
     const val DEFAULT_KEY = "category"
 
     private val icons: Map<String, ImageVector> = mapOf(
+        "wallet" to Icons.Filled.Wallet,
         "payments" to Icons.Filled.Payments,
         "credit_card" to Icons.Filled.CreditCard,
         "shopping_cart" to Icons.Filled.ShoppingCart,

@@ -48,7 +48,8 @@ class EditAccountViewModel @Inject constructor(
     private val _iconKey = MutableStateFlow("payments")
     val iconKey: StateFlow<String> = _iconKey.asStateFlow()
 
-    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    /** Цвет нового счёта: первая ячейка сетки цветов на экране. */
+    private val _colorKey = MutableStateFlow(CategoryPalette.availableKeys.first())
     val colorKey: StateFlow<String> = _colorKey.asStateFlow()
 
     private val _openingBalanceText = MutableStateFlow("0")
@@ -60,7 +61,8 @@ class EditAccountViewModel @Inject constructor(
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
-    val availableIconKeys: List<String> = IconCatalog.availableKeys
+    /** Доступные иконки счёта; «три точки» — ключ категорий, здесь не показываем. */
+    val availableIconKeys: List<String> = IconCatalog.availableKeys.filterNot { it == "more_horiz" }
 
     val canSave: StateFlow<Boolean> = combine(
         _name,

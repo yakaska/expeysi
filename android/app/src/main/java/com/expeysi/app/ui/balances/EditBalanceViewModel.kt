@@ -42,9 +42,6 @@ class EditBalanceViewModel @Inject constructor(
 
     val isEdit: Boolean = editId != null
 
-    val currencies: StateFlow<List<CurrencyEntity>> = currencyDao.observeAll()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
     private val _name = MutableStateFlow("")
     val name: StateFlow<String> = _name.asStateFlow()
 
@@ -52,20 +49,66 @@ class EditBalanceViewModel @Inject constructor(
     val currencyCode: StateFlow<String> = _currencyCode.asStateFlow()
 
     /** Ключ иконки баланса; пустой — круг с первой буквой названия. */
-    private val _iconKey = MutableStateFlow("")
+    private val _iconKey = MutableStateFlow(DEFAULT_BALANCE_ICON)
     val iconKey: StateFlow<String> = _iconKey.asStateFlow()
 
-    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    private val _colorKey = MutableStateFlow(DEFAULT_BALANCE_COLOR)
     val colorKey: StateFlow<String> = _colorKey.asStateFlow()
 
     private val _saved = MutableStateFlow(false)
     val saved: StateFlow<Boolean> = _saved.asStateFlow()
 
-    val availableIconKeys: List<String> = IconCatalog.availableKeys
+    /** Доступные иконки баланса; «три точки» — ключ категорий, здесь не показываем. */
+    val availableIconKeys: List<String> = IconCatalog.availableKeys.filterNot { it == "more_horiz" }
 
     val canSave: StateFlow<Boolean> = _name
         .map { it.isNotBlank() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Все валюты справочника: для резолва кода текущего баланса. */
+    val currencies: StateFlow<List<CurrencyEntity>> = currencyDao.observeAll()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Коды валют активных балансов: секция «Используемые» пикера. */
+    val usedCurrencyCodes: StateFlow<List<String>> = balanceDao.observeActive()
+        .map { balances ->
+            balances.sortedByDescending { it.updatedAt }
+                .map { it.currencyCode }
+                .distinct()
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Валюты, уже используемые в балансах: последние по времени изменения, до трёх. */
+    val recentCurrencyCodes: StateFlow<List<String>> = balanceDao.observeActive()
+        .map { balances ->
+            balances.sortedByDescending { it.updatedAt }
+                .map { it.currencyCode }
+                .distinct()
+                .take(RECENT_CURRENCY_LIMIT)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** Запрос поиска в пикере валют; в VM — переживает поворот экрана. */
+    private val _currencyQuery = MutableStateFlow("")
+    val currencyQuery: StateFlow<String> = _currencyQuery.asStateFlow()
+
+    /** Флаг «Все валюты» пикера: показывать остальной список. */
+    private val _showAllCurrencies = MutableStateFlow(false)
+    val showAllCurrencies: StateFlow<Boolean> = _showAllCurrencies.asStateFlow()
+
+    fun onCurrencyQueryChange(value: String) {
+        _currencyQuery.value = value
+    }
+
+    fun onShowAllCurrencies() {
+        _showAllCurrencies.value = true
+    }
+
+    /** Сброс состояния пикера при закрытии диалога. */
+    fun resetCurrencyPicker() {
+        _currencyQuery.value = ""
+        _showAllCurrencies.value = false
+    }
 
     init {
         if (editId != null) {
@@ -137,5 +180,16 @@ class EditBalanceViewModel @Inject constructor(
             deletedTransactions.forEach(syncEngine::uploadTransaction)
             _saved.value = true
         }
+    }
+
+    private companion object {
+        /** Иконка нового баланса по умолчанию — кошелёк. */
+        const val DEFAULT_BALANCE_ICON = "wallet"
+
+        /** Цвет нового баланса: первый в сетке цветов на экране. */
+        val DEFAULT_BALANCE_COLOR = CategoryPalette.availableKeys.first()
+
+        /** Валют в секции «Недавние» пикера. */
+        const val RECENT_CURRENCY_LIMIT = 3
     }
 }

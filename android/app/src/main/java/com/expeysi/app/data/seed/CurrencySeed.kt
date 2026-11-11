@@ -3,6 +3,9 @@ package com.expeysi.app.data.seed
 /** Одна валюта ISO 4217: код, английское название, символ. */
 data class CurrencyRow(val code: String, val name: String, val symbol: String)
 
+/** Значимость валюты в пикере баланса: от самых частых к скрываемым. */
+enum class CurrencyTier { CORE, COMMON, EXOTIC, HIDDEN }
+
 /**
  * Полный список валют (сгенерирован из java.util.Currency, JDK 21; в символах
  * вручную проставлены настоящие Unicode-знаки — getSymbol(Locale.ROOT) вместо
@@ -241,4 +244,63 @@ object CurrencySeed {
         CurrencyRow("ZWN", "ZWN", "ZWN"),
         CurrencyRow("ZWR", "Zimbabwean Dollar (2008)", "ZWR"),
     )
+
+    /**
+     * Коды, не являющиеся действующими валютами ISO 4217: отменённые (ADP, AFA,
+     * национальные марки евро и прочие) и заглушки JDK (AYM, ZWN). В пикере
+     * баланса скрыты, из справочника не удалены — у существующих балансов код
+     * должен резолвиться.
+     */
+    val deprecatedCodes: Set<String> = setOf(
+        "ADP", "AFA", "AYM", "ATS", "AZM", "BEF", "BGL", "BYB", "BYR", "CSD",
+        "CYP", "DEM", "EEK", "ESP", "FIM", "FRF", "GHC", "GRD", "GWP", "HRK",
+        "IEP", "ITL", "LTL", "LUF", "LVL", "MGF", "MRO", "MTL", "MZM", "NLG",
+        "PTE", "ROL", "RUR", "SDD", "SIT", "SKK", "SRG", "STD", "TMM", "TPE",
+        "TRL", "VEB", "VEF", "XBA", "XBB", "XBC", "XBD", "XFO", "XFU", "YUM",
+        "ZMK", "ZWD", "ZWN", "ZWR",
+    )
+
+    /** Годы в названии вида «(1927–2002)» или «(2009)»: валюта устарела. */
+    private val yearsPattern = Regex("\\(\\d{4}([–—-]\\d{4})?\\)")
+
+    /** Устаревшая ли валюта: скрывается в пикере баланса. */
+    fun isDeprecated(row: CurrencyRow): Boolean =
+        row.code in deprecatedCodes || yearsPattern.containsMatchIn(row.name)
+
+    /** Спец-коды, не являющиеся валютами: металлы, фонды, тестовые и неизвестные. */
+    private val hiddenCodes: Set<String> = setOf(
+        "XAU", "XAG", "XPT", "XPD", "XDR", "XTS", "XXX", "XSU", "XUA",
+    )
+
+    /** Ядро «Популярных»: фиксированный порядок = порядок секции. */
+    private val coreCodes: List<String> = listOf("RUB", "USD", "EUR", "VND", "CNY", "KZT")
+
+    /** Распространённые валюты: показываются в «Популярных» после ядра. */
+    private val commonCodes: List<String> = listOf(
+        "GBP", "JPY", "CHF", "CAD", "AUD", "NZD", "SEK", "NOK", "DKK", "PLN",
+        "CZK", "HUF", "TRY", "UAH", "BYN", "AMD", "GEL", "AZN", "UZS", "KGS",
+        "TJS", "MDL", "INR", "KRW", "HKD", "SGD", "THB", "IDR", "MYR", "PHP",
+        "TWD", "AED", "SAR", "ILS", "EGP", "ZAR", "MXN", "BRL", "ARS", "CLP",
+        "UYU",
+    )
+
+    /**
+     * Тиры валют пикера по коду. Не пишется в БД и не мигрирует: изменения
+     * доезжают до существующих пользователей вместе с приложением. HIDDEN в
+     * карте — не полный список скрытых: устаревшие добавляет isDeprecated.
+     */
+    val tiers: Map<String, CurrencyTier> = linkedMapOf<String, CurrencyTier>().apply {
+        coreCodes.forEach { put(it, CurrencyTier.CORE) }
+        commonCodes.forEach { put(it, CurrencyTier.COMMON) }
+        hiddenCodes.forEach { put(it, CurrencyTier.HIDDEN) }
+    }
+
+    /** Тир валюты для пикера: HIDDEN (устаревший/спец-код), иначе по карте, иначе EXOTIC. */
+    fun tierOf(code: String): CurrencyTier = when {
+        code in deprecatedCodes || code in hiddenCodes -> CurrencyTier.HIDDEN
+        byCode[code]?.let { yearsPattern.containsMatchIn(it.name) } == true -> CurrencyTier.HIDDEN
+        else -> tiers[code] ?: CurrencyTier.EXOTIC
+    }
+
+    private val byCode: Map<String, CurrencyRow> = all.associateBy { it.code }
 }

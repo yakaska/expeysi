@@ -43,7 +43,8 @@ class EditCategoryViewModel @Inject constructor(
     private val _iconKey = MutableStateFlow(IconCatalog.DEFAULT_KEY)
     val iconKey: StateFlow<String> = _iconKey.asStateFlow()
 
-    private val _colorKey = MutableStateFlow(CategoryPalette.DEFAULT_KEY)
+    /** Цвет новой категории: первая ячейка сетки цветов на экране. */
+    private val _colorKey = MutableStateFlow(CategoryPalette.availableKeys.first())
     val colorKey: StateFlow<String> = _colorKey.asStateFlow()
 
     private val _saved = MutableStateFlow(false)
