@@ -7,11 +7,16 @@ import java.math.RoundingMode
  * Простейший калькулятор: операции выполняются последовательно слева направо,
  * без приоритета умножения (как на карманном калькуляторе).
  * Результаты округляются до 2 знаков — сумма всё равно хранится в копейках.
+ * [expression] хранит ход текущего вычисления («100 − 40 + 10 =») для показа в интерфейсе.
  */
 class Calculator {
 
     var display: String = "0"
         private set
+
+    /** Ход текущего вычисления; пусто, пока вычисление не начато. */
+    val expression: String
+        get() = tokens.joinToString(" ")
 
     val isError: Boolean
         get() = display == ERROR
@@ -19,11 +24,13 @@ class Calculator {
     private var accumulator: Double? = null
     private var pendingOp: Char? = null
     private var freshInput = true
+    private val tokens = mutableListOf<String>()
 
     fun inputDigit(digit: Char) {
         require(digit in '0'..'9')
         if (isError) clear()
         if (freshInput) {
+            resetIfFinished()
             display = digit.toString()
             freshInput = false
         } else if (display.replace(".", "").length < 15) {
@@ -34,6 +41,7 @@ class Calculator {
     fun inputDot() {
         if (isError) clear()
         if (freshInput) {
+            resetIfFinished()
             display = "0."
             freshInput = false
         } else if (!display.contains('.')) {
@@ -44,10 +52,30 @@ class Calculator {
     fun inputOp(op: Char) {
         require(op in "+-*/")
         if (isError) return
-        if (accumulator == null) {
-            accumulator = display.toDoubleOrNull() ?: 0.0
-        } else if (!freshInput) {
-            if (!applyPending()) return
+        val glyph = opGlyph(op)
+        when {
+            accumulator == null -> {
+                accumulator = display.toDoubleOrNull() ?: 0.0
+                tokens.clear()
+                tokens += numberToken()
+                tokens += glyph
+            }
+            !freshInput -> {
+                val operand = numberToken()
+                if (!applyPending()) return
+                tokens += operand
+                tokens += glyph
+            }
+            tokens.lastOrNull() == RESULT -> {
+                tokens.clear()
+                tokens += numberToken()
+                tokens += glyph
+            }
+            tokens.lastOrNull() in OP_GLYPHS -> tokens[tokens.lastIndex] = glyph
+            else -> {
+                tokens += numberToken()
+                tokens += glyph
+            }
         }
         pendingOp = op
         freshInput = true
@@ -55,10 +83,20 @@ class Calculator {
 
     fun equals() {
         if (isError || pendingOp == null) return
+        val operand = numberToken()
         if (applyPending()) {
+            tokens += operand
+            tokens += RESULT
             pendingOp = null
             freshInput = true
         }
+    }
+
+    /** Удаляет последний символ вводимого числа; после «равно» и операции, а также при ошибке не действует. */
+    fun backspace() {
+        if (isError || freshInput) return
+        display = display.dropLast(1)
+        if (display.isEmpty() || display == "-") display = "0"
     }
 
     fun clear() {
@@ -66,6 +104,7 @@ class Calculator {
         accumulator = null
         pendingOp = null
         freshInput = true
+        tokens.clear()
     }
 
     /** Подставляет готовое значение (например, текущую сумму из поля ввода). Мусор игнорируется. */
@@ -74,10 +113,23 @@ class Calculator {
         val value = cleaned.toDoubleOrNull() ?: return
         clear()
         display = format(value)
+        // Предзаполненное значение — обычное число: его можно править (backspace, дописывание).
+        freshInput = false
     }
 
     /** Текст для подстановки в поле суммы; null, если на экране ошибка. */
     fun resultText(): String? = if (isError) null else display.trimEnd('.')
+
+    /** Новое число после «равно» начинает новую цепочку: сбрасывает накопитель и историю. */
+    private fun resetIfFinished() {
+        if (tokens.lastOrNull() == RESULT) {
+            tokens.clear()
+            accumulator = null
+            pendingOp = null
+        }
+    }
+
+    private fun numberToken(): String = groupDigits(display)
 
     private fun applyPending(): Boolean {
         val left = accumulator ?: return false
@@ -105,7 +157,16 @@ class Calculator {
 
     companion object {
         private const val ERROR = "Ошибка"
+        private const val RESULT = "="
+        private val OP_GLYPHS = setOf("+", "−", "×", "÷")
 
         fun groupDigits(raw: String): String = Money.formatInput(raw)
+
+        private fun opGlyph(op: Char): String = when (op) {
+            '+' -> "+"
+            '-' -> "−"
+            '*' -> "×"
+            else -> "÷"
+        }
     }
 }

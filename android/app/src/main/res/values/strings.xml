@@ -63,6 +63,11 @@
     <string name="report_share_percent">%1$d%%</string>
     <string name="money_suffix_million">млн</string>
     <string name="money_suffix_billion">млрд</string>
+    <string name="calc_title">Калькулятор</string>
+    <string name="calc_done">Готово</string>
+    <string name="calc_close_cd">Закрыть</string>
+    <string name="calc_backspace_cd">Удалить последний символ</string>
+    <string name="calc_error">Ошибка</string>
     <string name="placeholder_in_development">Раздел в разработке</string>
     <string name="analysis_title">Анализ финансов</string>
     <string name="analysis_menu_cd">Меню</string>
