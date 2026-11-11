@@ -26,4 +26,31 @@ class CurrencySeedTest {
         val codes = CurrencySeed.all.map { it.code }.toSet()
         assertTrue(codes.containsAll(listOf("RUB", "USD", "EUR", "KZT", "GEL", "AMD")))
     }
+
+    @Test
+    fun `валюты со своими знаками в unicode показывают глиф, а не код`() {
+        val byCode = CurrencySeed.all.associateBy { it.code }
+        val glyphs = mapOf(
+            "RUB" to "₽",
+            "TRY" to "₺",
+            "UAH" to "₴",
+            "KZT" to "₸",
+            "GEL" to "₾",
+            "AZN" to "₼",
+            "THB" to "฿",
+            "NGN" to "₦",
+            "BDT" to "৳",
+            "AFN" to "؋",
+            "MNT" to "₮",
+            "LAK" to "₭",
+            "GHS" to "₵",
+            "CRC" to "₡",
+            "NPR" to "₨",
+            "LKR" to "₨",
+            "PKR" to "₨",
+        )
+        glyphs.forEach { (code, glyph) ->
+            assertEquals(glyph, byCode.getValue(code).symbol)
+        }
+    }
 }

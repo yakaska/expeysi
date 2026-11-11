@@ -110,6 +110,19 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // В существующих БД символы записаны INSERT OR IGNORE-ом из старого сида
+        // (Locale.ROOT возвращает ISO-код вместо глифа); выравниваем по сиду.
+        CurrencySeed.all.forEach { row ->
+            db.execSQL(
+                "UPDATE currencies SET symbol = ? WHERE code = ?",
+                arrayOf(row.symbol, row.code),
+            )
+        }
+    }
+}
+
 @Database(
     entities = [
         AccountEntity::class,
@@ -118,7 +131,7 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
