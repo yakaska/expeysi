@@ -57,13 +57,14 @@ private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.M
 @Composable
 fun HistoryScreen(
     onBack: () -> Unit,
-    onAddClick: () -> Unit,
+    onAddClick: (TxType?) -> Unit,
     onItemClick: (String) -> Unit,
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val period by viewModel.period.collectAsStateWithLifecycle()
     val customRange by viewModel.customRange.collectAsStateWithLifecycle()
+    val selectedTypes by viewModel.selectedTypes.collectAsStateWithLifecycle()
 
     BackHandler(enabled = state.detail != null) { viewModel.closeDetail() }
 
@@ -85,7 +86,7 @@ fun HistoryScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddClick) {
+            FloatingActionButton(onClick = { onAddClick(selectedTypes.singleOrNull()) }) {
                 Icon(
                     Icons.Filled.Add,
                     contentDescription = stringResource(R.string.home_add_transaction),

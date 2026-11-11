@@ -274,7 +274,16 @@ private fun AppNavigation() {
             composable("data-import") {
                 PlaceholderScreen(title = R.string.drawer_data_import, onBack = { navigateBack() })
             }
-            composable("add") {
+            composable(
+                route = "add?type={type}",
+                arguments = listOf(
+                    navArgument("type") {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    },
+                ),
+            ) {
                 AddTransactionScreen(
                     onClose = { navigateBack() },
                     onAddCategoryClick = { type -> navController.navigate("categories/add?type=${type.wire}") },
@@ -357,7 +366,13 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
-                    onAddClick = { navController.navigate("add") },
+                    onAddClick = { type ->
+                        if (type == null) {
+                            navController.navigate("add")
+                        } else {
+                            navController.navigate("add?type=${type.wire}")
+                        }
+                    },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
@@ -367,7 +382,13 @@ private fun AppNavigation() {
             ) {
                 HistoryScreen(
                     onBack = { navigateBack() },
-                    onAddClick = { navController.navigate("add") },
+                    onAddClick = { type ->
+                        if (type == null) {
+                            navController.navigate("add")
+                        } else {
+                            navController.navigate("add?type=${type.wire}")
+                        }
+                    },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                 )
             }
