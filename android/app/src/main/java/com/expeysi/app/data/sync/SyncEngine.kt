@@ -1,7 +1,6 @@
 package com.expeysi.app.data.sync
 
 import android.util.Log
-import com.expeysi.app.data.AuthRepository
 import com.expeysi.app.data.FamilyStore
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
@@ -11,39 +10,44 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
-import com.google.firebase.firestore.CollectionReference
-import com.google.firebase.firestore.DocumentReference
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FirebaseFirestore
+import com.expeysi.app.data.remote.AuthProvider
+import com.expeysi.app.data.remote.SyncChange
+import com.expeysi.app.data.remote.SyncEntityType
+import com.expeysi.app.data.remote.SyncMapper
+import com.expeysi.app.data.remote.SyncRemote
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.tasks.await
-import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Синхронизация локального журнала Room с удалённым журналом семьи через
+ * [SyncRemote]. Room — источник правды UI (инвариант 1): входящие изменения
+ * сравниваются по updatedAt (last-write-wins), локально более свежие строки
+ * отправляются обратно. Записи в удалённое хранилище подтверждения не ждут
+ * (инвариант 5), кроме массовой загрузки импорта (батчи по 500, таймаут
+ * первых подтверждений). Сверка при выборе семьи ждёт сиды справочников
+ * в Room (инвариант 4).
+ */
 @Singleton
 class SyncEngine @Inject constructor(
-    private val firestore: FirebaseFirestore,
-    private val authRepository: AuthRepository,
+    private val remote: SyncRemote,
+    private val authRepository: AuthProvider,
     private val familyStore: FamilyStore,
     private val balanceDao: BalanceDao,
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
-) {
+) : SyncTrigger,
+    ImportStore {
+    /** Собственный scope движка: сеть и перенос dirty-строк никогда не идут в контексте вызывающего. */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var started = false
 
@@ -52,309 +56,198 @@ class SyncEngine @Inject constructor(
         started = true
         scope.launch {
             familyStore.familyId.collectLatest { familyId ->
-                Log.d("ExpeysiSync", "family=$familyId user=${authRepository.userId}")
+                Log.d(TAG, "family=$familyId user=${authRepository.userId}")
                 if (familyId != null && authRepository.userId != null) {
-                    coroutineScope {
-                        val initialized = List(4) { CompletableDeferred<Unit>() }
-                        val remote = RemoteVersions()
-                        launch { listen(familyId, "balances", initialized[0], remote.balances, ::mergeBalance) }
-                        launch { listen(familyId, "accounts", initialized[1], remote.accounts, ::mergeAccount) }
-                        launch { listen(familyId, "categories", initialized[2], remote.categories, ::mergeCategory) }
-                        launch { listen(familyId, "transactions", initialized[3], remote.transactions, ::mergeTransaction) }
-                        initialized.awaitAll()
-                        uploadMissingLocal(remote)
-                    }
+                    runFamilySync(familyId)
                 }
             }
         }
     }
 
-    private suspend fun uploadMissingLocal(remote: RemoteVersions) {
+    /**
+     * Полный цикл для одной семьи: слушатели изменений четырёх типов плюс
+     * первичная сверка, стартующая после первого снимка каждого типа.
+     */
+    internal suspend fun runFamilySync(familyId: String) {
+        coroutineScope {
+            val initialized = List(4) { CompletableDeferred<Unit>() }
+            val remoteVersions = RemoteVersions()
+            SyncEntityType.entries.forEachIndexed { index, type ->
+                launch {
+                    remote.observeChanges(familyId, type).collect { update ->
+                        update.changes.forEach { change ->
+                            remoteVersions[type, change.key.id] = change.updatedAt
+                            merge(familyId, change)
+                        }
+                        initialized[index].complete(Unit)
+                    }
+                }
+            }
+            initialized.awaitAll()
+            uploadMissingLocal(familyId, remoteVersions)
+        }
+    }
+
+    private suspend fun uploadMissingLocal(familyId: String, remoteVersions: RemoteVersions) {
+        // Сиды справочников обязаны быть в Room, сверка до их появления бессмысленна.
         val balances = balanceDao.observeAll().first { it.isNotEmpty() }
         val accounts = accountDao.observeAll().first { it.isNotEmpty() }
         val categories = categoryDao.observeAll().first { it.isNotEmpty() }
         val transactions = transactionDao.observeAll().first()
         var uploaded = 0
         balances.forEach {
-            if (needsUpload(it.updatedAt, remote.balances[it.id])) {
-                uploadBalance(it)
+            if (needsUpload(it.updatedAt, remoteVersions[SyncEntityType.BALANCE, it.id])) {
+                remote.postChange(familyId, SyncMapper.toChange(it))
                 uploaded++
             }
         }
         accounts.forEach {
-            if (needsUpload(it.updatedAt, remote.accounts[it.id])) {
-                uploadAccount(it)
+            if (needsUpload(it.updatedAt, remoteVersions[SyncEntityType.ACCOUNT, it.id])) {
+                remote.postChange(familyId, SyncMapper.toChange(it))
                 uploaded++
             }
         }
         categories.forEach {
-            if (needsUpload(it.updatedAt, remote.categories[it.id])) {
-                uploadCategory(it)
+            if (needsUpload(it.updatedAt, remoteVersions[SyncEntityType.CATEGORY, it.id])) {
+                remote.postChange(familyId, SyncMapper.toChange(it))
                 uploaded++
             }
         }
         transactions.forEach {
-            if (needsUpload(it.updatedAt, remote.transactions[it.id])) {
-                uploadTransaction(it)
+            if (needsUpload(it.updatedAt, remoteVersions[SyncEntityType.TRANSACTION, it.id])) {
+                remote.postChange(familyId, SyncMapper.toChange(it, authRepository.userId))
                 uploaded++
             }
         }
         val total = balances.size + accounts.size + categories.size + transactions.size
-        Log.d("ExpeysiSync", "startup upload uploaded=$uploaded skipped=${total - uploaded}")
+        Log.d(TAG, "startup upload uploaded=$uploaded skipped=${total - uploaded}")
     }
 
-    fun uploadBalance(value: BalanceEntity) {
-        collection("balances")?.document(value.id)?.set(
-            mapOf(
-                "name" to value.name,
-                "currencyCode" to value.currencyCode,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            ),
-        )
+    private suspend fun merge(familyId: String, change: SyncChange) {
+        when (change.key.type) {
+            SyncEntityType.BALANCE -> mergeBalance(familyId, change)
+            SyncEntityType.ACCOUNT -> mergeAccount(familyId, change)
+            SyncEntityType.CATEGORY -> mergeCategory(familyId, change)
+            SyncEntityType.TRANSACTION -> mergeTransaction(familyId, change)
+        }
     }
 
-    fun uploadAccount(value: AccountEntity) {
-        collection("accounts")?.document(value.id)?.set(
-            mapOf(
-                "name" to value.name,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "openingBalanceMinor" to value.openingBalanceMinor,
-                "balanceId" to value.balanceId,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            ),
-        )
+    private suspend fun mergeBalance(familyId: String, change: SyncChange) {
+        val value = SyncMapper.balance(change) ?: return
+        val local = balanceDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> balanceDao.upsert(value)
+            value.updatedAt < local.updatedAt -> remote.postChange(familyId, SyncMapper.toChange(local))
+        }
     }
 
-    fun uploadCategory(value: CategoryEntity) {
-        collection("categories")?.document(value.id)?.set(
-            mapOf(
-                "name" to value.name,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "type" to value.type,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            ),
-        )
+    private suspend fun mergeAccount(familyId: String, change: SyncChange) {
+        val value = SyncMapper.account(change) ?: return
+        val local = accountDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> accountDao.upsert(value)
+            value.updatedAt < local.updatedAt -> remote.postChange(familyId, SyncMapper.toChange(local))
+        }
     }
 
-    fun uploadTransaction(value: TransactionEntity) {
-        collection("transactions")?.document(value.id)?.set(
-            mapOf(
-                "type" to value.type,
-                "amountMinor" to value.amountMinor,
-                "accountId" to value.accountId,
-                "categoryId" to value.categoryId,
-                "date" to value.date,
-                "note" to value.note,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-                "updatedBy" to (authRepository.userId ?: value.updatedBy),
-            ),
-        )
+    private suspend fun mergeCategory(familyId: String, change: SyncChange) {
+        val value = SyncMapper.category(change) ?: return
+        val local = categoryDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> categoryDao.upsert(value)
+            value.updatedAt < local.updatedAt -> remote.postChange(familyId, SyncMapper.toChange(local))
+        }
     }
 
-    suspend fun uploadImportedData(
+    private suspend fun mergeTransaction(familyId: String, change: SyncChange) {
+        val value = SyncMapper.transaction(change) ?: return
+        val local = transactionDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> transactionDao.upsert(value)
+            value.updatedAt < local.updatedAt -> remote.postChange(familyId, SyncMapper.toChange(local, authRepository.userId))
+        }
+    }
+
+    /**
+     * Запускает перенос dirty-строк и возвращается, не дожидаясь отправки
+     * (инвариант 5): работа идёт в собственном scope движка — сеть никогда
+     * не вызывается из контекста вызывающего.
+     */
+    override fun trigger() {
+        scope.launch { requestSync() }
+    }
+
+    /**
+     * Переносит dirty-строки Room в удалённый журнал. Подтверждения не ждёт:
+     * доставка транспорта асинхронна. Флаг снимается условно по updatedAt —
+     * правка строки во время переноса не потеряется, строка уйдёт заново при
+     * следующем requestSync.
+     */
+    suspend fun requestSync() {
+        val familyId = familyStore.familyId.value ?: return
+        balanceDao.listDirty().forEach { value ->
+            remote.postChange(familyId, SyncMapper.toChange(value))
+            balanceDao.markClean(value.id, value.updatedAt)
+        }
+        accountDao.listDirty().forEach { value ->
+            remote.postChange(familyId, SyncMapper.toChange(value))
+            accountDao.markClean(value.id, value.updatedAt)
+        }
+        categoryDao.listDirty().forEach { value ->
+            remote.postChange(familyId, SyncMapper.toChange(value))
+            categoryDao.markClean(value.id, value.updatedAt)
+        }
+        transactionDao.listDirty().forEach { value ->
+            remote.postChange(familyId, SyncMapper.toChange(value, authRepository.userId))
+            transactionDao.markClean(value.id, value.updatedAt)
+        }
+    }
+
+    /**
+     * Массовая загрузка импортированных данных: батчи по 500 в транспорте,
+     * подтверждения первых батчей ждут с таймаутом (инвариант 5).
+     */
+    override suspend fun uploadImportedData(
         balances: List<BalanceEntity>,
         accounts: List<AccountEntity>,
         categories: List<CategoryEntity>,
         transactions: List<TransactionEntity>,
     ) {
         val familyId = familyStore.familyId.value ?: return
-        val family = firestore.collection("families").document(familyId)
-        val writes = mutableListOf<Pair<DocumentReference, Map<String, Any>>>()
-        balances.forEach { value ->
-            writes += family.collection("balances").document(value.id) to mapOf(
-                "name" to value.name,
-                "currencyCode" to value.currencyCode,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            )
-        }
-        accounts.forEach { value ->
-            writes += family.collection("accounts").document(value.id) to mapOf(
-                "name" to value.name,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "openingBalanceMinor" to value.openingBalanceMinor,
-                "balanceId" to value.balanceId,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            )
-        }
-        categories.forEach { value ->
-            writes += family.collection("categories").document(value.id) to mapOf(
-                "name" to value.name,
-                "iconKey" to value.iconKey,
-                "colorKey" to value.colorKey,
-                "type" to value.type,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-            )
-        }
-        transactions.forEach { value ->
-            writes += family.collection("transactions").document(value.id) to mapOf(
-                "type" to value.type,
-                "amountMinor" to value.amountMinor,
-                "accountId" to value.accountId,
-                "categoryId" to value.categoryId,
-                "date" to value.date,
-                "note" to value.note,
-                "deleted" to value.deleted,
-                "updatedAt" to value.updatedAt,
-                "updatedBy" to (authRepository.userId ?: value.updatedBy),
-            )
-        }
-        val batches = firestoreBatches(writes)
-        var awaitAcks = true
-        batches.forEachIndexed { index, chunk ->
-            val batch = firestore.batch()
-            chunk.forEach { (document, data) -> batch.set(document, data) }
-            when {
-                // Подтверждение батча не должно держать импорт вечно: при подвисшей
-                // связи записи уже в офлайн-очереди Firestore и доставятся сами.
-                awaitAcks -> try {
-                    withTimeout(IMPORT_UPLOAD_TIMEOUT_MILLIS) { batch.commit().await() }
-                    Log.d("ExpeysiSync", "import upload batch ${index + 1}/${batches.size} acknowledged")
-                } catch (e: TimeoutCancellationException) {
-                    awaitAcks = false
-                    Log.w("ExpeysiSync", "import upload batch ${index + 1}/${batches.size} deferred", e)
-                }
-                // Подтверждение не ждём: commit кладёт записи в очередь при вызове.
-                else -> batch.commit()
-            }
-        }
-        Log.d("ExpeysiSync", "import upload documents=${writes.size}")
+        val changes = balanceChanges(balances) +
+            accountChanges(accounts) +
+            categoryChanges(categories) +
+            transactionChanges(transactions)
+        remote.uploadBulk(familyId, changes, IMPORT_UPLOAD_TIMEOUT_MILLIS)
     }
 
-    private fun collection(name: String): CollectionReference? = familyStore.familyId.value?.let {
-        firestore.collection("families").document(it).collection(name)
-    }
+    private fun balanceChanges(values: List<BalanceEntity>): List<SyncChange> = values.map { SyncMapper.toChange(it) }
 
-    private suspend fun listen(
-        familyId: String,
-        name: String,
-        initialized: CompletableDeferred<Unit>,
-        remoteVersions: MutableMap<String, Long>,
-        merge: suspend (DocumentSnapshot) -> Unit,
-    ) {
-        changes(familyId, name).collect { documents ->
-            Log.d("ExpeysiSync", "snapshot $name=${documents.size}")
-            remoteVersions.clear()
-            documents.forEach { document ->
-                remoteVersions[document.id] = document.getLong("updatedAt") ?: 0
-                merge(document)
-            }
-            initialized.complete(Unit)
-        }
-    }
+    private fun accountChanges(values: List<AccountEntity>): List<SyncChange> = values.map { SyncMapper.toChange(it) }
 
-    private fun changes(familyId: String, name: String) = callbackFlow {
-        val registration = firestore.collection("families").document(familyId).collection(name)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    Log.e("ExpeysiSync", "listener $name", error)
-                    close(error)
-                } else if (snapshot != null) {
-                    trySend(snapshot.documents)
-                }
-            }
-        awaitClose { registration.remove() }
-    }.retryWhen { _, _ ->
-        delay(5_000)
-        true
-    }
+    private fun categoryChanges(values: List<CategoryEntity>): List<SyncChange> = values.map { SyncMapper.toChange(it) }
 
-    private suspend fun mergeBalance(document: DocumentSnapshot) {
-        val value = BalanceEntity(
-            id = document.id,
-            name = document.getString("name") ?: return,
-            currencyCode = document.getString("currencyCode") ?: "RUB",
-            iconKey = document.getString("iconKey") ?: "",
-            colorKey = document.getString("colorKey") ?: "default",
-            deleted = document.getBoolean("deleted") ?: false,
-            updatedAt = document.getLong("updatedAt") ?: 0,
-        )
-        val local = balanceDao.byId(value.id)
-        when {
-            local == null || value.updatedAt > local.updatedAt -> balanceDao.upsert(value)
-            value.updatedAt < local.updatedAt -> uploadBalance(local)
-        }
-    }
+    private fun transactionChanges(values: List<TransactionEntity>): List<SyncChange> = values.map { SyncMapper.toChange(it, authRepository.userId) }
 
-    private suspend fun mergeAccount(document: DocumentSnapshot) {
-        val value = AccountEntity(
-            id = document.id,
-            name = document.getString("name") ?: return,
-            iconKey = document.getString("iconKey") ?: "",
-            colorKey = document.getString("colorKey") ?: "default",
-            openingBalanceMinor = document.getLong("openingBalanceMinor") ?: 0,
-            balanceId = document.getString("balanceId") ?: return,
-            deleted = document.getBoolean("deleted") ?: false,
-            updatedAt = document.getLong("updatedAt") ?: 0,
-        )
-        val local = accountDao.byId(value.id)
-        when {
-            local == null || value.updatedAt > local.updatedAt -> accountDao.upsert(value)
-            value.updatedAt < local.updatedAt -> uploadAccount(local)
-        }
-    }
-
-    private suspend fun mergeCategory(document: DocumentSnapshot) {
-        val value = CategoryEntity(
-            id = document.id,
-            name = document.getString("name") ?: return,
-            iconKey = document.getString("iconKey") ?: "",
-            colorKey = document.getString("colorKey") ?: "default",
-            type = document.getString("type") ?: return,
-            deleted = document.getBoolean("deleted") ?: false,
-            updatedAt = document.getLong("updatedAt") ?: 0,
-        )
-        val local = categoryDao.byId(value.id)
-        when {
-            local == null || value.updatedAt > local.updatedAt -> categoryDao.upsert(value)
-            value.updatedAt < local.updatedAt -> uploadCategory(local)
-        }
-    }
-
-    private suspend fun mergeTransaction(document: DocumentSnapshot) {
-        val value = TransactionEntity(
-            id = document.id,
-            type = document.getString("type") ?: return,
-            amountMinor = document.getLong("amountMinor") ?: return,
-            accountId = document.getString("accountId") ?: return,
-            categoryId = document.getString("categoryId") ?: return,
-            date = document.getLong("date") ?: return,
-            note = document.getString("note") ?: "",
-            deleted = document.getBoolean("deleted") ?: false,
-            updatedAt = document.getLong("updatedAt") ?: 0,
-            updatedBy = document.getString("updatedBy") ?: "",
-        )
-        val local = transactionDao.byId(value.id)
-        when {
-            local == null || value.updatedAt > local.updatedAt -> transactionDao.upsert(value)
-            value.updatedAt < local.updatedAt -> uploadTransaction(local)
-        }
+    private companion object {
+        const val TAG = "ExpeysiSync"
     }
 }
 
-private data class RemoteVersions(
-    val balances: MutableMap<String, Long> = mutableMapOf(),
-    val accounts: MutableMap<String, Long> = mutableMapOf(),
-    val categories: MutableMap<String, Long> = mutableMapOf(),
-    val transactions: MutableMap<String, Long> = mutableMapOf(),
-)
+/** Версии строк удалённого журнала по типам: сравнение при первичной сверке. */
+private class RemoteVersions {
+    private val byType = SyncEntityType.entries.associateWith { mutableMapOf<String, Long>() }
+
+    operator fun get(type: SyncEntityType): MutableMap<String, Long> = byType.getValue(type)
+
+    operator fun get(type: SyncEntityType, id: String): Long? = get(type)[id]
+
+    operator fun set(type: SyncEntityType, id: String, updatedAt: Long) {
+        get(type)[id] = updatedAt
+    }
+}
 
 internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
-
-internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(500)
 
 /** Порог ожидания подтверждения одного батча загрузки импорта. */
 private const val IMPORT_UPLOAD_TIMEOUT_MILLIS = 20_000L

@@ -6,7 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
-import com.expeysi.app.data.sync.SyncEngine
+import com.expeysi.app.data.sync.SyncTrigger
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -25,7 +25,7 @@ import javax.inject.Inject
 class EditCategoryViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val categoryDao: CategoryDao,
-    private val syncEngine: SyncEngine,
+    private val syncTrigger: SyncTrigger,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["categoryId"]
@@ -99,8 +99,8 @@ class EditCategoryViewModel @Inject constructor(
                 type = _type.value.wire,
                 updatedAt = System.currentTimeMillis(),
             )
-            categoryDao.upsert(category)
-            syncEngine.uploadCategory(category)
+            categoryDao.upsert(category.copy(dirty = true))
+            syncTrigger.trigger()
             _saved.value = true
         }
     }
@@ -108,9 +108,9 @@ class EditCategoryViewModel @Inject constructor(
     fun delete() {
         val category = original ?: return
         viewModelScope.launch {
-            val deleted = category.copy(deleted = true, updatedAt = System.currentTimeMillis())
+            val deleted = category.copy(deleted = true, updatedAt = System.currentTimeMillis(), dirty = true)
             categoryDao.upsert(deleted)
-            syncEngine.uploadCategory(deleted)
+            syncTrigger.trigger()
             _saved.value = true
         }
     }

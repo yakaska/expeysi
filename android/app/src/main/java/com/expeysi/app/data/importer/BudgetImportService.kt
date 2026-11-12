@@ -9,7 +9,7 @@ import com.expeysi.app.data.db.AppDatabase
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionEntity
-import com.expeysi.app.data.sync.SyncEngine
+import com.expeysi.app.data.sync.ImportStore
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -26,7 +26,7 @@ data class BudgetImportResult(
 class BudgetImportService @Inject constructor(
     private val database: AppDatabase,
     private val parser: BudgetCsvParser,
-    private val syncEngine: SyncEngine,
+    private val importStore: ImportStore,
     private val selectedBalanceStore: SelectedBalanceStore,
 ) {
     suspend fun import(input: InputStream): BudgetImportResult {
@@ -96,7 +96,7 @@ class BudgetImportService @Inject constructor(
         }
         Log.d(TAG, "import committed transactions=${transactions.size}")
 
-        syncEngine.uploadImportedData(
+        importStore.uploadImportedData(
             balanceByKey.values.toList(),
             accountByKey.values.toList(),
             newCategories + recoloredCategories.values,

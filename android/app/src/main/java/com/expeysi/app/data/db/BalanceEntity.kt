@@ -15,4 +15,9 @@ data class BalanceEntity(
     @ColumnInfo(defaultValue = "default") val colorKey: String = "default",
     val deleted: Boolean = false,
     val updatedAt: Long,
+    /**
+     * Локальное изменение ещё не передано транспорту синхронизации.
+     * По умолчанию false: сиды и строки, пришедшие с сервера, не грязные.
+     */
+    @ColumnInfo(defaultValue = "0") val dirty: Boolean = false,
 )

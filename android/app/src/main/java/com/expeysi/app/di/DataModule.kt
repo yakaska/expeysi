@@ -5,6 +5,8 @@ import android.content.SharedPreferences
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.expeysi.app.data.FamilyStore
+import com.expeysi.app.data.SharedPrefsFamilyStore
 import com.expeysi.app.data.analysis.AnalysisRepository
 import com.expeysi.app.data.analysis.RoomAnalysisRepository
 import com.expeysi.app.data.db.AccountDao
@@ -13,6 +15,7 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
+import com.expeysi.app.data.db.FamilyDataReset
 import com.expeysi.app.data.db.MIGRATION_1_2
 import com.expeysi.app.data.db.MIGRATION_2_3
 import com.expeysi.app.data.db.MIGRATION_3_4
@@ -20,9 +23,14 @@ import com.expeysi.app.data.db.MIGRATION_4_5
 import com.expeysi.app.data.db.MIGRATION_5_6
 import com.expeysi.app.data.db.MIGRATION_6_7
 import com.expeysi.app.data.db.MIGRATION_7_8
+import com.expeysi.app.data.db.MIGRATION_8_9
+import com.expeysi.app.data.db.RoomFamilyDataReset
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
+import com.expeysi.app.data.sync.ImportStore
+import com.expeysi.app.data.sync.SyncEngine
+import com.expeysi.app.data.sync.SyncTrigger
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -55,6 +63,7 @@ object DataModule {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             )
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
@@ -102,4 +111,32 @@ abstract class AnalysisRepositoryModule {
     @Binds
     @Singleton
     abstract fun bindAnalysisRepository(impl: RoomAnalysisRepository): AnalysisRepository
+}
+
+/** Локальные швы семьи: выбранная семья и очистка семейных данных Room. */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class FamilyLocalModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindFamilyStore(impl: SharedPrefsFamilyStore): FamilyStore
+
+    @Binds
+    @Singleton
+    abstract fun bindFamilyDataReset(impl: RoomFamilyDataReset): FamilyDataReset
+}
+
+/** Швы синхронизации: UI и импортёр не знают SyncEngine — только узкие интерфейсы. */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class SyncSeamsModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncTrigger(impl: SyncEngine): SyncTrigger
+
+    @Binds
+    @Singleton
+    abstract fun bindImportStore(impl: SyncEngine): ImportStore
 }

@@ -11,7 +11,7 @@ import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
 import com.expeysi.app.data.db.TransactionDao
-import com.expeysi.app.data.sync.SyncEngine
+import com.expeysi.app.data.sync.SyncTrigger
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -34,7 +34,7 @@ class EditBalanceViewModel @Inject constructor(
     private val accountDao: AccountDao,
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
-    private val syncEngine: SyncEngine,
+    private val syncTrigger: SyncTrigger,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["balanceId"]
@@ -151,8 +151,8 @@ class EditBalanceViewModel @Inject constructor(
                 colorKey = _colorKey.value,
                 updatedAt = System.currentTimeMillis(),
             )
-            balanceDao.upsert(balance)
-            syncEngine.uploadBalance(balance)
+            balanceDao.upsert(balance.copy(dirty = true))
+            syncTrigger.trigger()
             _saved.value = true
         }
     }
@@ -161,13 +161,13 @@ class EditBalanceViewModel @Inject constructor(
         val balance = original ?: return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val deletedBalance = balance.copy(deleted = true, updatedAt = now)
+            val deletedBalance = balance.copy(deleted = true, updatedAt = now, dirty = true)
             val accounts = accountDao.byBalanceId(balance.id)
             val transactions = transactionDao.byAccountIds(accounts.map { it.id })
             val deletedAccounts = accounts.filterNot { it.deleted }
-                .map { it.copy(deleted = true, updatedAt = now) }
+                .map { it.copy(deleted = true, updatedAt = now, dirty = true) }
             val deletedTransactions = transactions.filterNot { it.deleted }
-                .map { it.copy(deleted = true, updatedAt = now) }
+                .map { it.copy(deleted = true, updatedAt = now, dirty = true) }
 
             database.withTransaction {
                 balanceDao.upsert(deletedBalance)
@@ -175,9 +175,8 @@ class EditBalanceViewModel @Inject constructor(
                 deletedTransactions.forEach { transactionDao.upsert(it) }
             }
 
-            syncEngine.uploadBalance(deletedBalance)
-            deletedAccounts.forEach(syncEngine::uploadAccount)
-            deletedTransactions.forEach(syncEngine::uploadTransaction)
+            // Один транзакционный акт удаления — один запуск переноса dirty-строк.
+            syncTrigger.trigger()
             _saved.value = true
         }
     }
