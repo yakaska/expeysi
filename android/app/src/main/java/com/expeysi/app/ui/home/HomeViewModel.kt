@@ -325,6 +325,10 @@ class HomeViewModel @Inject constructor(
                 selectedBalanceStore.clear()
             } catch (e: Exception) {
                 _leaveState.value = LeaveFamilyUiState(failed = true)
+            } finally {
+                // Спиннер снимается и на успехе: иначе после возврата в семью
+                // пункт меню навсегда блокируется вечным индикатором.
+                _leaveState.update { it.copy(inProgress = false) }
             }
         }
     }

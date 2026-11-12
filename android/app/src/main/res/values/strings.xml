@@ -152,6 +152,12 @@
     <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
+    <!-- Экспорт CSV: файл возвращается в приложение через «Импорт из Бюджета». -->
+    <string name="export_button">Экспортировать в CSV</string>
+    <!-- %1$d — количество экспортированных операций. -->
+    <string name="export_done">Экспортировано операций: %1$d</string>
+    <string name="export_error_generic">Не удалось экспортировать данные</string>
+    <string name="export_hint">Выберите типы операций — выгрузятся все балансы и выбранные операции. Начальный остаток счёта идёт служебной строкой с категорией «Начальный остаток» — после повторного импорта операции из неё не создадутся. Файл возвращается в приложение через «Импорт из Бюджета».</string>
     <string name="auth_error_generic">Не удалось выполнить вход</string>
     <string name="auth_error_cancelled">Вход отменён</string>
     <string name="family_error_connect">Не удалось подключить семью</string>
@@ -195,6 +201,7 @@
     <string name="categories_add_cd">Добавить категорию</string>
     <string name="category_delete_title">Удалить категорию?</string>
     <string name="category_delete_text">Категория исчезнет из списка, её операции останутся в истории.</string>
+    <string name="category_error_reserved">Название «Начальный остаток» зарезервировано</string>
     <string name="category_title_new">Новая категория</string>
     <string name="category_title_edit">Изменить категорию</string>
     <string name="categoryreport_title">Операции по категориям</string>

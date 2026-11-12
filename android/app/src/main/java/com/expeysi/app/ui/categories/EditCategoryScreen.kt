@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.EntityPreview
 import com.expeysi.app.ui.common.SaveButton
@@ -64,6 +65,8 @@ fun EditCategoryScreen(
     var nameHadFocus by rememberSaveable { mutableStateOf(false) }
     var showNameError by rememberSaveable { mutableStateOf(false) }
     val nameError = showNameError && name.isBlank()
+    // Резерв «Начальный остатка» показываем сразу, как только название совпало.
+    val reservedNameError = CsvFormat.isOpeningRowCategory(name)
 
     LaunchedEffect(saved) {
         if (saved) onClose()
@@ -166,8 +169,13 @@ fun EditCategoryScreen(
                         }
                     },
                 label = { Text(stringResource(R.string.common_name)) },
-                isError = nameError,
-                supportingText = { if (nameError) Text(stringResource(R.string.common_name_error)) },
+                isError = nameError || reservedNameError,
+                supportingText = {
+                    when {
+                        nameError -> Text(stringResource(R.string.common_name_error))
+                        reservedNameError -> Text(stringResource(R.string.category_error_reserved))
+                    }
+                },
                 singleLine = true,
             )
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

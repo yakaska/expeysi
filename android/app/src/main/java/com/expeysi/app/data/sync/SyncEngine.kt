@@ -28,7 +28,9 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -210,10 +212,24 @@ class SyncEngine @Inject constructor(
                 "updatedBy" to (authRepository.userId ?: value.updatedBy),
             )
         }
-        firestoreBatches(writes).forEach { chunk ->
+        val batches = firestoreBatches(writes)
+        var awaitAcks = true
+        batches.forEachIndexed { index, chunk ->
             val batch = firestore.batch()
             chunk.forEach { (document, data) -> batch.set(document, data) }
-            batch.commit().await()
+            when {
+                // Подтверждение батча не должно держать импорт вечно: при подвисшей
+                // связи записи уже в офлайн-очереди Firestore и доставятся сами.
+                awaitAcks -> try {
+                    withTimeout(IMPORT_UPLOAD_TIMEOUT_MILLIS) { batch.commit().await() }
+                    Log.d("ExpeysiSync", "import upload batch ${index + 1}/${batches.size} acknowledged")
+                } catch (e: TimeoutCancellationException) {
+                    awaitAcks = false
+                    Log.w("ExpeysiSync", "import upload batch ${index + 1}/${batches.size} deferred", e)
+                }
+                // Подтверждение не ждём: commit кладёт записи в очередь при вызове.
+                else -> batch.commit()
+            }
         }
         Log.d("ExpeysiSync", "import upload documents=${writes.size}")
     }
@@ -339,3 +355,6 @@ private data class RemoteVersions(
 internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
 
 internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(500)
+
+/** Порог ожидания подтверждения одного батча загрузки импорта. */
+private const val IMPORT_UPLOAD_TIMEOUT_MILLIS = 20_000L
