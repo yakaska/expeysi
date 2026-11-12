@@ -53,6 +53,48 @@ class BudgetCsvParserTest {
     }
 
     @Test
+    fun `колонки оформления читаются если они в заголовке`() {
+        val transactions = parse(
+            "${HEADER.trimEnd()};Иконка категории;Цвет категории;Иконка счета;Цвет счета;" +
+                "Название баланса;Иконка баланса;Цвет баланса\n" +
+                "2026-01-02;03:04;Карта;Еда;-800.50;RUB;Квартира;restaurant;orange;credit_card;blue;Основной;payments;blue\n",
+        )
+
+        val tx = transactions.single()
+        assertEquals("restaurant", tx.categoryIconKey)
+        assertEquals("orange", tx.categoryColorKey)
+        assertEquals("credit_card", tx.accountIconKey)
+        assertEquals("blue", tx.accountColorKey)
+        assertEquals("Основной", tx.balanceName)
+        assertEquals("payments", tx.balanceIconKey)
+        assertEquals("blue", tx.balanceColorKey)
+    }
+
+    @Test
+    fun `без колонок оформления атрибуты не заполнены`() {
+        val transactions = parse(HEADER + "2026-01-02;03:04;Наличные;Еда;-100;VND;\n")
+        val tx = transactions.single()
+        assertEquals(null, tx.categoryIconKey)
+        assertEquals(null, tx.accountColorKey)
+        assertEquals(null, tx.balanceName)
+        assertEquals(null, tx.balanceColorKey)
+    }
+
+    @Test
+    fun `строки короче колонок оформления дают пустые атрибуты`() {
+        val transactions = parse(
+            "${HEADER.trimEnd()};Иконка категории;Цвет категории;Иконка счета;Цвет счета;" +
+                "Название баланса;Иконка баланса;Цвет баланса\n" +
+                "2026-01-02;03:04;Карта;Еда;-800.50;RUB;\n",
+        )
+
+        val tx = transactions.single()
+        assertEquals(null, tx.categoryIconKey)
+        assertEquals(null, tx.accountColorKey)
+        assertEquals(null, tx.balanceName)
+    }
+
+    @Test
     fun `жилье с е и ё сопоставляется одинаково`() {
         assertEquals(normalizeBudgetCategoryName("Жилье"), normalizeBudgetCategoryName(" Жильё "))
     }

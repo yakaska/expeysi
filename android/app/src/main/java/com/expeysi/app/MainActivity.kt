@@ -37,6 +37,7 @@ import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.common.asString
+import com.expeysi.app.ui.export.ExportScreen
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
@@ -279,7 +280,7 @@ private fun AppNavigation() {
                 )
             }
             composable("data-export") {
-                PlaceholderScreen(title = R.string.drawer_data_export, onBack = { navigateBack() })
+                ExportScreen(onBack = { navigateBack() })
             }
             composable("data-import") {
                 PlaceholderScreen(title = R.string.drawer_data_import, onBack = { navigateBack() })

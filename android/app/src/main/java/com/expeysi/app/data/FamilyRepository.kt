@@ -1,10 +1,12 @@
 package com.expeysi.app.data
 
 import androidx.room.withTransaction
+import android.util.Log
 import com.expeysi.app.data.db.AppDatabase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,17 +53,33 @@ class FamilyRepository @Inject constructor(
     suspend fun leaveFamily() {
         val uid = checkSignedIn()
         val familyId = familyStore.familyId.value ?: return
-        firestore.collection("families").document(familyId)
-            .collection("members").document(uid)
-            .delete()
-            .await()
+        Log.d(TAG, "leave start uid=$uid family=$familyId")
+        runCatching {
+            // Таймаут, чтобы подтверждение удаления не могло держать загрузку
+            // вечно: мутация остаётся в офлайн-очереди Firestore и применится
+            // на сервере, как только появится сеть.
+            withTimeout(MEMBER_DELETE_TIMEOUT_MILLIS) {
+                firestore.collection("families").document(familyId)
+                    .collection("members").document(uid)
+                    .delete()
+                    .await()
+            }
+        }.onFailure { error ->
+            // Отказ удалить своё членство (нет сети, доступ запрещён, членство
+            // уже снято на сервере) не отменяет выход: локальное состояние всё
+            // равно сбрасываем, мутация дойдёт до сервера сама.
+            Log.w(TAG, "member delete not acknowledged", error)
+        }
         database.withTransaction {
+            Log.d(TAG, "room clear begin")
             database.transactionDao().clear()
             database.accountDao().clear()
             database.categoryDao().clear()
             database.balanceDao().clear()
+            Log.d(TAG, "room clear end")
         }
         familyStore.clear()
+        Log.d(TAG, "family store cleared")
     }
 
     private fun memberData(uid: String) = mapOf(
@@ -78,6 +96,11 @@ class FamilyRepository @Inject constructor(
 
 /** Вызывается без входа в аккаунт; текст показа резолвится в UI-слое. */
 class FamilyNotSignedInException : Exception()
+
+private const val TAG = "ExpeysiFamily"
+
+/** Ожидание подтверждения удаления членства, после которого выход идёт локально. */
+private const val MEMBER_DELETE_TIMEOUT_MILLIS = 10_000L
 
 /** Вызован вход в семью с пустым кодом; текст показа резолвится в UI-слое. */
 class FamilyCodeEmptyException : Exception()

@@ -1,5 +1,6 @@
 package com.expeysi.app.data.importer
 
+import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.domain.TxType
 import java.io.InputStream
 import java.math.BigDecimal
@@ -19,6 +20,14 @@ data class BudgetTransaction(
     val currencyCode: String,
     val date: Long,
     val note: String,
+    // Атрибуты оформления из файла экспорта Expeysi; null — колонки в файле нет.
+    val categoryIconKey: String? = null,
+    val categoryColorKey: String? = null,
+    val accountIconKey: String? = null,
+    val accountColorKey: String? = null,
+    val balanceName: String? = null,
+    val balanceIconKey: String? = null,
+    val balanceColorKey: String? = null,
 )
 
 class BudgetCsvParser @Inject constructor() {
@@ -33,13 +42,15 @@ class BudgetCsvParser @Inject constructor() {
         val columns = REQUIRED_COLUMNS.mapValues { (_, name) ->
             header[name] ?: throw BudgetImportException(BudgetImportError.MISSING_COLUMN, column = name)
         }
+        // Колонки оформления экспорта Expeysi читаются, только если заявлены в заголовке.
+        val optionalColumns = OPTIONAL_COLUMNS.mapNotNull { header[it]?.let { index -> it to index } }.toMap()
         val lastColumn = columns.values.max()
 
         return rows.drop(1).map { row ->
             if (row.values.size <= lastColumn) {
                 throw BudgetImportException(BudgetImportError.TOO_FEW_COLUMNS, line = row.line)
             }
-            parseTransaction(row.values, columns, row.line)
+            parseTransaction(row.values, columns, optionalColumns, row.line)
         }.also {
             if (it.isEmpty()) throw BudgetImportException(BudgetImportError.NO_TRANSACTIONS)
         }
@@ -48,9 +59,16 @@ class BudgetCsvParser @Inject constructor() {
     private fun parseTransaction(
         values: List<String>,
         columns: Map<String, Int>,
+        optionalColumns: Map<String, Int>,
         line: Int,
     ): BudgetTransaction {
         fun value(column: String) = values[columns.getValue(column)].trim()
+
+        // Колонки могут отсутствовать; строка может быть короче заявленных колонок.
+        fun optionalValue(column: String): String? = optionalColumns[column]
+            ?.let { values.getOrNull(it) }
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 
         val accountName = value("account")
         val categoryName = value("category")
@@ -90,6 +108,13 @@ class BudgetCsvParser @Inject constructor() {
             currencyCode = currencyCode,
             date = date,
             note = value("note"),
+            categoryIconKey = optionalValue(CsvFormat.CATEGORY_ICON_COLUMN),
+            categoryColorKey = optionalValue(CsvFormat.CATEGORY_COLOR_COLUMN),
+            accountIconKey = optionalValue(CsvFormat.ACCOUNT_ICON_COLUMN),
+            accountColorKey = optionalValue(CsvFormat.ACCOUNT_COLOR_COLUMN),
+            balanceName = optionalValue(CsvFormat.BALANCE_NAME_COLUMN),
+            balanceIconKey = optionalValue(CsvFormat.BALANCE_ICON_COLUMN),
+            balanceColorKey = optionalValue(CsvFormat.BALANCE_COLOR_COLUMN),
         )
     }
 
@@ -150,6 +175,15 @@ class BudgetCsvParser @Inject constructor() {
             "amount" to "Сумма",
             "currency" to "Валюта",
             "note" to "Комментарий",
+        )
+        val OPTIONAL_COLUMNS = listOf(
+            CsvFormat.CATEGORY_ICON_COLUMN,
+            CsvFormat.CATEGORY_COLOR_COLUMN,
+            CsvFormat.ACCOUNT_ICON_COLUMN,
+            CsvFormat.ACCOUNT_COLOR_COLUMN,
+            CsvFormat.BALANCE_NAME_COLUMN,
+            CsvFormat.BALANCE_ICON_COLUMN,
+            CsvFormat.BALANCE_COLOR_COLUMN,
         )
     }
 }

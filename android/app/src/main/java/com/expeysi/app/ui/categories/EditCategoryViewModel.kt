@@ -3,6 +3,7 @@ package com.expeysi.app.ui.categories
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.sync.SyncEngine
@@ -52,8 +53,9 @@ class EditCategoryViewModel @Inject constructor(
 
     val availableIconKeys: List<String> = IconCatalog.availableKeys
 
+    /** Служебное имя «Начальный остаток» занято CSV-экспортом, категории с ним быть не может. */
     val canSave: StateFlow<Boolean> = _name
-        .map { it.isNotBlank() }
+        .map { it.isNotBlank() && !CsvFormat.isOpeningRowCategory(it) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     init {
