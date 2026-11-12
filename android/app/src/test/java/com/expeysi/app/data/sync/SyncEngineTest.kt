@@ -10,32 +10,38 @@ import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.data.remote.AuthProvider
+import com.expeysi.app.data.remote.PushResult
 import com.expeysi.app.data.remote.RemoteUpdate
 import com.expeysi.app.data.remote.SyncChange
 import com.expeysi.app.data.remote.SyncEntityType
 import com.expeysi.app.data.remote.SyncKey
-import com.expeysi.app.data.remote.SyncMapper
 import com.expeysi.app.data.remote.SyncRemote
-import com.expeysi.app.data.remote.firebase.firestoreBatches
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 
 /**
  * Поведение SyncEngine на интерфейсах: фейковый SyncRemote плюс фейки DAO,
- * повторяющие SQL-контракты (условный markClean по updatedAt). Существующие
- * проверки чистых функций оставлены без изменений.
+ * повторяющие SQL-контракты (условный markClean по updatedAt). Корутины
+ * движка живут в backgroundScope теста: виртуальное время, без
+ * Dispatchers.IO и реальных пауз. Проверки чистых функций оставлены
+ * без изменений.
  */
 class SyncEngineTest {
 
@@ -59,21 +65,15 @@ class SyncEngineTest {
         assertFalse(needsUpload(localUpdatedAt = 100, remoteUpdatedAt = 101))
     }
 
-    @Test
-    fun `батчи ровно по 500 документов Firestore`() {
-        assertEquals(listOf(500, 1), firestoreBatches(List(501) { it }).map { it.size })
-        assertEquals(listOf(500), firestoreBatches(List(500) { it }).map { it.size })
-        assertEquals(emptyList<List<Int>>(), firestoreBatches(emptyList<Int>()))
-    }
-
     // Тесты движка на фейках: слияние по updatedAt (инвариант 1), первичная
-    // сверка (инвариант 4), перенос dirty-строк и загрузка импорта (инвариант 5).
+    // сверка (инвариант 4), рабочий цикл отправки (инвариант 5).
 
     @Test
     fun `снимок новее локали заменяет строку с дефолтами wire-формата`() = runTest {
         seedCatalogs(balance = balanceRow(name = "Старое имя", updatedAt = 50))
         remote.setInitialUpdates(initialUpdates())
-        engine().runFamilySync(FAMILY_ID)
+        engine().start()
+        advanceUntilIdle()
         val row = balanceDao.rows.value.single()
         assertEquals(100L, row.updatedAt)
         assertEquals("Продукты", row.name)
@@ -81,26 +81,30 @@ class SyncEngineTest {
         assertEquals("", row.iconKey)
         assertEquals("default", row.colorKey)
         assertFalse(row.deleted)
+        assertFalse(row.dirty)
         assertTrue(remote.posted.isEmpty())
     }
 
     @Test
-    fun `локаль новее снимка отправляется и не перезаписывается`() = runTest {
+    fun `локально новее снимка помечается dirty и уходит через воркера`() = runTest {
         seedCatalogs(balance = balanceRow(name = "Моё имя", updatedAt = 100))
         remote.setInitialUpdates(
             initialUpdates(
                 balanceChanges = listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 50, "Чужое старое имя")),
             ),
         )
-        engine().runFamilySync(FAMILY_ID)
+        engine().start()
+        advanceUntilIdle()
         val row = balanceDao.rows.value.single()
         assertEquals("Моё имя", row.name)
         assertEquals(100L, row.updatedAt)
-        // И слияние, и первичная сверка считают строку новее транспорта —
-        // обе отправляют, как и прежний движок (set по id идемпотентен).
+        // Слияние и сверка не шлют напрямую: строку отправляет рабочий цикл.
+        // Два прохода — после слияния и после сверки (обе считают строку
+        // новее транспорта; push идемпотентен, как и у прежнего движка).
         assertEquals(2, remote.posted.size)
         assertTrue(remote.posted.all { it.updatedAt == 100L })
         assertTrue(remote.posted.all { it.fields["name"] == "Моё имя" })
+        assertFalse(row.dirty)
     }
 
     @Test
@@ -111,7 +115,8 @@ class SyncEngineTest {
                 balanceChanges = listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Иное имя")),
             ),
         )
-        engine().runFamilySync(FAMILY_ID)
+        engine().start()
+        advanceUntilIdle()
         assertTrue(remote.posted.isEmpty())
         assertEquals("Моё имя", balanceDao.rows.value.single().name)
     }
@@ -125,7 +130,8 @@ class SyncEngineTest {
         )
         transactionDao.rows.value = listOf(transactionRow(updatedAt = 300))
         remote.setInitialUpdates(initialUpdates(allEmpty = true))
-        engine().runFamilySync(FAMILY_ID)
+        engine().start()
+        advanceUntilIdle()
         assertEquals(
             listOf(
                 SyncKey(SyncEntityType.BALANCE, "b1"),
@@ -140,6 +146,25 @@ class SyncEngineTest {
     }
 
     @Test
+    fun `сверка не шлёт напрямую, только помечает dirty`() = runTest {
+        seedCatalogs(balance = balanceRow(updatedAt = 300))
+        remote.setInitialUpdates(
+            initialUpdates(
+                balanceChanges = listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Продукты")),
+                allEmpty = false,
+            ),
+        )
+        engine().start()
+        advanceUntilIdle()
+        // Прямых отправок из слияния и сверки нет (построчного push больше
+        // не существует): строку отправляет рабочий цикл. Двойная отправка —
+        // слияние и сверка обе считают строку новее, как и прежний движок.
+        assertEquals(2, remote.posted.size)
+        assertTrue(remote.posted.all { it.key == SyncKey(SyncEntityType.BALANCE, "b1") })
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
     fun `слияние отдаёт локальную транзакцию с updatedBy текущего пользователя`() = runTest {
         seedCatalogs()
         transactionDao.rows.value = listOf(transactionRow(updatedAt = 100, updatedBy = "old-uid"))
@@ -148,44 +173,38 @@ class SyncEngineTest {
                 transactionChanges = listOf(staleTransactionChange()),
             ),
         )
-        engine().runFamilySync(FAMILY_ID)
+        engine().start()
+        advanceUntilIdle()
         assertTrue(remote.posted.isNotEmpty())
         assertTrue(remote.posted.all { it.fields["updatedBy"] == UID })
         assertEquals(100L, transactionDao.rows.value.single().updatedAt)
     }
 
     @Test
-    fun `requestSync публикует dirty и снимает флаг той же версией`() = runTest {
+    fun `syncDirty публикует dirty и снимает флаг той же версией`() = runTest {
         balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
-        engine().requestSync()
+        engine().syncDirty()
         assertEquals(SyncKey(SyncEntityType.BALANCE, "b1"), remote.posted.single().key)
         assertEquals("b1" to 100L, balanceDao.cleanCalls.single())
         assertFalse(balanceDao.rows.value.single().dirty)
     }
 
     @Test
-    fun `requestSync без выбранной семьи ничего не отправляет и не чистит`() = runTest {
+    fun `syncDirty без выбранной семьи ничего не отправляет и не чистит`() = runTest {
         familyStore.clear()
         balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
-        engine().requestSync()
+        engine().syncDirty()
         assertTrue(remote.posted.isEmpty())
-        assertTrue(remote.bulkCalls.isEmpty())
+        assertTrue(remote.pushFamilyIds.isEmpty())
         assertTrue(balanceDao.rows.value.single().dirty)
         assertTrue(balanceDao.cleanCalls.isEmpty())
     }
 
     @Test
-    fun `trigger переносит dirty-строки в собственном scope движка`() = runTest {
-        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100).copy(dirty = true))
-        engine().trigger()
-        // trigger() возвращается сразу: перенос идёт в собственном IO-scope движка
-        // (сеть вне контекста вызывающего). Ждём фактического завершения ряда:
-        // dirty снимется только после отправки и markClean.
-        withContext(Dispatchers.IO) {
-            withTimeout(2_000) {
-                while (transactionDao.rows.value.single().dirty) delay(10)
-            }
-        }
+    fun `старт сессии семьи поднимает проход отправки dirty-строк`() = runTest {
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100, updatedBy = "old-uid").copy(dirty = true))
+        engine().start()
+        advanceUntilIdle()
         assertEquals(SyncKey(SyncEntityType.TRANSACTION, "t1"), remote.posted.single().key)
         assertEquals(UID, remote.posted.single().fields["updatedBy"])
         assertEquals(100L, remote.posted.single().updatedAt)
@@ -194,31 +213,235 @@ class SyncEngineTest {
     }
 
     @Test
-    fun `uploadImportedData без семьи не отправляет`() = runTest {
-        familyStore.clear()
-        engine().uploadImportedData(listOf(balanceRow()), emptyList(), emptyList(), emptyList())
-        assertTrue(remote.bulkCalls.isEmpty())
-        assertTrue(remote.bulkTimeouts.isEmpty())
+    fun `trigger возвращает управление сразу, отправку делает воркер`() = runTest {
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        assertTrue(remote.posted.isEmpty())
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100).copy(dirty = true))
+        syncEngine.trigger()
+        assertEquals(0, remote.posted.size)
+        advanceUntilIdle()
+        assertEquals(SyncKey(SyncEntityType.TRANSACTION, "t1"), remote.posted.single().key)
+        assertEquals("t1" to 100L, transactionDao.cleanCalls.single())
+        assertFalse(transactionDao.rows.value.single().dirty)
     }
 
     @Test
-    fun `uploadImportedData передаёт wire-изменения и таймаут батча`() = runTest {
-        val balance = balanceRow(updatedAt = 300)
-        val account = accountRow(updatedAt = 300)
-        val category = categoryRow(updatedAt = 300)
-        val transaction = transactionRow(updatedAt = 300)
-        engine().uploadImportedData(listOf(balance), listOf(account), listOf(category), listOf(transaction))
-        assertEquals("fam-1", remote.bulkFamilyIds.single())
-        assertEquals(listOf(IMPORT_TIMEOUT_MILLIS), remote.bulkTimeouts)
-        assertEquals(
-            listOf(
-                SyncMapper.toChange(balance),
-                SyncMapper.toChange(account),
-                SyncMapper.toChange(category),
-                SyncMapper.toChange(transaction, UID),
-            ),
-            remote.bulkCalls.single(),
+    fun `правка во время отправки уходит заново и снимается по своей версии`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        var editsLeft = 1
+        remote.onPush = {
+            // Правка той же строки, когда её push уже в полёте.
+            if (editsLeft > 0) {
+                editsLeft--
+                balanceDao.upsert(balanceRow(name = "Моё имя", updatedAt = 150).copy(dirty = true))
+            }
+        }
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        // markClean по отправленной версии бережёт правку: строка остаётся dirty.
+        assertEquals(1, remote.pushCount)
+        assertEquals(listOf(100L), remote.posted.map { it.updatedAt })
+        assertEquals(150L, balanceDao.rows.value.single().updatedAt)
+        assertTrue(balanceDao.rows.value.single().dirty)
+
+        syncEngine.trigger()
+        advanceUntilIdle()
+
+        assertEquals(2, remote.pushCount)
+        assertEquals(listOf(100L, 150L), remote.posted.map { it.updatedAt })
+        assertEquals(150L, balanceDao.rows.value.single().updatedAt)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `сбой повторяется через пять секунд и цикл продолжает работу`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        remote.failTimes = 2
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        // Два сбоя подряд: пауза 5 секунд виртуального времени и повтор после каждого.
+        assertEquals(10000L, testScheduler.currentTime)
+        assertEquals(3, remote.pushCount)
+        assertEquals(1, remote.posted.size)
+        assertFalse(balanceDao.rows.value.single().dirty)
+
+        // Цикл жив после исключений: новый проход работает.
+        balanceDao.upsert(balanceRow(updatedAt = 100).copy(dirty = true))
+        syncEngine.trigger()
+        advanceUntilIdle()
+        assertEquals(4, remote.pushCount)
+        assertEquals(2, remote.posted.size)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `частичный accepted чистит только принятые и повторяет недобор`() = runTest {
+        balanceDao.rows.value = listOf(
+            balanceRow(updatedAt = 100).copy(dirty = true),
+            balanceRow(updatedAt = 100).copy(dirty = true).copy(id = "b2"),
         )
+        remote.acceptNext(setOf(SyncKey(SyncEntityType.BALANCE, "b1")))
+        engine().start()
+        advanceUntilIdle()
+        // b1 принят и чистится, b2 остаётся dirty и уходит вторым проходом.
+        assertEquals(2, remote.pushCount)
+        assertEquals(5000L, testScheduler.currentTime)
+        assertEquals(listOf("b1", "b2", "b2"), remote.posted.map { it.key.id })
+        assertTrue(balanceDao.rows.value.all { !it.dirty })
+    }
+
+    @Test
+    fun `пятьдесят триггеров сливаются в один проход отправки`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        val syncEngine = engine()
+        syncEngine.start()
+        repeat(50) { syncEngine.trigger() }
+        advanceUntilIdle()
+        assertEquals(1, remote.pushCount)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `dirty строки без семьи уходят после выбора семьи`() = runTest {
+        familyStore.clear()
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100).copy(dirty = true))
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        assertEquals(0, remote.pushCount)
+        assertTrue(transactionDao.rows.value.single().dirty)
+
+        familyStore.select(FAMILY_ID)
+        advanceUntilIdle()
+
+        assertEquals(1, remote.pushCount)
+        assertEquals(SyncKey(SyncEntityType.TRANSACTION, "t1"), remote.posted.single().key)
+        assertFalse(transactionDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `полное состояние заменяет карту и строка уходит после сверки`() = runTest {
+        seedCatalogs(
+            balance = balanceRow(updatedAt = 50),
+            account = accountRow(updatedAt = 100),
+            category = categoryRow(updatedAt = 100),
+        )
+        remote.setInitialUpdates(
+            listOf(
+                fullUpdate(SyncEntityType.BALANCE, listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Продукты"))),
+            ),
+        )
+        engine().start()
+        advanceUntilIdle()
+        // Слияние заменило строку (dirty = false); сверка ещё не запускалась.
+        assertEquals(0, remote.pushCount)
+        assertEquals(100L, balanceDao.rows.value.single().updatedAt)
+
+        remote.setInitialUpdates(
+            listOf(
+                fullUpdate(SyncEntityType.BALANCE, emptyList()),
+                fullUpdate(SyncEntityType.ACCOUNT, listOf(snapshotChange(SyncEntityType.ACCOUNT, "a1", 100, "Наличные"))),
+                fullUpdate(SyncEntityType.CATEGORY, listOf(snapshotChange(SyncEntityType.CATEGORY, "c1", 100, "Еда"))),
+                fullUpdate(SyncEntityType.TRANSACTION, emptyList()),
+            ),
+        )
+        advanceUntilIdle()
+        // Если бы карта не заменилась, сверка сочла бы b1 равным и не отправила его.
+        assertEquals(1, remote.pushCount)
+        assertEquals(SyncKey(SyncEntityType.BALANCE, "b1"), remote.posted.single().key)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `сверка ждёт полное состояние всех четырёх типов`() = runTest {
+        seedCatalogs(balance = balanceRow(updatedAt = 100), account = accountRow(updatedAt = 100), category = categoryRow(updatedAt = 100))
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 300))
+        remote.setInitialUpdates(
+            listOf(
+                fullUpdate(SyncEntityType.BALANCE, listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Продукты"))),
+                fullUpdate(SyncEntityType.ACCOUNT, listOf(snapshotChange(SyncEntityType.ACCOUNT, "a1", 100, "Наличные"))),
+            ),
+        )
+        engine().start()
+        advanceUntilIdle()
+        // Два из четырёх: сверки нет, t1@300 не отправляется.
+        assertEquals(0, remote.pushCount)
+
+        remote.setInitialUpdates(
+            listOf(
+                fullUpdate(SyncEntityType.CATEGORY, listOf(snapshotChange(SyncEntityType.CATEGORY, "c1", 100, "Еда"))),
+                fullUpdate(SyncEntityType.TRANSACTION, emptyList()),
+            ),
+        )
+        advanceUntilIdle()
+        // Отсутствующая в полном состоянии транзакция уходит после сверки.
+        assertEquals(1, remote.pushCount)
+        assertEquals(SyncKey(SyncEntityType.TRANSACTION, "t1"), remote.posted.single().key)
+        assertFalse(transactionDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `дельты никогда не запускают сверку`() = runTest {
+        seedCatalogs()
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 300))
+        remote.setInitialUpdates(
+            listOf(
+                deltaUpdate(SyncEntityType.BALANCE, listOf(snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Продукты"))),
+                deltaUpdate(SyncEntityType.ACCOUNT, listOf(snapshotChange(SyncEntityType.ACCOUNT, "a1", 100, "Наличные"))),
+                deltaUpdate(SyncEntityType.CATEGORY, listOf(snapshotChange(SyncEntityType.CATEGORY, "c1", 100, "Еда"))),
+                deltaUpdate(SyncEntityType.TRANSACTION, emptyList()),
+            ),
+        )
+        engine().start()
+        advanceUntilIdle()
+        // Равные версии сливаются без действий; t1@300 не сверяется.
+        assertEquals(0, remote.pushCount)
+        assertFalse(transactionDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `невалидный документ пропускается при слиянии`() = runTest {
+        seedCatalogs(
+            balance = balanceRow(updatedAt = 100),
+            account = accountRow(updatedAt = 100),
+            category = categoryRow(updatedAt = 100),
+        )
+        remote.setInitialUpdates(
+            listOf(
+                fullUpdate(
+                    SyncEntityType.BALANCE,
+                    listOf(
+                        snapshotChange(SyncEntityType.BALANCE, "b1", 100, "Продукты"),
+                        // Нет обязательного name — документ невалиден.
+                        SyncChange(
+                            key = SyncKey(SyncEntityType.BALANCE, "b9"),
+                            updatedAt = 50,
+                            fields = mapOf("updatedAt" to 50L),
+                        ),
+                    ),
+                ),
+                fullUpdate(SyncEntityType.ACCOUNT, listOf(snapshotChange(SyncEntityType.ACCOUNT, "a1", 100, "Наличные"))),
+                fullUpdate(SyncEntityType.CATEGORY, listOf(snapshotChange(SyncEntityType.CATEGORY, "c1", 100, "Еда"))),
+                fullUpdate(SyncEntityType.TRANSACTION, emptyList()),
+            ),
+        )
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        // Невалидный документ не создаёт строку и не отправляет ничего.
+        assertEquals(0, remote.pushCount)
+        assertEquals(listOf("b1"), balanceDao.rows.value.map { it.id })
+
+        // Цикл продолжает работать после невалидного документа.
+        balanceDao.markDirty("b1")
+        syncEngine.trigger()
+        advanceUntilIdle()
+        assertEquals(1, remote.pushCount)
+        assertTrue(balanceDao.rows.value.all { !it.dirty })
     }
 
     // Фикстуры и фейки.
@@ -226,7 +449,6 @@ class SyncEngineTest {
     private companion object {
         const val FAMILY_ID = "fam-1"
         const val UID = "uid-1"
-        const val IMPORT_TIMEOUT_MILLIS = 20_000L
     }
 
     private val remote = FakeSyncRemote()
@@ -236,7 +458,8 @@ class SyncEngineTest {
     private val transactionDao = FakeTransactionDao()
     private val familyStore = FakeFamilyStore(FAMILY_ID)
 
-    private fun engine() = SyncEngine(
+    /** Движок с подменённым scope на планировщике теста (виртуальное время). */
+    private fun TestScope.engine(): SyncEngine = SyncEngine(
         remote = remote,
         authRepository = FakeAuthProvider(),
         familyStore = familyStore,
@@ -244,6 +467,7 @@ class SyncEngineTest {
         accountDao = accountDao,
         categoryDao = categoryDao,
         transactionDao = transactionDao,
+        scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler)),
     )
 
     private fun balanceRow(
@@ -291,6 +515,12 @@ class SyncEngineTest {
         updatedAt = updatedAt,
         updatedBy = updatedBy,
     )
+
+    /** Одиночное полное состояние типа. */
+    private fun fullUpdate(type: SyncEntityType, changes: List<SyncChange>) = RemoteUpdate(type, isFullState = true, changes = changes)
+
+    /** Одиночная дельта типа. */
+    private fun deltaUpdate(type: SyncEntityType, changes: List<SyncChange>) = RemoteUpdate(type, isFullState = false, changes = changes)
 
     /** Снимок из удалённого журнала: id и поля wire-формата. */
     private fun snapshotChange(type: SyncEntityType, id: String, updatedAt: Long, name: String) = SyncChange(
@@ -359,30 +589,38 @@ class SyncEngineTest {
 
     private class FakeSyncRemote : SyncRemote {
         val posted = mutableListOf<SyncChange>()
-        val postedFamilyIds = mutableListOf<String>()
-        val bulkCalls = mutableListOf<List<SyncChange>>()
-        val bulkFamilyIds = mutableListOf<String>()
-        val bulkTimeouts = mutableListOf<Long>()
-        private val initial = mutableMapOf<SyncEntityType, List<RemoteUpdate>>()
+        val pushFamilyIds = mutableListOf<String>()
+        var pushCount = 0
+            private set
+        var failTimes = 0
+        var onPush: suspend (List<SyncChange>) -> Unit = {}
+        private var pendingAccepted: Set<SyncKey>? = null
+        private val updates = MutableStateFlow<List<RemoteUpdate>>(emptyList())
 
         fun setInitialUpdates(updates: List<RemoteUpdate>) {
-            updates.forEach { initial[it.type] = listOf(it) }
+            this.updates.value = updates
         }
 
-        override fun observeChanges(familyId: String, type: SyncEntityType): Flow<RemoteUpdate> {
-            val prepared = initial[type].orEmpty()
-            return flowOf(*prepared.toTypedArray())
+        /** Частичный accepted только для следующего push. */
+        fun acceptNext(accepted: Set<SyncKey>) {
+            pendingAccepted = accepted
         }
 
-        override suspend fun postChange(familyId: String, change: SyncChange) {
-            postedFamilyIds += familyId
-            posted += change
-        }
+        @OptIn(ExperimentalCoroutinesApi::class)
+        override fun observe(familyId: String): Flow<RemoteUpdate> = updates.flatMapLatest { it.asFlow() }
 
-        override suspend fun uploadBulk(familyId: String, changes: List<SyncChange>, timeoutMillis: Long) {
-            bulkFamilyIds += familyId
-            bulkCalls += changes
-            bulkTimeouts += timeoutMillis
+        override suspend fun push(familyId: String, changes: List<SyncChange>): PushResult {
+            pushCount++
+            if (failTimes > 0) {
+                failTimes--
+                throw IOException("transport down")
+            }
+            val accepted = pendingAccepted ?: changes.map { it.key }.toSet()
+            pendingAccepted = null
+            posted += changes
+            pushFamilyIds += familyId
+            onPush(changes)
+            return PushResult(accepted)
         }
     }
 

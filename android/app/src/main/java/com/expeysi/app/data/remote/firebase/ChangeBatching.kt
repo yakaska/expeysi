@@ -9,13 +9,20 @@ import kotlinx.coroutines.withTimeout
 
 /**
  * Единое место батчевой записи в Firestore: размер батча и логика ожидания
- * подтверждений живут только здесь — пользуется [FirebaseSyncRemote.uploadBulk].
+ * подтверждений живут только здесь — пользуется [FirebaseSyncRemote.push].
  */
 
 /** Размер батча записи в Firestore (ограничение транспортного API). */
 internal const val FIRESTORE_BATCH_SIZE = 500
 
 internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(FIRESTORE_BATCH_SIZE)
+
+/**
+ * Решение push о режиме отправки: короткая отправка (не больше одного батча)
+ * идёт одним батчем без ожидания подтверждения (инвариант 5); длинная режется
+ * батчами по 500, и первые батчи ждут подтверждения — до первого таймаута.
+ */
+internal fun pushWaitAcks(changeCount: Int): Boolean = changeCount > FIRESTORE_BATCH_SIZE
 
 /**
  * Пишет [writes] батчами по 500. Первые батчи ждут подтверждения с таймаутом

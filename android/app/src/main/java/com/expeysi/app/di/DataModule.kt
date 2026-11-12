@@ -2,6 +2,7 @@ package com.expeysi.app.di
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -26,9 +27,10 @@ import com.expeysi.app.data.db.MIGRATION_7_8
 import com.expeysi.app.data.db.MIGRATION_8_9
 import com.expeysi.app.data.db.RoomFamilyDataReset
 import com.expeysi.app.data.db.TransactionDao
+import com.expeysi.app.data.importer.ImportWriter
+import com.expeysi.app.data.importer.RoomImportWriter
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
-import com.expeysi.app.data.sync.ImportStore
 import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.data.sync.SyncTrigger
 import dagger.Binds
@@ -37,6 +39,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -102,6 +105,16 @@ object DataModule {
     @Provides
     @Singleton
     fun provideSharedPreferences(@ApplicationContext context: Context): SharedPreferences = context.getSharedPreferences("expeysi_prefs", Context.MODE_PRIVATE)
+
+    /** Скоуп синхронизации: движок и его рабочий воркер живут здесь всегда. */
+    @Provides
+    @Singleton
+    @SyncScope
+    fun provideSyncScope(): CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, error ->
+            Log.e("ExpeysiSync", "sync engine scope", error)
+        },
+    )
 }
 
 @Module
@@ -127,7 +140,7 @@ abstract class FamilyLocalModule {
     abstract fun bindFamilyDataReset(impl: RoomFamilyDataReset): FamilyDataReset
 }
 
-/** Швы синхронизации: UI и импортёр не знают SyncEngine — только узкие интерфейсы. */
+/** Швы синхронизации: UI не знает SyncEngine — только узкие интерфейсы. */
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class SyncSeamsModule {
@@ -135,8 +148,14 @@ abstract class SyncSeamsModule {
     @Binds
     @Singleton
     abstract fun bindSyncTrigger(impl: SyncEngine): SyncTrigger
+}
+
+/** Швы импортёра: запись импортированных строк в Room. */
+@Module
+@InstallIn(SingletonComponent::class)
+abstract class ImportSeamsModule {
 
     @Binds
     @Singleton
-    abstract fun bindImportStore(impl: SyncEngine): ImportStore
+    abstract fun bindImportWriter(impl: RoomImportWriter): ImportWriter
 }

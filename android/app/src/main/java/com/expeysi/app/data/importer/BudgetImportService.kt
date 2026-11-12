@@ -1,15 +1,15 @@
 package com.expeysi.app.data.importer
 
 import android.util.Log
-import androidx.room.withTransaction
 import com.expeysi.app.data.SelectedBalanceStore
 import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.data.db.AccountEntity
-import com.expeysi.app.data.db.AppDatabase
+import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
+import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionEntity
-import com.expeysi.app.data.sync.ImportStore
+import com.expeysi.app.data.sync.SyncTrigger
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -24,9 +24,11 @@ data class BudgetImportResult(
 )
 
 class BudgetImportService @Inject constructor(
-    private val database: AppDatabase,
+    private val balanceDao: BalanceDao,
+    private val categoryDao: CategoryDao,
     private val parser: BudgetCsvParser,
-    private val importStore: ImportStore,
+    private val importWriter: ImportWriter,
+    private val syncTrigger: SyncTrigger,
     private val selectedBalanceStore: SelectedBalanceStore,
 ) {
     suspend fun import(input: InputStream): BudgetImportResult {
@@ -35,7 +37,7 @@ class BudgetImportService @Inject constructor(
         val (openingByKey, operations) = splitOpeningRows(imported)
         // Импорт аддитивен: балансы и счета всегда создаются новыми, а текущие
         // не изменяются. Активные имена нужны лишь для нумерации копий балансов.
-        val activeBalanceNames = database.balanceDao().observeAll().first()
+        val activeBalanceNames = balanceDao.observeAll().first()
             .filter { !it.deleted }
             .map { it.name }
             .toSet()
@@ -52,7 +54,7 @@ class BudgetImportService @Inject constructor(
         )
         val newCategories = mutableListOf<CategoryEntity>()
         val recoloredCategories = mutableMapOf<String, CategoryEntity>()
-        val categoryByName = database.categoryDao().observeAll().first()
+        val categoryByName = categoryDao.observeAll().first()
             .filter { !it.deleted }
             .associateBy {
                 CategoryKey(normalizeBudgetCategoryName(it.name), TxType.fromWire(it.type))
@@ -88,21 +90,19 @@ class BudgetImportService @Inject constructor(
             )
         }
 
-        database.withTransaction {
-            database.balanceDao().upsertAll(balanceByKey.values.toList())
-            database.accountDao().upsertAll(accountByKey.values.toList())
-            database.categoryDao().upsertAll(newCategories + recoloredCategories.values)
-            database.transactionDao().upsertAll(transactions)
-        }
+        // Все импортированные строки уходят dirty: запись в Room делает
+        // импортёрский шов, отправку — рабочий цикл SyncEngine (инвариант 5),
+        // поэтому транспорт и его батчи импортёру не видны.
+        importWriter.write(
+            balances = balanceByKey.values.map { it.copy(dirty = true) },
+            accounts = accountByKey.values.map { it.copy(dirty = true) },
+            categories = (newCategories + recoloredCategories.values).map { it.copy(dirty = true) },
+            transactions = transactions.map { it.copy(dirty = true) },
+        )
         Log.d(TAG, "import committed transactions=${transactions.size}")
 
-        importStore.uploadImportedData(
-            balanceByKey.values.toList(),
-            accountByKey.values.toList(),
-            newCategories + recoloredCategories.values,
-            transactions,
-        )
         selectedBalanceStore.select(balanceByKey.values.first().id)
+        syncTrigger.trigger()
         return BudgetImportResult(transactions.size, balanceByKey.values.first().id)
     }
 
