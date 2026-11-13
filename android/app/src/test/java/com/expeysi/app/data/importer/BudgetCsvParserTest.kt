@@ -100,6 +100,25 @@ class BudgetCsvParserTest {
     }
 
     @Test
+    fun `файл с запятой как разделителем тоже читается`() {
+        // Разделитель опознаётся по заголовку; комментарий с запятой — в кавычках.
+        val transactions = parse(
+            "Дата,Время,Название счета,Категория,Сумма,Валюта,Комментарий\n" +
+                "2026-01-02,03:04,Наличные,Еда,-100,VND,\n" +
+                "2026-01-02,03:05,\"Карта, запасная\",Зарплата,200,RUB,\"Магазин, «ужин»\"\n",
+        )
+
+        assertEquals(2, transactions.size)
+        assertEquals("Наличные", transactions.first().accountName)
+        assertEquals(10_000L, transactions.first().amountMinor)
+        assertEquals(TxType.EXPENSE, transactions.first().type)
+        assertEquals("Карта, запасная", transactions.last().accountName)
+        assertEquals(20_000L, transactions.last().amountMinor)
+        assertEquals(TxType.INCOME, transactions.last().type)
+        assertEquals("Магазин, «ужин»", transactions.last().note)
+    }
+
+    @Test
     fun `некорректная сумма сообщает номер строки`() {
         val error = assertThrows(BudgetImportException::class.java) {
             parse(HEADER + "2026-01-02;03:04;Наличные;Еда;abc;VND;\n")

@@ -148,10 +148,28 @@
     <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
+    <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
     <string name="export_button">Экспортировать в CSV</string>
-    <string name="export_done">Экспортировано операций: %1$d</string>
+    <string name="export_description">Выберите типы операций для экспорта. Балансы счетов экспортируются всегда.</string>
+    <!-- Начальные балансы идут служебными строками, импорт их дубликатами не сделает. -->
+    <string name="export_opening_balance_note">Начальные балансы счетов выгружаются служебными строками, поэтому повторный импорт файла не создаст дубликаты.</string>
+    <string name="export_section_types">Типы операций</string>
+    <!-- %1$d — количество операций данного типа в выгрузке. -->
+    <string name="export_type_income">Доход (%1$d)</string>
+    <string name="export_type_expense">Расход (%1$d)</string>
+    <string name="export_advanced">Дополнительно</string>
+    <string name="export_date_range">Диапазон дат</string>
+    <string name="export_date_not_set">Не выбран</string>
+    <string name="export_date_clear_cd">Очистить даты</string>
+    <string name="export_accounts">Счета</string>
+    <string name="export_delimiter">Разделитель</string>
+    <string name="export_delimiter_comma">Запятая (,)</string>
+    <string name="export_delimiter_semicolon">Точка с запятой (;)</string>
+    <!-- BOM нужен Excel, иначе он читает UTF-8 как ANSI. -->
+    <string name="export_bom">UTF-8 с BOM (для Excel)</string>
+    <string name="export_saved">Файл сохранён</string>
+    <string name="export_share">Поделиться</string>
     <string name="export_error_generic">Не удалось экспортировать данные</string>
-    <string name="export_hint">Выберите типы операций — выгрузятся все балансы и выбранные операции. Начальный остаток счёта идёт служебной строкой с категорией «Начальный остаток» — после повторного импорта операции из неё не создадутся. Файл возвращается в приложение через «Импорт».</string>
     <string name="auth_error_generic">Не удалось выполнить вход</string>
     <string name="auth_error_cancelled">Вход отменён</string>
     <string name="family_error_connect">Не удалось подключить семью</string>

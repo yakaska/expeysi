@@ -35,7 +35,7 @@ class BudgetCsvParser @Inject constructor() {
 
     fun parse(input: InputStream): List<BudgetTransaction> {
         val text = input.bufferedReader(Charsets.UTF_8).use { it.readText() }.removePrefix("\uFEFF")
-        val rows = parseRows(text).filter { row -> row.values.any { it.isNotBlank() } }
+        val rows = parseRows(text, detectDelimiter(text)).filter { row -> row.values.any { it.isNotBlank() } }
         if (rows.isEmpty()) throw BudgetImportException(BudgetImportError.EMPTY_FILE)
 
         val header = rows.first().values.mapIndexed { index, name -> name.trim() to index }.toMap()
@@ -118,7 +118,17 @@ class BudgetCsvParser @Inject constructor() {
         )
     }
 
-    private fun parseRows(text: String): List<CsvRow> {
+    /**
+     * Разделитель опознаётся по заголовочной строке: где встречается чаще — тот и
+     * разделитель. Запятые файлы пишут Excel; имена колонок не содержат ни запятых,
+     * ни точек с запятой, поэтому подсчёт однозначен.
+     */
+    private fun detectDelimiter(text: String): Char {
+        val head = text.substringBefore('\n', "").ifEmpty { text }
+        return if (head.count { it == ',' } > head.count { it == ';' }) ',' else ';'
+    }
+
+    private fun parseRows(text: String, delimiter: Char): List<CsvRow> {
         val rows = mutableListOf<CsvRow>()
         var row = mutableListOf<String>()
         var field = StringBuilder()
@@ -147,7 +157,7 @@ class BudgetCsvParser @Inject constructor() {
                     index++
                 }
                 char == '"' -> inQuotes = !inQuotes
-                !inQuotes && char == ';' -> endField()
+                !inQuotes && char == delimiter -> endField()
                 !inQuotes && (char == '\n' || char == '\r') -> {
                     endRow()
                     if (char == '\r' && text.getOrNull(index + 1) == '\n') index++
