@@ -9,6 +9,7 @@ import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.remote.AuthProvider
 import com.expeysi.app.data.remote.SyncChange
 import com.expeysi.app.data.remote.SyncEntityType
+import com.expeysi.app.data.remote.SyncKey
 import com.expeysi.app.data.remote.SyncMapper
 import com.expeysi.app.data.remote.SyncRemote
 import com.expeysi.app.di.SyncScope
@@ -18,6 +19,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,13 +29,19 @@ import javax.inject.Singleton
  * Синхронизация локального журнала Room с удалённым журналом семьи через
  * [SyncRemote]. Room — источник правды UI (инвариант 1): входящие изменения
  * сравниваются по updatedAt (last-write-wins), локально более свежие строки
- * помечаются dirty и уезжают при ближайшем проходе рабочего цикла. Отправка
- * dirty-строк идёт долгоживущим воркером через conflated-канал: подтверждения
- * не ждут (инвариант 5), сбой — пауза [RETRY_DELAY_MILLIS] и повтор, иные
- * ошибки рабочий цикл не убивают. Первичная сверка запускается один раз за
- * сессию семьи после полного состояния всех четырёх типов и появления сидов
- * в Room (инвариант 4) и только помечает строки dirty — отправка всегда
- * через рабочий цикл.
+ * помечаются dirty и уезжают при ближайшем проходе рабочего цикла; ключи,
+ * отклонённые сервером после приёма к доставке ([SyncRemote.rejections]),
+ * снова становятся dirty. Отправка dirty-строк идёт долгоживущим воркером
+ * через conflated-канал: подтверждения не ждут (инвариант 5), неполный
+ * проход или исключение — backoff от [RETRY_DELAY_MIN_MILLIS] до
+ * [RETRY_DELAY_MAX_MILLIS] с повтором, полный успех сбрасывает паузу; флаги
+ * снимаются только после accepted, ошибки Room не теряют dirty. Без выбранной
+ * семьи или входа (инвариант 7) ничего не отправляется и не падает: строки
+ * уходят после выбора семьи или входа (isSignedIn ставит запрос прохода и
+ * поднимает сессию). Первичная сверка запускается один раз за сессию семьи
+ * после полного состояния всех четырёх типов и появления сидов в Room
+ * (инвариант 4) и только помечает строки dirty — отправка всегда через
+ * рабочий цикл.
  */
 @Singleton
 class SyncEngine @Inject constructor(
@@ -55,11 +63,23 @@ class SyncEngine @Inject constructor(
         if (started) return
         started = true
         scope.launch {
-            familyStore.familyId.collectLatest { familyId ->
-                Log.d(TAG, "family=$familyId user=${authRepository.userId}")
-                if (familyId != null && authRepository.userId != null) {
+            // Сессия семьи зависит и от входа: приложение, запущенное до
+            // входа (familyId сохранён, userId ещё нет), поднимает сессию,
+            // когда isSignedIn становится true.
+            combine(familyStore.familyId, authRepository.isSignedIn) { familyId, signedIn ->
+                if (familyId != null && signedIn && authRepository.userId != null) familyId else null
+            }.collectLatest { familyId ->
+                if (familyId != null) {
+                    Log.d(TAG, "family=$familyId user=${authRepository.userId}")
                     runFamilySync(familyId)
                 }
+            }
+        }
+        scope.launch {
+            // Строки, накопленные до входа, отправляются после него.
+            // Начальное значение true тоже ставит запрос прохода.
+            authRepository.isSignedIn.collect { signedIn ->
+                if (signedIn) trigger()
             }
         }
         scope.launch {
@@ -78,6 +98,15 @@ class SyncEngine @Inject constructor(
             val remoteVersions = RemoteVersions()
             val fullStateTypes = mutableSetOf<SyncEntityType>()
             var reconciling = false
+            launch {
+                // Отклонение сервером ранее принятой записи: строка остаётся в
+                // журнале dirty и уходит заново ближайшим проходом.
+                remote.rejections.collect { key ->
+                    markRejectedDirty(key)
+                    Log.w(TAG, "push rejected $key; will retry")
+                    trigger()
+                }
+            }
             launch {
                 remote.observe(familyId).collect { update ->
                     if (update.isFullState) {
@@ -146,18 +175,35 @@ class SyncEngine @Inject constructor(
         }
     }
 
-    /** Воркер рабочего цикла: один проход на полученный триггер, подряд слитые — вместе. */
+    /**
+     * Воркер рабочего цикла: один проход на полученный триггер, подряд
+     * слитые — вместе. Проход без полного успеха или любое исключение (кроме
+     * отмены) — пауза backoff и повтор: 5 с, затем удвоение до потолка 5 мин;
+     * полный успех сбрасывает на 5 с. Триггеры, пришедшие во время паузы,
+     * сливаются в канале и не обходят её: после паузы — один проход.
+     * Исключения воркера не убивают (лог с сбойной операцией), dirty
+     * не теряются: флаг снимается только после accepted.
+     */
     private suspend fun worker() {
+        var backoff = RETRY_DELAY_MIN_MILLIS
         while (true) {
             // CONFLATED-канал: N подряд пришедших триггеров дают один проход.
             triggers.receive()
+            var fullSuccess = false
             try {
-                syncDirty()
+                fullSuccess = syncDirty()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Иная ошибка не убивает рабочий цикл: лог и продолжение.
                 Log.e(TAG, "sync pass failed", e)
+            }
+            if (fullSuccess) {
+                backoff = RETRY_DELAY_MIN_MILLIS
+            } else {
+                delay(backoff)
+                backoff = (backoff * 2).coerceAtMost(RETRY_DELAY_MAX_MILLIS)
+                triggers.trySend(Unit)
             }
         }
     }
@@ -166,33 +212,39 @@ class SyncEngine @Inject constructor(
      * Один проход отправки: dirty-строки всех четырёх типов одним
      * [SyncRemote.push]; флаг снимается условно по updatedAt отправленной
      * версии — правка строки во время отправки не потеряется, строка уйдёт
-     * заново. Недобор accepted или ошибка push: лог, пауза [RETRY_DELAY_MILLIS]
-     * и повтор. CancellationException пробрасывается. Без выбранной семьи
-     * проход завершается, строки остаются dirty.
+     * заново. Возвращает признак полного успеха: все dirty-строки приняты
+     * (или отправлять нечего). Повтор недобора и паузы — ответственность
+     * [worker]. Без выбранной семьи или пользователя (инвариант 7) ничего
+     * не отправляется и не падает, строки остаются dirty; такой проход
+     * считается завершённым — повтор не нужен, строки уйдут после выбора
+     * семьи или входа. Ошибки Room и push не глушатся: пробрасываются
+     * воркеру с именем сбойной операции.
      */
-    internal suspend fun syncDirty() {
-        val familyId = familyStore.familyId.value ?: return
-        val balances = balanceDao.listDirty().map { SyncMapper.toChange(it) }
-        val accounts = accountDao.listDirty().map { SyncMapper.toChange(it) }
-        val categories = categoryDao.listDirty().map { SyncMapper.toChange(it) }
-        val transactions = transactionDao.listDirty().map { SyncMapper.toChange(it, authRepository.userId) }
+    internal suspend fun syncDirty(): Boolean {
+        val familyId = familyStore.familyId.value ?: return true
+        val userId = authRepository.userId ?: return true
+        val balances = stage("listDirty BALANCE") { balanceDao.listDirty() }.map { SyncMapper.toChange(it) }
+        val accounts = stage("listDirty ACCOUNT") { accountDao.listDirty() }.map { SyncMapper.toChange(it) }
+        val categories = stage("listDirty CATEGORY") { categoryDao.listDirty() }.map { SyncMapper.toChange(it) }
+        val transactions = stage("listDirty TRANSACTION") { transactionDao.listDirty() }.map { SyncMapper.toChange(it, userId) }
         val changes = balances + accounts + categories + transactions
-        if (changes.isEmpty()) return
-        try {
-            val accepted = remote.push(familyId, changes).accepted
-            balances.forEach { if (it.key in accepted) balanceDao.markClean(it.key.id, it.updatedAt) }
-            accounts.forEach { if (it.key in accepted) accountDao.markClean(it.key.id, it.updatedAt) }
-            categories.forEach { if (it.key in accepted) categoryDao.markClean(it.key.id, it.updatedAt) }
-            transactions.forEach { if (it.key in accepted) transactionDao.markClean(it.key.id, it.updatedAt) }
-            if (accepted.size >= changes.size) return
-            Log.w(TAG, "push partial accepted=${accepted.size} sent=${changes.size}")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            Log.w(TAG, "push failed; retry in $RETRY_DELAY_MILLIS ms", e)
+        if (changes.isEmpty()) return true
+        val accepted = stage("push") { remote.push(familyId, changes).accepted }
+        balances.forEach { if (it.key in accepted) stage("markClean BALANCE") { balanceDao.markClean(it.key.id, it.updatedAt) } }
+        accounts.forEach { if (it.key in accepted) stage("markClean ACCOUNT") { accountDao.markClean(it.key.id, it.updatedAt) } }
+        categories.forEach { if (it.key in accepted) stage("markClean CATEGORY") { categoryDao.markClean(it.key.id, it.updatedAt) } }
+        transactions.forEach { if (it.key in accepted) stage("markClean TRANSACTION") { transactionDao.markClean(it.key.id, it.updatedAt) } }
+        return accepted.size >= changes.size
+    }
+
+    /** Отклонённая сервером строка остаётся в журнале dirty до успешного прохода. */
+    private suspend fun markRejectedDirty(key: SyncKey) {
+        when (key.type) {
+            SyncEntityType.BALANCE -> balanceDao.markDirty(key.id)
+            SyncEntityType.ACCOUNT -> accountDao.markDirty(key.id)
+            SyncEntityType.CATEGORY -> categoryDao.markDirty(key.id)
+            SyncEntityType.TRANSACTION -> transactionDao.markDirty(key.id)
         }
-        delay(RETRY_DELAY_MILLIS)
-        triggers.trySend(Unit)
     }
 
     /**
@@ -271,9 +323,24 @@ class SyncEngine @Inject constructor(
     private companion object {
         const val TAG = "ExpeysiSync"
 
-        /** Пауза перед повтором прохода отправки после сбоя. */
-        const val RETRY_DELAY_MILLIS = 5_000L
+        /** Первая пауза backoff после неполного прохода или ошибки. */
+        const val RETRY_DELAY_MIN_MILLIS = 5_000L
+
+        /** Потолок backoff. */
+        const val RETRY_DELAY_MAX_MILLIS = 5 * 60 * 1000L
     }
+}
+
+/**
+ * Ошибки Room и транспорта внутри прохода не теряют контекст: воркер логирует
+ * имя сбойной операции. Отмена корутины пробрасывается как есть.
+ */
+private suspend fun <T> stage(name: String, block: suspend () -> T): T = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    throw IllegalStateException("sync stage: $name", e)
 }
 
 /**

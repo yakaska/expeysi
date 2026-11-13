@@ -19,7 +19,9 @@ import com.expeysi.app.data.remote.SyncRemote
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asFlow
@@ -241,41 +243,190 @@ class SyncEngineTest {
         val syncEngine = engine()
         syncEngine.start()
         advanceUntilIdle()
-        // markClean по отправленной версии бережёт правку: строка остаётся dirty.
-        assertEquals(1, remote.pushCount)
-        assertEquals(listOf(100L), remote.posted.map { it.updatedAt })
-        assertEquals(150L, balanceDao.rows.value.single().updatedAt)
-        assertTrue(balanceDao.rows.value.single().dirty)
-
-        syncEngine.trigger()
-        advanceUntilIdle()
-
+        // markClean по отправленной версии бережёт правку: строка осталась dirty
+        // и следующим проходом ушла заново уже версией 150.
         assertEquals(2, remote.pushCount)
         assertEquals(listOf(100L, 150L), remote.posted.map { it.updatedAt })
         assertEquals(150L, balanceDao.rows.value.single().updatedAt)
         assertFalse(balanceDao.rows.value.single().dirty)
+
+        // Строка чиста: новые проходы ничего не отправляют.
+        syncEngine.trigger()
+        advanceUntilIdle()
+        assertEquals(2, remote.pushCount)
     }
 
     @Test
-    fun `сбой повторяется через пять секунд и цикл продолжает работу`() = runTest {
+    fun `сбои повторяются по backoff и успех сбрасывает паузу`() = runTest {
         balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
         remote.failTimes = 2
         val syncEngine = engine()
         syncEngine.start()
         advanceUntilIdle()
-        // Два сбоя подряд: пауза 5 секунд виртуального времени и повтор после каждого.
-        assertEquals(10000L, testScheduler.currentTime)
+        // Два сбоя подряд: паузы 5 и 10 секунд виртуального времени.
+        assertEquals(15000L, testScheduler.currentTime)
         assertEquals(3, remote.pushCount)
         assertEquals(1, remote.posted.size)
         assertFalse(balanceDao.rows.value.single().dirty)
 
-        // Цикл жив после исключений: новый проход работает.
+        // После полного успеха backoff сброшен: новый сбой снова ждёт 5 секунд.
         balanceDao.upsert(balanceRow(updatedAt = 100).copy(dirty = true))
+        remote.failTimes = 1
         syncEngine.trigger()
         advanceUntilIdle()
-        assertEquals(4, remote.pushCount)
+        assertEquals(20000L, testScheduler.currentTime)
+        assertEquals(5, remote.pushCount)
         assertEquals(2, remote.posted.size)
         assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `backoff растёт до потолка пяти минут`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        remote.failTimes = 10
+        engine().start()
+        advanceUntilIdle()
+        // Паузы 5, 10, 20, 40, 80, 160 с и затем потолок 5 мин (4 повтора).
+        assertEquals(1515000L, testScheduler.currentTime)
+        // Десять сбоев плюс успешный одиннадцатый проход.
+        assertEquals(11, remote.pushCount)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `триггеры во время паузы не создают проходов сверх одного после неё`() = runTest {
+        balanceDao.rows.value = listOf(
+            balanceRow(updatedAt = 100).copy(dirty = true),
+            balanceRow(updatedAt = 100).copy(dirty = true).copy(id = "b2"),
+        )
+        remote.acceptNext(setOf(SyncKey(SyncEntityType.BALANCE, "b1")))
+        val syncEngine = engine()
+        syncEngine.start()
+        testScheduler.runCurrent()
+        // Первый проход: b1 принят, b2 остался dirty; воркер ушёл в паузу backoff.
+        assertEquals(1, remote.pushCount)
+        repeat(5) { syncEngine.trigger() }
+        advanceUntilIdle()
+        // Пять триггеров во время паузы слились: после паузы один проход.
+        assertEquals(2, remote.pushCount)
+        assertEquals(5000L, testScheduler.currentTime)
+        assertTrue(balanceDao.rows.value.all { !it.dirty })
+    }
+
+    @Test
+    fun `ядовитая запись не блокирует остальные и уходит после снятия отказа`() = runTest {
+        balanceDao.rows.value = listOf(
+            balanceRow(updatedAt = 100).copy(dirty = true),
+            balanceRow(updatedAt = 100).copy(dirty = true).copy(id = "b2"),
+        )
+        remote.alwaysExclude = setOf(SyncKey(SyncEntityType.BALANCE, "b2"))
+        var pushes = 0
+        remote.onPush = {
+            pushes += 1
+            if (pushes >= 3) remote.alwaysExclude = emptySet()
+        }
+        val syncEngine = engine()
+        syncEngine.start()
+        testScheduler.runCurrent()
+        // Первый проход: здоровая строка принята и чиста сразу, ядовитая осталась dirty.
+        assertEquals(1, remote.pushCount)
+        assertFalse(balanceDao.rows.value.first { it.id == "b1" }.dirty)
+        assertTrue(balanceDao.rows.value.first { it.id == "b2" }.dirty)
+        advanceUntilIdle()
+        // Проходы с ядом шли с backoff 5, 10, 20 с; после снятия отказа b2 принята.
+        assertEquals(4, remote.pushCount)
+        assertEquals(35000L, testScheduler.currentTime)
+        assertTrue(balanceDao.rows.value.all { !it.dirty })
+    }
+
+    @Test
+    fun `отклонение сервера помечает строку dirty и отправляет её заново`() = runTest {
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100, updatedBy = "old-uid").copy(dirty = true))
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        assertEquals(1, remote.pushCount)
+        assertFalse(transactionDao.rows.value.single().dirty)
+
+        // Сервер отклонил принятую ранее запись: строка снова dirty и уходит повтором.
+        remote.reject(SyncKey(SyncEntityType.TRANSACTION, "t1"))
+        advanceUntilIdle()
+        assertEquals(2, remote.pushCount)
+        assertEquals(UID, remote.posted.last().fields["updatedBy"])
+        assertFalse(transactionDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `Room-ошибка listDirty не убивает воркера, повтор через 5 секунд и успех`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        balanceDao.listDirtyErrors = 1
+        engine().start()
+        advanceUntilIdle()
+        assertEquals(5000L, testScheduler.currentTime)
+        assertEquals(1, remote.pushCount)
+        assertFalse(balanceDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `Room-ошибка markClean посреди прохода сохраняет dirty до повтора`() = runTest {
+        balanceDao.rows.value = listOf(
+            balanceRow(updatedAt = 100).copy(dirty = true),
+            balanceRow(updatedAt = 100).copy(dirty = true).copy(id = "b2"),
+        )
+        balanceDao.markCleanFailAtCall = 2
+        engine().start()
+        advanceUntilIdle()
+        // Первый проход: b1 чист, на чистке b2 ошибка; повтор через 5 с дочистил b2.
+        assertEquals(5000L, testScheduler.currentTime)
+        assertEquals(2, remote.pushCount)
+        assertTrue(balanceDao.rows.value.all { !it.dirty })
+        assertEquals(listOf("b1", "b2"), balanceDao.cleanCalls.map { it.first })
+    }
+
+    @Test
+    fun `строки без пользователя не отправляются и уходят после входа`() = runTest {
+        auth.isSignedIn.value = false
+        transactionDao.rows.value = listOf(transactionRow(updatedAt = 100, updatedBy = "old-uid").copy(dirty = true))
+        val syncEngine = engine()
+        syncEngine.start()
+        advanceUntilIdle()
+        assertEquals(0, remote.pushCount)
+        assertTrue(transactionDao.rows.value.single().dirty)
+
+        // Вход: dirty-строка уходит, сессия поднимается.
+        auth.isSignedIn.value = true
+        advanceUntilIdle()
+        assertEquals(1, remote.pushCount)
+        assertEquals("t1" to 100L, transactionDao.cleanCalls.single())
+        assertFalse(transactionDao.rows.value.single().dirty)
+    }
+
+    @Test
+    fun `отмена скоупа завершает воркера без повторов`() = runTest {
+        balanceDao.rows.value = listOf(balanceRow(updatedAt = 100).copy(dirty = true))
+        remote.failTimes = 1
+        val scope = CoroutineScope(SupervisorJob() + StandardTestDispatcher(testScheduler))
+        val syncEngine = SyncEngine(
+            remote = remote,
+            authRepository = auth,
+            familyStore = familyStore,
+            balanceDao = balanceDao,
+            accountDao = accountDao,
+            categoryDao = categoryDao,
+            transactionDao = transactionDao,
+            scope = scope,
+        )
+        syncEngine.start()
+        testScheduler.runCurrent()
+        // Первый проход упал; воркер в паузе backoff.
+        assertEquals(1, remote.pushCount)
+        assertTrue(balanceDao.rows.value.single().dirty)
+
+        scope.cancel()
+        advanceUntilIdle()
+        // Отмена завершает воркера (CancellationException пробрасывается): повторов нет.
+        assertEquals(1, remote.pushCount)
+        assertTrue(balanceDao.rows.value.single().dirty)
     }
 
     @Test
@@ -452,6 +603,7 @@ class SyncEngineTest {
     }
 
     private val remote = FakeSyncRemote()
+    private val auth = FakeAuthProvider()
     private val balanceDao = FakeBalanceDao()
     private val accountDao = FakeAccountDao()
     private val categoryDao = FakeCategoryDao()
@@ -461,7 +613,7 @@ class SyncEngineTest {
     /** Движок с подменённым scope на планировщике теста (виртуальное время). */
     private fun TestScope.engine(): SyncEngine = SyncEngine(
         remote = remote,
-        authRepository = FakeAuthProvider(),
+        authRepository = auth,
         familyStore = familyStore,
         balanceDao = balanceDao,
         accountDao = accountDao,
@@ -571,7 +723,9 @@ class SyncEngineTest {
 
     private class FakeAuthProvider : AuthProvider {
         override val isSignedIn = MutableStateFlow(true)
-        override val userId: String? = UID
+
+        /** Пока вход не выполнен, userId нет: строки ждут (инвариант 7). */
+        override val userId: String? get() = if (isSignedIn.value) UID else null
         override val displayName: String = "Тест Нейм"
         override suspend fun signInWithGoogle(idToken: String) = Unit
     }
@@ -593,9 +747,19 @@ class SyncEngineTest {
         var pushCount = 0
             private set
         var failTimes = 0
+
+        /** Ключи, которые сервер всегда отклоняет по отправке, пока не сняты. */
+        var alwaysExclude: Set<SyncKey> = emptySet()
         var onPush: suspend (List<SyncChange>) -> Unit = {}
         private var pendingAccepted: Set<SyncKey>? = null
+        private val _rejections = MutableSharedFlow<SyncKey>(extraBufferCapacity = 16)
+        override val rejections: Flow<SyncKey> = _rejections
         private val updates = MutableStateFlow<List<RemoteUpdate>>(emptyList())
+
+        /** Отказ сервера по ключу, который был принят к доставке. */
+        fun reject(key: SyncKey) {
+            _rejections.tryEmit(key)
+        }
 
         fun setInitialUpdates(updates: List<RemoteUpdate>) {
             this.updates.value = updates
@@ -615,7 +779,7 @@ class SyncEngineTest {
                 failTimes--
                 throw IOException("transport down")
             }
-            val accepted = pendingAccepted ?: changes.map { it.key }.toSet()
+            val accepted = pendingAccepted ?: changes.map { it.key }.toSet() - alwaysExclude
             pendingAccepted = null
             posted += changes
             pushFamilyIds += familyId
@@ -627,6 +791,13 @@ class SyncEngineTest {
     private class FakeBalanceDao : BalanceDao {
         val rows = MutableStateFlow<List<BalanceEntity>>(emptyList())
         val cleanCalls = mutableListOf<Pair<String, Long>>()
+
+        /** Ошибки чтения dirty-строк: столько сбоев подряд перед успехом. */
+        var listDirtyErrors = 0
+
+        /** Бросать исключение на этом по счёту (с 1) вызове markClean; 0 — не бросать. */
+        var markCleanFailAtCall = 0
+        private var markCleanCalls = 0
 
         override suspend fun upsert(balance: BalanceEntity) {
             rows.value = rows.value.filterNot { it.id == balance.id } + balance
@@ -640,9 +811,17 @@ class SyncEngineTest {
 
         override suspend fun byId(id: String): BalanceEntity? = rows.value.firstOrNull { it.id == id }
 
-        override suspend fun listDirty(): List<BalanceEntity> = rows.value.filter { it.dirty }
+        override suspend fun listDirty(): List<BalanceEntity> {
+            if (listDirtyErrors > 0) {
+                listDirtyErrors--
+                throw IOException("room read failed")
+            }
+            return rows.value.filter { it.dirty }
+        }
 
         override suspend fun markClean(id: String, updatedAt: Long): Int {
+            markCleanCalls += 1
+            if (markCleanCalls == markCleanFailAtCall) throw IOException("room write failed")
             cleanCalls += id to updatedAt
             val current = rows.value.firstOrNull { it.id == id } ?: return 0
             if (current.updatedAt != updatedAt) return 0
