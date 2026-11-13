@@ -15,7 +15,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.FileDownload
@@ -69,7 +68,6 @@ fun HomeNavigationDrawer(
     onIncomesReportClick: () -> Unit,
     onImportClick: () -> Unit,
     onExportClick: () -> Unit,
-    onDataImportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
     onLeaveFamilyClick: () -> Unit,
@@ -171,18 +169,11 @@ fun HomeNavigationDrawer(
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.drawer_data_import)) },
                         selected = false,
-                        icon = { Icon(Icons.Filled.FileUpload, contentDescription = null) },
-                        onClick = onDataImportClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_import_budget)) },
-                        selected = false,
                         icon = {
                             if (importing) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                             } else {
-                                Icon(Icons.Filled.AttachMoney, contentDescription = null)
+                                Icon(Icons.Filled.FileUpload, contentDescription = null)
                             }
                         },
                         onClick = { if (!importing) onImportClick() },
