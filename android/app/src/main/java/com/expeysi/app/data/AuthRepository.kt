@@ -16,6 +16,15 @@ class AuthRepository @Inject constructor(
     private val _isSignedIn = MutableStateFlow(auth.currentUser != null)
     val isSignedIn: StateFlow<Boolean> = _isSignedIn.asStateFlow()
 
+    init {
+        // Восстановление сессии асинхронно: currentUser при создании репозитория
+        // ещё может быть null, а слушатель выставляет фактическое состояние, как
+        // только Firebase определит сессию или её потерю.
+        auth.addAuthStateListener { firebaseAuth ->
+            _isSignedIn.value = firebaseAuth.currentUser != null
+        }
+    }
+
     val userId: String?
         get() = auth.currentUser?.uid
 

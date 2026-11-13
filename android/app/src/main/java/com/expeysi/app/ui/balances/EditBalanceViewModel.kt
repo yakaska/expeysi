@@ -175,9 +175,7 @@ class EditBalanceViewModel @Inject constructor(
                 deletedTransactions.forEach { transactionDao.upsert(it) }
             }
 
-            syncEngine.uploadBalance(deletedBalance)
-            deletedAccounts.forEach(syncEngine::uploadAccount)
-            deletedTransactions.forEach(syncEngine::uploadTransaction)
+            syncEngine.uploadBalanceDeletion(deletedBalance, deletedAccounts, deletedTransactions)
             _saved.value = true
         }
     }
