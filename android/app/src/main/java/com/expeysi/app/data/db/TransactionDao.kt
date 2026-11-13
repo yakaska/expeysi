@@ -92,16 +92,6 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions")
     fun observeAll(): Flow<List<TransactionEntity>>
 
-    @Query("SELECT * FROM transactions WHERE dirty = 1")
-    suspend fun listDirty(): List<TransactionEntity>
-
-    /** Сбрасывает dirty только если updatedAt строки ещё равен отправленной версии. */
-    @Query("UPDATE transactions SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
-    suspend fun markClean(id: String, updatedAt: Long): Int
-
-    @Query("UPDATE transactions SET dirty = 1 WHERE id = :id")
-    suspend fun markDirty(id: String)
-
     @Query("DELETE FROM transactions")
     suspend fun clear()
 }

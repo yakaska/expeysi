@@ -123,17 +123,6 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
-val MIGRATION_8_9 = object : Migration(8, 9) {
-    override fun migrate(db: SupportSQLiteDatabase) {
-        // dirty = 1 значит «локальное изменение ещё не передано транспорту
-        // синхронизации». DEFAULT 0: существующие строки на миграцию — не грязные.
-        db.execSQL("ALTER TABLE balances ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE accounts ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE categories ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0")
-        db.execSQL("ALTER TABLE transactions ADD COLUMN dirty INTEGER NOT NULL DEFAULT 0")
-    }
-}
-
 @Database(
     entities = [
         AccountEntity::class,
@@ -142,7 +131,7 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 9,
+    version = 8,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

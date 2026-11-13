@@ -32,16 +32,6 @@ interface AccountDao {
     @Query("SELECT * FROM accounts WHERE balanceId = :balanceId")
     suspend fun byBalanceId(balanceId: String): List<AccountEntity>
 
-    @Query("SELECT * FROM accounts WHERE dirty = 1")
-    suspend fun listDirty(): List<AccountEntity>
-
-    /** Сбрасывает dirty только если updatedAt строки ещё равен отправленной версии. */
-    @Query("UPDATE accounts SET dirty = 0 WHERE id = :id AND updatedAt = :updatedAt")
-    suspend fun markClean(id: String, updatedAt: Long): Int
-
-    @Query("UPDATE accounts SET dirty = 1 WHERE id = :id")
-    suspend fun markDirty(id: String)
-
     @Query("DELETE FROM accounts")
     suspend fun clear()
 }

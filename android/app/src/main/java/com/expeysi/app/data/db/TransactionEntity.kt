@@ -1,6 +1,5 @@
 package com.expeysi.app.data.db
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -18,6 +17,4 @@ data class TransactionEntity(
     val deleted: Boolean = false,
     val updatedAt: Long,
     val updatedBy: String = "",
-    /** Локальное изменение ещё не передано транспорту синхронизации. */
-    @ColumnInfo(defaultValue = "0") val dirty: Boolean = false,
 )

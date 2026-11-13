@@ -7,7 +7,7 @@ import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
-import com.expeysi.app.data.sync.SyncTrigger
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Money
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -28,7 +28,7 @@ class EditAccountViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
     balanceDao: BalanceDao,
-    private val syncTrigger: SyncTrigger,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["accountId"]
@@ -128,8 +128,8 @@ class EditAccountViewModel @Inject constructor(
                 balanceId = balanceId,
                 updatedAt = System.currentTimeMillis(),
             )
-            accountDao.upsert(account.copy(dirty = true))
-            syncTrigger.trigger()
+            accountDao.upsert(account)
+            syncEngine.uploadAccount(account)
             _saved.value = true
         }
     }
@@ -137,9 +137,9 @@ class EditAccountViewModel @Inject constructor(
     fun delete() {
         val account = original ?: return
         viewModelScope.launch {
-            val deleted = account.copy(deleted = true, updatedAt = System.currentTimeMillis(), dirty = true)
+            val deleted = account.copy(deleted = true, updatedAt = System.currentTimeMillis())
             accountDao.upsert(deleted)
-            syncTrigger.trigger()
+            syncEngine.uploadAccount(deleted)
             _saved.value = true
         }
     }

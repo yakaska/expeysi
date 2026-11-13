@@ -3,6 +3,7 @@ package com.expeysi.app.ui.add
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.expeysi.app.data.AuthRepository
 import com.expeysi.app.data.LastTransactionSelectionStore
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
@@ -13,8 +14,7 @@ import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
-import com.expeysi.app.data.remote.AuthProvider
-import com.expeysi.app.data.sync.SyncTrigger
+import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -45,9 +45,9 @@ class AddTransactionViewModel @Inject constructor(
     private val transactionDao: TransactionDao,
     currencyDao: CurrencyDao,
     balanceDao: BalanceDao,
-    authRepository: AuthProvider,
+    authRepository: AuthRepository,
     private val selectionStore: LastTransactionSelectionStore,
-    private val syncTrigger: SyncTrigger,
+    private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
@@ -220,8 +220,8 @@ class AddTransactionViewModel @Inject constructor(
                 note = _note.value.trim(),
                 updatedAt = now,
             )
-            transactionDao.upsert(transaction.copy(dirty = true))
-            syncTrigger.trigger()
+            transactionDao.upsert(transaction)
+            syncEngine.uploadTransaction(transaction)
             _saved.value = true
         }
     }
@@ -229,9 +229,9 @@ class AddTransactionViewModel @Inject constructor(
     fun delete() {
         val tx = original ?: return
         viewModelScope.launch {
-            val deleted = tx.copy(deleted = true, updatedAt = System.currentTimeMillis(), dirty = true)
+            val deleted = tx.copy(deleted = true, updatedAt = System.currentTimeMillis())
             transactionDao.upsert(deleted)
-            syncTrigger.trigger()
+            syncEngine.uploadTransaction(deleted)
             _saved.value = true
         }
     }

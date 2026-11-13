@@ -1,6 +1,5 @@
 package com.expeysi.app.data.db
 
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
@@ -15,6 +14,4 @@ data class CategoryEntity(
     val colorKey: String = "default",
     val deleted: Boolean = false,
     val updatedAt: Long,
-    /** Локальное изменение ещё не передано транспорту синхронизации. */
-    @ColumnInfo(defaultValue = "0") val dirty: Boolean = false,
 )
