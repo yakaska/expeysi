@@ -30,8 +30,10 @@ import javax.inject.Singleton
  * [SyncRemote]. Room — источник правды UI (инвариант 1): входящие изменения
  * сравниваются по updatedAt (last-write-wins), локально более свежие строки
  * помечаются dirty и уезжают при ближайшем проходе рабочего цикла; ключи,
- * отклонённые сервером после приёма к доставке ([SyncRemote.rejections]),
- * снова становятся dirty. Отправка dirty-строк идёт долгоживущим воркером
+ * отклонённые сервером после приёма к доставке, ставятся на удержание своей
+ * версии с per-key паузой 5 с * 2^(n-1) до 5 мин ([RejectionTracker]):
+ * выпуск после паузы помечает строку dirty и запрашивает проход. Отправка
+ * dirty-строк идёт долгоживущим воркером
  * через conflated-канал: подтверждения не ждут (инвариант 5), неполный
  * проход или исключение — backoff от [RETRY_DELAY_MIN_MILLIS] до
  * [RETRY_DELAY_MAX_MILLIS] с повтором, полный успех сбрасывает паузу; флаги
@@ -58,6 +60,12 @@ class SyncEngine @Inject constructor(
     /** Запросы прохода отправки; N подряд дают не более одного лишнего прохода. */
     private val triggers = Channel<Unit>(Channel.CONFLATED)
     private var started = false
+
+    /** Учёт отказов сервера: per-key удержания и паузы (см. [RejectionTracker]). */
+    private val heldRejections = RejectionTracker(
+        scope = scope,
+        onRelease = { key, version -> releaseRejectedRow(key, version) },
+    )
 
     fun start() {
         if (started) return
@@ -93,19 +101,19 @@ class SyncEngine @Inject constructor(
      * чтобы строки, созданные до выбора семьи, ушли.
      */
     internal suspend fun runFamilySync(familyId: String) {
+        // Сессия семьи началась: счётчики попыток и удержания предыдущей
+        // сессии сброшены, job выпуска отменены.
+        heldRejections.reset()
         trigger()
         coroutineScope {
             val remoteVersions = RemoteVersions()
             val fullStateTypes = mutableSetOf<SyncEntityType>()
             var reconciling = false
             launch {
-                // Отклонение сервером ранее принятой записи: строка остаётся в
-                // журнале dirty и уходит заново ближайшим проходом.
-                remote.rejections.collect { key ->
-                    markRejectedDirty(key)
-                    Log.w(TAG, "push rejected $key; will retry")
-                    trigger()
-                }
+                // Отклонение сервером ранее принятой записи: только запись
+                // удержания — без markDirty и без немедленного триггера,
+                // выпуск после per-key паузы сделает и то и другое.
+                remote.rejections.collect { key -> heldRejections.recordRejection(key) }
             }
             launch {
                 remote.observe(familyId).collect { update ->
@@ -212,13 +220,17 @@ class SyncEngine @Inject constructor(
      * Один проход отправки: dirty-строки всех четырёх типов одним
      * [SyncRemote.push]; флаг снимается условно по updatedAt отправленной
      * версии — правка строки во время отправки не потеряется, строка уйдёт
-     * заново. Возвращает признак полного успеха: все dirty-строки приняты
-     * (или отправлять нечего). Повтор недобора и паузы — ответственность
-     * [worker]. Без выбранной семьи или пользователя (инвариант 7) ничего
-     * не отправляется и не падает, строки остаются dirty; такой проход
-     * считается завершённым — повтор не нужен, строки уйдут после выбора
-     * семьи или входа. Ошибки Room и push не глушатся: пробрасываются
-     * воркеру с именем сбойной операции.
+     * заново. Строки на удержании отклонённой версии не отправляются и не
+     * делают проход неполным; markClean пропускается и для строки, по которой
+     * отказ уже записан на отправленную версию (отказ между отправкой и
+     * чисткой не теряется: строка останется dirty до выпуска). Возвращает
+     * признак полного успеха: все отправленные строки приняты (или отправлять
+     * нечего, включая случай «остались только удержанные»). Повтор недобора и
+     * паузы — ответственность [worker]. Без выбранной семьи или пользователя
+     * (инвариант 7) ничего не отправляется и не падает, строки остаются
+     * dirty; такой проход считается завершённым — повтор не нужен, строки
+     * уйдут после выбора семьи или входа. Ошибки Room и push не глушатся:
+     * пробрасываются воркеру с именем сбойной операции.
      */
     internal suspend fun syncDirty(): Boolean {
         val familyId = familyStore.familyId.value ?: return true
@@ -229,12 +241,18 @@ class SyncEngine @Inject constructor(
         val transactions = stage("listDirty TRANSACTION") { transactionDao.listDirty() }.map { SyncMapper.toChange(it, userId) }
         val changes = balances + accounts + categories + transactions
         if (changes.isEmpty()) return true
-        val accepted = stage("push") { remote.push(familyId, changes).accepted }
-        balances.forEach { if (it.key in accepted) stage("markClean BALANCE") { balanceDao.markClean(it.key.id, it.updatedAt) } }
-        accounts.forEach { if (it.key in accepted) stage("markClean ACCOUNT") { accountDao.markClean(it.key.id, it.updatedAt) } }
-        categories.forEach { if (it.key in accepted) stage("markClean CATEGORY") { categoryDao.markClean(it.key.id, it.updatedAt) } }
-        transactions.forEach { if (it.key in accepted) stage("markClean TRANSACTION") { transactionDao.markClean(it.key.id, it.updatedAt) } }
-        return accepted.size >= changes.size
+        // Строки на удержании отклонённой версии не отправляются и не считаются
+        // неполным проходом: здоровые строки и строки с более свежей версией
+        // уходят сразу.
+        val toSend = changes.filterNot { heldRejections.isHeldAt(it.key, it.updatedAt) }
+        if (toSend.isEmpty()) return true
+        toSend.forEach { heldRejections.notePushed(it.key, it.updatedAt) }
+        val accepted = stage("push") { remote.push(familyId, toSend).accepted }
+        balances.forEach { if (it.key in accepted && !heldRejections.isHeldAt(it.key, it.updatedAt)) stage("markClean BALANCE") { balanceDao.markClean(it.key.id, it.updatedAt) } }
+        accounts.forEach { if (it.key in accepted && !heldRejections.isHeldAt(it.key, it.updatedAt)) stage("markClean ACCOUNT") { accountDao.markClean(it.key.id, it.updatedAt) } }
+        categories.forEach { if (it.key in accepted && !heldRejections.isHeldAt(it.key, it.updatedAt)) stage("markClean CATEGORY") { categoryDao.markClean(it.key.id, it.updatedAt) } }
+        transactions.forEach { if (it.key in accepted && !heldRejections.isHeldAt(it.key, it.updatedAt)) stage("markClean TRANSACTION") { transactionDao.markClean(it.key.id, it.updatedAt) } }
+        return accepted.size >= toSend.size
     }
 
     /** Отклонённая сервером строка остаётся в журнале dirty до успешного прохода. */
@@ -244,6 +262,26 @@ class SyncEngine @Inject constructor(
             SyncEntityType.ACCOUNT -> accountDao.markDirty(key.id)
             SyncEntityType.CATEGORY -> categoryDao.markDirty(key.id)
             SyncEntityType.TRANSACTION -> transactionDao.markDirty(key.id)
+        }
+    }
+
+    /**
+     * Выпуск удержанной строки после per-key паузы: повторная пометка dirty,
+     * только если строка всё ещё на отклонённой версии — более свежая правка
+     * уходит сама. Проход запрашивается только при фактической пометке, чтобы
+     * посторонние триггеры не порождали пустые проходы.
+     */
+    private suspend fun releaseRejectedRow(key: SyncKey, version: Long) {
+        val stillAt = when (key.type) {
+            SyncEntityType.BALANCE -> balanceDao.byId(key.id)?.updatedAt == version
+            SyncEntityType.ACCOUNT -> accountDao.byId(key.id)?.updatedAt == version
+            SyncEntityType.CATEGORY -> categoryDao.byId(key.id)?.updatedAt == version
+            SyncEntityType.TRANSACTION -> transactionDao.byId(key.id)?.updatedAt == version
+        }
+        if (stillAt) {
+            Log.d(TAG, "rejection retry for $key version=$version")
+            markRejectedDirty(key)
+            trigger()
         }
     }
 
