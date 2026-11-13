@@ -2,6 +2,7 @@ package com.expeysi.app.data.remote.firebase
 
 import android.util.Log
 import com.expeysi.app.data.remote.PushResult
+import com.expeysi.app.data.remote.RejectionBuffer
 import com.expeysi.app.data.remote.RemoteUpdate
 import com.expeysi.app.data.remote.SyncChange
 import com.expeysi.app.data.remote.SyncEntityType
@@ -11,8 +12,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.retryWhen
@@ -45,8 +44,8 @@ class FirebaseSyncRemote @Inject constructor(
 ) : SyncRemote {
 
     /** Ключи, принятые к доставке, но позже отклонённые сервером (KDoc контракта). */
-    private val _rejections = MutableSharedFlow<SyncKey>(extraBufferCapacity = REJECTIONS_BUFFER_CAPACITY)
-    override val rejections: Flow<SyncKey> = _rejections.asSharedFlow()
+    private val rejectionBuffer = RejectionBuffer()
+    override val rejections: Flow<SyncKey> get() = rejectionBuffer.flow
 
     override fun observe(familyId: String): Flow<RemoteUpdate> = merge(
         observeType(familyId, SyncEntityType.BALANCE),
@@ -62,7 +61,7 @@ class FirebaseSyncRemote @Inject constructor(
             timeoutMillis = PUSH_ACK_TIMEOUT_MILLIS,
             onRejected = { key, error ->
                 Log.e(TAG, "push rejected $key", error)
-                _rejections.tryEmit(key)
+                rejectionBuffer.offer(key)
             },
         )
         return PushResult(accepted)
@@ -103,9 +102,6 @@ class FirebaseSyncRemote @Inject constructor(
 
         /** Пауза переподключения snapshot-слушателя после ошибки. */
         const val LISTENER_RETRY_DELAY_MILLIS = 5_000L
-
-        /** Вместимость буфера rejections: события не теряются до первой подписки. */
-        const val REJECTIONS_BUFFER_CAPACITY = 64
     }
 }
 
