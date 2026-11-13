@@ -140,6 +140,127 @@ class CsvExportServiceTest {
     }
 
     @Test
+    fun `границы дат оставляют операции в диапазоне`() {
+        val file = buildCsv(
+            accounts = listOf(account("a1", "Карта", opening = 50_000, balanceId = "b1")),
+            balances = balances,
+            categories = listOf(category("c1", "Еда", TxType.EXPENSE)),
+            transactions = listOf(
+                tx("t0", TxType.EXPENSE, 1_000, "a1", "c1", millis("2025-12-31T23:59:00Z")),
+                tx("t1", TxType.EXPENSE, 2_000, "a1", "c1", millis("2026-01-01T00:00:00Z")),
+                tx("t2", TxType.EXPENSE, 4_000, "a1", "c1", millis("2026-01-31T23:00:00Z")),
+                tx("t3", TxType.EXPENSE, 8_000, "a1", "c1", millis("2026-02-01T00:00:00Z")),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME, TxType.EXPENSE),
+            fromMillis = millis("2026-01-01T00:00:00Z"),
+            toMillisExclusive = millis("2026-02-01T00:00:00Z"),
+        )
+
+        // Начало входит, конец не входит; служебная строка датируется
+        // ранней включённой операцией.
+        assertEquals(
+            listOf(
+                EXTENDED_HEADER,
+                "2026-01-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue",
+                "2026-01-01;00:00;Карта;Еда;-20.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
+                "2026-01-31;23:00;Карта;Еда;-40.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
+                "",
+            ).joinToString("\r\n"),
+            file.text,
+        )
+        assertEquals(2, file.transactionCount)
+    }
+
+    @Test
+    fun `выбор счетов оставляет их операции и служебные строки`() {
+        val file = buildCsv(
+            accounts = listOf(
+                account("a1", "Карта", opening = 50_000, balanceId = "b1"),
+                account("a2", "Наличные", opening = -10_000, balanceId = "b1"),
+            ),
+            balances = balances,
+            categories = listOf(category("c1", "Еда", TxType.EXPENSE)),
+            transactions = listOf(
+                tx("t1", TxType.EXPENSE, 25_050, "a1", "c1", millis("2026-01-05T22:30:00Z")),
+                tx("t2", TxType.EXPENSE, 5_000, "a2", "c1", millis("2026-01-06T10:00:00Z")),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME, TxType.EXPENSE),
+            accountIds = setOf("a1"),
+        )
+
+        // Наличные не выгружаются ни операциями, ни служебной строкой.
+        assertEquals(
+            listOf(
+                EXTENDED_HEADER,
+                "2026-01-05;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue",
+                "2026-01-05;22:30;Карта;Еда;-250.50;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
+                "",
+            ).joinToString("\r\n"),
+            file.text,
+        )
+        assertEquals(1, file.transactionCount)
+    }
+
+    @Test
+    fun `пустой выбор счетов выгружает только заголовок`() {
+        val file = buildCsv(
+            accounts = listOf(account("a1", "Карта", opening = 50_000, balanceId = "b1")),
+            balances = balances,
+            categories = emptyList(),
+            transactions = listOf(
+                tx("t1", TxType.EXPENSE, 1_000, "a1", "c1", millis("2026-01-05T22:30:00Z")),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME, TxType.EXPENSE),
+            accountIds = emptySet(),
+        )
+
+        assertEquals("$EXTENDED_HEADER\r\n", file.text)
+        assertEquals(0, file.transactionCount)
+    }
+
+    @Test
+    fun `запятая как разделитель проходит в заголовок и экранируется в полях`() {
+        val file = buildCsv(
+            accounts = listOf(account("a1", "Карта", opening = 50_000, balanceId = "b1")),
+            balances = balances,
+            categories = listOf(category("c1", "Еда", TxType.EXPENSE)),
+            transactions = listOf(
+                tx("t1", TxType.EXPENSE, 25_050, "a1", "c1", millis("2026-01-05T22:30:00Z"), note = "Магазин, «ужин»"),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME, TxType.EXPENSE),
+            delimiter = ',',
+        )
+
+        // Поле с запятой взято в кавычки, точка с запятой в нем безопасна.
+        assertEquals(
+            listOf(
+                EXTENDED_HEADER.replace(';', ','),
+                "2026-01-05,00:00,Карта,Начальный остаток,500.00,RUB,,,,payments,blue,Основной,payments,blue",
+                "2026-01-05,22:30,Карта,Еда,-250.50,RUB,\"Магазин, «ужин»\",restaurant,orange,payments,blue,Основной,payments,blue",
+                "",
+            ).joinToString("\r\n"),
+            file.text,
+        )
+        assertEquals(1, file.transactionCount)
+    }
+
+    @Test
+    fun `экранирование учитывает текущий разделитель`() {
+        assertEquals("\"a,b\"", escape("a,b", ','))
+        assertEquals("a;b", escape("a;b", ','))
+        assertEquals("\"a;b\"", escape("a;b"))
+        assertEquals("a,b", escape("a,b"))
+    }
+
+    @Test
     fun `сумма пишется с точкой и двумя знаками`() {
         assertEquals("0.00", formatAmount(0))
         assertEquals("0.05", formatAmount(5))

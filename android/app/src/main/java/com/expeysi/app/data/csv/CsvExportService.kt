@@ -26,7 +26,11 @@ internal data class CsvExportFile(val text: String, val transactionCount: Int)
 /**
  * Экспорт всех данных в CSV: операции всех активных счетов (выбранных типов)
  * плюс служебные строки начальных остатков с оформлением счетов и балансов.
- * Файл возвращается через «Импорт из Бюджета», поэтому формат задаёт [CsvFormat].
+ * Файл возвращается через «Импорт из Бюджета», поэтому формат задаёт [CsvFormat],
+ * а разделитель распознаёт парсер импорта. Необязательные параметры фильтруют
+ * выгрузку ([fromMillis], [toMillisExclusive], [accountIds]) и настраивают файл
+ * ([delimiter], [bom]); значения по умолчанию повторяют прежнее поведение —
+ * все операции, разделитель «;», файл с BOM.
  */
 class CsvExportService @Inject constructor(
     private val accountDao: AccountDao,
@@ -40,6 +44,11 @@ class CsvExportService @Inject constructor(
         output: OutputStream,
         types: Set<TxType> = setOf(TxType.INCOME, TxType.EXPENSE),
         zone: ZoneId = ZoneId.systemDefault(),
+        fromMillis: Long? = null,
+        toMillisExclusive: Long? = null,
+        accountIds: Set<String>? = null,
+        delimiter: Char = ';',
+        bom: Boolean = true,
     ): CsvExportResult {
         val file = buildCsv(
             accounts = accountDao.listActive(),
@@ -49,10 +58,14 @@ class CsvExportService @Inject constructor(
             nowMillis = System.currentTimeMillis(),
             zone = zone,
             types = types,
+            fromMillis = fromMillis,
+            toMillisExclusive = toMillisExclusive,
+            accountIds = accountIds,
+            delimiter = delimiter,
         )
         // BOM: парсер его срезает, Excel без него путает кодировку.
         output.use {
-            it.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
+            if (bom) it.write(byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()))
             it.write(file.text.toByteArray(Charsets.UTF_8))
         }
         return CsvExportResult(file.transactionCount)
@@ -71,18 +84,34 @@ internal fun buildCsv(
     nowMillis: Long,
     zone: ZoneId,
     types: Set<TxType>,
+    fromMillis: Long? = null,
+    toMillisExclusive: Long? = null,
+    accountIds: Set<String>? = null,
+    delimiter: Char = ';',
 ): CsvExportFile {
+    // null — фильтр счетов не задан, выгружаются все активные счета.
     val activeAccounts = accounts.filterNot { it.deleted }
+    val selectedAccounts = if (accountIds == null) {
+        activeAccounts
+    } else {
+        activeAccounts.filter { it.id in accountIds }
+    }
     val balanceById = balances.associateBy { it.id }
-    val accountById = activeAccounts.associateBy { it.id }
+    val accountById = selectedAccounts.associateBy { it.id }
     val categoryById = categories.associateBy { it.id }
     val includedTransactions = transactions
         .filterNot { it.deleted }
-        .filter { it.accountId in accountById && TxType.fromWire(it.type) in types }
+        .filter {
+            it.accountId in accountById &&
+                TxType.fromWire(it.type) in types &&
+                (fromMillis == null || it.date >= fromMillis) &&
+                (toMillisExclusive == null || it.date < toMillisExclusive)
+        }
 
-    val rows = mutableListOf(CsvFormat.EXTENDED_HEADER)
+    // Заголовок CsvFormat не содержит разделителя в именах колонок, замена безопасна.
+    val rows = mutableListOf(CsvFormat.EXTENDED_HEADER.replace(';', delimiter))
     // Служебные строки остатков идут до операций, порядок — по имени счёта.
-    activeAccounts
+    selectedAccounts
         .filter { it.openingBalanceMinor != 0L }
         .sortedBy { it.name }
         .forEach { account ->
@@ -93,13 +122,13 @@ internal fun buildCsv(
                 .filter { it.accountId == account.id }
                 .minOfOrNull { it.date }
                 ?: nowMillis
-            rows += serviceRow(account, balanceById[account.balanceId], date, zone)
+            rows += serviceRow(account, balanceById[account.balanceId], date, zone, delimiter)
         }
     includedTransactions
         .sortedWith(compareBy({ it.date }, { it.id }))
         .forEach { tx ->
             val account = accountById.getValue(tx.accountId)
-            rows += transactionRow(tx, account, balanceById[account.balanceId], categoryById[tx.categoryId], zone)
+            rows += transactionRow(tx, account, balanceById[account.balanceId], categoryById[tx.categoryId], zone, delimiter)
         }
     return CsvExportFile(
         text = rows.joinToString("\r\n") + "\r\n",
@@ -111,8 +140,15 @@ internal fun buildCsv(
 private fun currencyOf(account: AccountEntity, balance: BalanceEntity?): String =
     balance?.currencyCode ?: account.currencyCode
 
-private fun serviceRow(account: AccountEntity, balance: BalanceEntity?, dateMillis: Long, zone: ZoneId): String =
+private fun serviceRow(
+    account: AccountEntity,
+    balance: BalanceEntity?,
+    dateMillis: Long,
+    zone: ZoneId,
+    delimiter: Char,
+): String =
     csvRow(
+        delimiter,
         formatDate(dateMillis, zone),
         "00:00",
         account.name,
@@ -136,7 +172,9 @@ private fun transactionRow(
     balance: BalanceEntity?,
     category: CategoryEntity?,
     zone: ZoneId,
+    delimiter: Char,
 ): String = csvRow(
+    delimiter,
     formatDate(tx.date, zone),
     formatTime(tx.date, zone),
     account.name,
@@ -159,7 +197,8 @@ private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.
     TxType.EXPENSE -> -tx.amountMinor
 }
 
-private fun csvRow(vararg fields: String): String = fields.joinToString(";") { escape(it) }
+private fun csvRow(delimiter: Char, vararg fields: String): String =
+    fields.joinToString(delimiter.toString()) { escape(it, delimiter) }
 
 /** 123456 → "1234.56", -10010 → "-100.10": точка и два знака, без группировки. */
 internal fun formatAmount(minor: Long): String {
@@ -169,8 +208,8 @@ internal fun formatAmount(minor: Long): String {
 }
 
 /** RFC 4180: поле с разделителем, кавычкой или переводом строки — в кавычках, кавычки удваиваются. */
-internal fun escape(field: String): String =
-    if (field.none { it == ';' || it == '"' || it == '\n' || it == '\r' }) {
+internal fun escape(field: String, delimiter: Char = ';'): String =
+    if (field.none { it == delimiter || it == '"' || it == '\n' || it == '\r' }) {
         field
     } else {
         "\"" + field.replace("\"", "\"\"") + "\""

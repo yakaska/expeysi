@@ -151,11 +151,27 @@
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
     <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
-    <string name="export_button">Экспортировать в CSV</string>
-    <!-- %1$d — количество экспортированных операций. -->
-    <string name="export_done">Экспортировано операций: %1$d</string>
-    <string name="export_error_generic">Не удалось экспортировать данные</string>
-    <string name="export_hint">Select the transaction types to export — all balances and the selected transactions will be exported. Each account\'s opening balance goes into a service row with the “Opening balance” category, so re-importing the file won\'t duplicate those transactions. The file is brought back into the app via “Import”.</string>
+    <string name="export_button">Export to CSV</string>
+    <string name="export_description">Select transaction types to export. Account balances are always exported.</string>
+    <!-- Начальные остатки идут служебными строками, импорт их дубликатами не сделает. -->
+    <string name="export_opening_balance_note">Accounts’ opening balances are exported as service rows, so importing this file back won’t create duplicates.</string>
+    <string name="export_section_types">Transaction types</string>
+    <!-- %1$d — количество операций данного типа в выгрузке. -->
+    <string name="export_type_income">Income (%1$d)</string>
+    <string name="export_type_expense">Expense (%1$d)</string>
+    <string name="export_advanced">Advanced</string>
+    <string name="export_date_range">Date range</string>
+    <string name="export_date_not_set">Not set</string>
+    <string name="export_date_clear_cd">Clear dates</string>
+    <string name="export_accounts">Accounts</string>
+    <string name="export_delimiter">Delimiter</string>
+    <string name="export_delimiter_comma">Comma (,)</string>
+    <string name="export_delimiter_semicolon">Semicolon (;)</string>
+    <!-- BOM нужен Excel, иначе он читает UTF-8 как ANSI. -->
+    <string name="export_bom">UTF-8 with BOM (for Excel)</string>
+    <string name="export_saved">File saved</string>
+    <string name="export_share">Share</string>
+    <string name="export_error_generic">Couldn’t export data</string>
     <string name="auth_error_generic">Не удалось выполнить вход</string>
     <string name="auth_error_cancelled">Вход отменён</string>
     <string name="family_error_connect">Не удалось подключить семью</string>

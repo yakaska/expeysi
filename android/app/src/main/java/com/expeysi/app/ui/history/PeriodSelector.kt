@@ -1,7 +1,6 @@
 package com.expeysi.app.ui.history
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,17 +11,13 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,10 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.window.Dialog
 import com.expeysi.app.R
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
+import com.expeysi.app.ui.common.DateRangePickerDialog
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -105,11 +100,10 @@ internal fun PeriodPickerSheet(
             )
         }
         if (showRangePicker) {
-            RangePickerDialog(
-                onConfirm = { start, end ->
-                    onRangeSelected(start, end)
-                    onDismiss()
-                },
+            DateRangePickerDialog(
+                initialStart = customRange?.startLocalDate(),
+                initialEnd = customRange?.endLocalDate(),
+                onConfirm = onRangeSelected,
                 onDismiss = onDismiss,
             )
         }
@@ -140,50 +134,6 @@ private fun PeriodOptionRow(label: String, selected: Boolean, onClick: () -> Uni
         },
         modifier = Modifier.clickable(onClick = onClick),
     )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun RangePickerDialog(onConfirm: (LocalDate, LocalDate) -> Unit, onDismiss: () -> Unit) {
-    val rangeState = rememberDateRangePickerState()
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        ) {
-            Column(modifier = Modifier.padding(top = 8.dp)) {
-                DateRangePicker(
-                    state = rangeState,
-                    modifier = Modifier.weight(1f, fill = false),
-                    title = null,
-                    headline = null,
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                    TextButton(
-                        onClick = {
-                            val start = rangeState.selectedStartDateMillis
-                            val end = rangeState.selectedEndDateMillis
-                            if (start != null && end != null) {
-                                val zone = ZoneId.of("UTC")
-                                onConfirm(
-                                    Instant.ofEpochMilli(start).atZone(zone).toLocalDate(),
-                                    Instant.ofEpochMilli(end).atZone(zone).toLocalDate(),
-                                )
-                            } else {
-                                onDismiss()
-                            }
-                        },
-                    ) { Text(stringResource(R.string.common_ok)) }
-                }
-            }
-        }
-    }
 }
 
 /** Триггер-карточка отчётов: текущий выбор периода и открытие шторки. */
@@ -237,3 +187,11 @@ internal fun rangeLabel(range: DateRangeFilter): String {
     val end = Instant.ofEpochMilli(range.endMillisExclusive - 1).atZone(zone).format(dayFormatter)
     return "$start–$end"
 }
+
+/** Начало диапазона пикеру: millis хранятся в системной зоне (см. DateRangeFilter.ofDays). */
+private fun DateRangeFilter.startLocalDate(): LocalDate =
+    Instant.ofEpochMilli(startMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+
+/** Конец диапазона пикеру: миллисекунда конца дня, у последнего дня — от неё же. */
+private fun DateRangeFilter.endLocalDate(): LocalDate =
+    Instant.ofEpochMilli(endMillisExclusive - 1).atZone(ZoneId.systemDefault()).toLocalDate()
