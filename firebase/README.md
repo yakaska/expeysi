@@ -1,7 +1,11 @@
 # Настройка Firebase
 
+Этот этап нужен один раз, чтобы собрать приложение из исходников: без
+настроенного Firebase-проекта и файла `google-services.json` сборка не пройдёт.
+Пользователю приложения ничего из этого делать не нужно — он ставит готовый APK.
+
 Проект создаётся вручную в [Firebase Console](https://console.firebase.google.com).
-Здесь — чек-лист и файлы конфигурации.
+Достаточно бесплатного тарифа Spark. Здесь — чек-лист и файлы конфигурации.
 
 ## Чек-лист консоли
 
@@ -13,12 +17,12 @@
 4. **Project settings** → Your apps → Add app → Android:
    - package name: `com.expeysi.app`
    - nickname: `expeysi-android`
-   - скачать `google-services.json` — он понадобится на этапе «Android: данные»,
-     кладётся в `android/app/`. **В git не коммитить** (в `.gitignore`).
+   - скачать `google-services.json` — кладётся в `android/app/`.
+     **В git не коммитить** (файл в `.gitignore`).
 
 ## Файлы
 
 - `firestore.rules` — правила безопасности: доступ к данным семьи только у её
   членов; присоединение — созданием своего документа в `members/` по коду семьи.
 
-Модель данных и правила слияния — в `docs/data-model.md`.
+Модель данных и правила слияния — в [`docs/data-model.md`](../docs/data-model.md).

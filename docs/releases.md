@@ -1,8 +1,9 @@
 # Релизы через GitHub Releases
 
-Релиз распространяется как подписанный APK. Публикация запускается автоматически после
-отправки тега вида `v0.1.0`; тег должен совпадать с `versionName` в
-`android/app/build.gradle.kts`.
+Релиз распространяется как подписанный APK. Пользователю ничего собирать не нужно:
+готовые APK лежат на странице [Releases проекта](https://github.com/yakaska/expeysi/releases).
+Публикация запускается автоматически после отправки тега вида `v0.1.0`; тег должен
+совпадать с `versionName` в `android/app/build.gradle.kts`.
 
 ## Секреты
 
@@ -20,12 +21,28 @@ Keystore, пароли и `google-services.json` не коммитятся. Ло
 
 ## Локальная release-сборка
 
-В Git Bash задать переменные окружения из сохранённого файла параметров и выполнить:
+Release-сборке нужны четыре переменные окружения подписи:
+
+| Переменная | Значение |
+|------------|----------|
+| `RELEASE_STORE_FILE` | путь к файлу keystore |
+| `RELEASE_STORE_PASSWORD` | пароль keystore |
+| `RELEASE_KEY_ALIAS` | alias ключа в keystore |
+| `RELEASE_KEY_PASSWORD` | пароль ключа |
+
+Их хранит локальный файл параметров владельца проекта. Перед сборкой
+задать переменные и выполнить (в Git Bash):
 
 ```bash
 source ~/.expeysi-release/release.env
 cd android
 ./gradlew ktlintCheck lint :app:testDebugUnitTest :app:assembleRelease
+```
+
+В `release.env` каждая переменная задаётся командой `export`, например:
+
+```bash
+export RELEASE_STORE_FILE="$HOME/.expeysi-release/expeysi-release.keystore"
 ```
 
 APK будет создан в `android/app/build/outputs/apk/release/app-release.apk`.
