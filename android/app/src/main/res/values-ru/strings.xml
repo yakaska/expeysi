@@ -69,7 +69,6 @@
     <string name="calc_close_cd">Закрыть</string>
     <string name="calc_backspace_cd">Удалить последний символ</string>
     <string name="calc_error">Ошибка</string>
-    <string name="placeholder_in_development">Раздел в разработке</string>
     <string name="analysis_title">Анализ финансов</string>
     <string name="analysis_menu_cd">Меню</string>
     <string name="analysis_filters">Фильтры</string>
@@ -130,7 +129,6 @@
     <string name="drawer_section_data">Данные</string>
     <string name="drawer_section_misc">Разное</string>
     <string name="drawer_home">Главная</string>
-    <string name="drawer_import_budget">Импорт из Бюджета</string>
     <string name="history_detail_title_parts">%1$s · %2$s</string>
     <!-- %1$s — количество импортированных операций. -->
     <string name="import_done">Импортировано операций: %1$d</string>
@@ -153,7 +151,7 @@
     <string name="export_button">Экспортировать в CSV</string>
     <string name="export_done">Экспортировано операций: %1$d</string>
     <string name="export_error_generic">Не удалось экспортировать данные</string>
-    <string name="export_hint">Выберите типы операций — выгрузятся все балансы и выбранные операции. Начальный остаток счёта идёт служебной строкой с категорией «Начальный остаток» — после повторного импорта операции из неё не создадутся. Файл возвращается в приложение через «Импорт из Бюджета».</string>
+    <string name="export_hint">Выберите типы операций — выгрузятся все балансы и выбранные операции. Начальный остаток счёта идёт служебной строкой с категорией «Начальный остаток» — после повторного импорта операции из неё не создадутся. Файл возвращается в приложение через «Импорт».</string>
     <string name="auth_error_generic">Не удалось выполнить вход</string>
     <string name="auth_error_cancelled">Вход отменён</string>
     <string name="family_error_connect">Не удалось подключить семью</string>

@@ -42,7 +42,7 @@
     <string name="home_more_accounts" translatable="false">+%1$d</string>
     <string name="home_add_account">Добавить счёт</string>
     <string name="history_mode_transactions">Операции</string>
-    <string name="history_mode_categories">Категории</string>
+    <string name="history_mode_categories">Categories</string>
     <string name="history_mode_accounts">Счета</string>
     <string name="history_back_groups_cd">К группам</string>
     <string name="history_expand_cd">Развернуть</string>
@@ -55,11 +55,11 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_copy">Copy</string>
     <string name="common_back">Назад</string>
-    <string name="drawer_transaction_comparison">Сравнение</string>
-    <string name="drawer_expenses_report">Расходы</string>
-    <string name="drawer_incomes_report">Доходы</string>
-    <string name="drawer_data_export">Экспорт</string>
-    <string name="drawer_data_import">Импорт</string>
+    <string name="drawer_transaction_comparison">Comparison</string>
+    <string name="drawer_expenses_report">Expenses</string>
+    <string name="drawer_incomes_report">Income</string>
+    <string name="drawer_data_export">Export</string>
+    <string name="drawer_data_import">Import</string>
     <string name="report_total_income">Всего получено</string>
     <string name="report_total_expense">Всего потрачено</string>
     <string name="report_uncategorized">Без категории</string>
@@ -71,8 +71,7 @@
     <string name="calc_close_cd">Закрыть</string>
     <string name="calc_backspace_cd">Удалить последний символ</string>
     <string name="calc_error">Ошибка</string>
-    <string name="placeholder_in_development">Раздел в разработке</string>
-    <string name="analysis_title">Анализ финансов</string>
+    <string name="analysis_title">Financial analysis</string>
     <string name="analysis_menu_cd">Меню</string>
     <string name="analysis_filters">Фильтры</string>
     <string name="analysis_all_accounts">Все счета</string>
@@ -128,11 +127,10 @@
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
-    <string name="drawer_section_reports">Отчёты</string>
-    <string name="drawer_section_data">Данные</string>
-    <string name="drawer_section_misc">Разное</string>
-    <string name="drawer_home">Главная</string>
-    <string name="drawer_import_budget">Импорт из Бюджета</string>
+    <string name="drawer_section_reports">Reports</string>
+    <string name="drawer_section_data">Data</string>
+    <string name="drawer_section_misc">Miscellaneous</string>
+    <string name="drawer_home">Home</string>
     <string name="history_detail_title_parts">%1$s · %2$s</string>
     <!-- %1$s — количество импортированных операций. -->
     <string name="import_done">Импортировано операций: %1$d</string>
@@ -152,12 +150,12 @@
     <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
-    <!-- Экспорт CSV: файл возвращается в приложение через «Импорт из Бюджета». -->
+    <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
     <string name="export_button">Экспортировать в CSV</string>
     <!-- %1$d — количество экспортированных операций. -->
     <string name="export_done">Экспортировано операций: %1$d</string>
     <string name="export_error_generic">Не удалось экспортировать данные</string>
-    <string name="export_hint">Выберите типы операций — выгрузятся все балансы и выбранные операции. Начальный остаток счёта идёт служебной строкой с категорией «Начальный остаток» — после повторного импорта операции из неё не создадутся. Файл возвращается в приложение через «Импорт из Бюджета».</string>
+    <string name="export_hint">Select the transaction types to export — all balances and the selected transactions will be exported. Each account\'s opening balance goes into a service row with the “Opening balance” category, so re-importing the file won\'t duplicate those transactions. The file is brought back into the app via “Import”.</string>
     <string name="auth_error_generic">Не удалось выполнить вход</string>
     <string name="auth_error_cancelled">Вход отменён</string>
     <string name="family_error_connect">Не удалось подключить семью</string>
