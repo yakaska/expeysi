@@ -7,19 +7,38 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-@Singleton
-class FamilyStore @Inject constructor(
-    private val prefs: SharedPreferences,
-) {
-    private val _familyId = MutableStateFlow(prefs.getString(KEY, null))
-    val familyId: StateFlow<String?> = _familyId.asStateFlow()
+/**
+ * Хранилище выбранной семьи. Интерфейс существует ради тестируемости
+ * потребителей; классы зависят от него, а не от SharedPreferences.
+ */
+interface FamilyStore {
 
-    fun select(id: String) {
+    /** null — семья не выбрана: не создана, не вступили или вышел. */
+    val familyId: StateFlow<String?>
+
+    fun select(id: String)
+
+    fun clear()
+}
+
+/**
+ * Реализация поверх SharedPreferences. familyId — код приглашения и
+ * одновременно id семьи в удалённом хранилище; ключ прежний, «family_id»,
+ * чтобы сохранённое значение пережило обновление приложения.
+ */
+@Singleton
+class SharedPrefsFamilyStore @Inject constructor(
+    private val prefs: SharedPreferences,
+) : FamilyStore {
+    private val _familyId = MutableStateFlow(prefs.getString(KEY, null))
+    override val familyId: StateFlow<String?> = _familyId.asStateFlow()
+
+    override fun select(id: String) {
         prefs.edit().putString(KEY, id).apply()
         _familyId.value = id
     }
 
-    fun clear() {
+    override fun clear() {
         prefs.edit().remove(KEY).apply()
         _familyId.value = null
     }

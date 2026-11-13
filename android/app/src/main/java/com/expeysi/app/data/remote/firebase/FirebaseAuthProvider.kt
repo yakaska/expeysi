@@ -1,5 +1,6 @@
-package com.expeysi.app.data
+package com.expeysi.app.data.remote.firebase
 
+import com.expeysi.app.data.remote.AuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -9,20 +10,25 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Firebase-реализация [AuthProvider]. Поведение прежнее: isSignedIn
+ * выставляется один раз при входе, имя — displayName аккаунта или email,
+ * строка «Пользователь» — данные о пользователе, не UI-текст.
+ */
 @Singleton
-class AuthRepository @Inject constructor(
+class FirebaseAuthProvider @Inject constructor(
     private val auth: FirebaseAuth,
-) {
+) : AuthProvider {
     private val _isSignedIn = MutableStateFlow(auth.currentUser != null)
-    val isSignedIn: StateFlow<Boolean> = _isSignedIn.asStateFlow()
+    override val isSignedIn: StateFlow<Boolean> = _isSignedIn.asStateFlow()
 
-    val userId: String?
+    override val userId: String?
         get() = auth.currentUser?.uid
 
-    val displayName: String
+    override val displayName: String
         get() = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Пользователь"
 
-    suspend fun signInWithGoogle(idToken: String) {
+    override suspend fun signInWithGoogle(idToken: String) {
         auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
         _isSignedIn.value = true
     }

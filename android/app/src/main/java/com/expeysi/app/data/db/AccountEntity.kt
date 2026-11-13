@@ -18,4 +18,6 @@ data class AccountEntity(
     @ColumnInfo(defaultValue = "") val balanceId: String = "",
     val deleted: Boolean = false,
     val updatedAt: Long,
+    /** Локальное изменение ещё не передано транспорту синхронизации. */
+    @ColumnInfo(defaultValue = "0") val dirty: Boolean = false,
 )

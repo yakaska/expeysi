@@ -52,6 +52,15 @@ android {
     buildFeatures {
         compose = true
     }
+
+    testOptions {
+        unitTests {
+            // JVM-тесты исполняются на unmocked android.jar: Log и другие
+            // системные вызовы возвращают значения по умолчанию вместо
+            // RuntimeException «not mocked». Нужно тестам FamilyRepository.
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 tasks.matching { it.name == "assembleRelease" }.configureEach {
@@ -110,4 +119,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.play.services)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
