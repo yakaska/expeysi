@@ -1,0 +1,96 @@
+name: Release smoke
+
+# Проверяет, что minified-сборка (releaseCheck: тот же R8 и resource-шринкинг,
+# что у release, но с debug-подписью) не только собирается, но и запускается:
+# unit-тесты и lint идут по debug-варианту, проблемы R8 видны только в release.
+on:
+  pull_request:
+    paths:
+      - "android/**"
+
+jobs:
+  release-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Restore Google Services configuration
+        working-directory: android/app
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo "$GOOGLE_SERVICES_JSON" | base64 --decode > google-services.json
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name=kvm
+
+      - name: Build minified APK and launch it
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 30
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: |
+            set -euxo pipefail
+
+            cd "$GITHUB_WORKSPACE/android"
+            ./gradlew :app:assembleReleaseCheck
+
+            adb install -r app/build/outputs/apk/releaseCheck/app-releaseCheck.apk
+
+            LOGDIR="$GITHUB_WORKSPACE/release-smoke-logs"
+            mkdir -p "$LOGDIR"
+
+            adb logcat -c
+            adb shell am start -n com.expeysi.app/.MainActivity
+            sleep 15
+
+            # Сборка останавливается на экране входа, это норма; задача —
+            # поймать падение minified-сборки: живой процесс и ни одного
+            # маркера краша в логах.
+            APP_PID=$(adb shell pidof com.expeysi.app | tr -d '\r\n' || true)
+
+            adb logcat -d > "$LOGDIR/full-logcat.txt"
+
+            if [ -z "$APP_PID" ]; then
+              echo "::error::Процесс com.expeysi.app не работает спустя 15 секунд после запуска"
+              exit 1
+            fi
+
+            # AndroidRuntime пишет фатальный стек из самого падающего процесса,
+            # поэтому выборка по pid ловит собственные краши приложения.
+            adb logcat -d --pid="$APP_PID" > "$LOGDIR/app-logcat.txt"
+
+            FAIL=0
+            if grep -E "FATAL EXCEPTION|ClassNotFoundException|NoSuchMethodError|NoClassDefFoundError" "$LOGDIR/app-logcat.txt"; then
+              echo "::error::Маркеры падения в логах процесса com.expeysi.app"
+              FAIL=1
+            fi
+            # "Process: <pkg>" в логкате появляется только в фатальном краш-блоке;
+            # страховка на случай, если pid успело смениться.
+            if grep -F "Process: com.expeysi.app" "$LOGDIR/full-logcat.txt"; then
+              echo "::error::Фатальное падение процесса com.expeysi.app"
+              FAIL=1
+            fi
+            exit $FAIL
+
+      - name: Upload logcat on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-smoke-logcat
+          path: release-smoke-logs/
+          if-no-files-found: ignore
