@@ -167,7 +167,14 @@ class HomeViewModel @Inject constructor(
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
             // Пары переводов внутри одного баланса показываются одной строкой.
-            val collapsedTransactions = Transfers.collapse(transactions)
+            // Нога, чей партнёр отрезан границей страницы, подтягивает его по
+            // связке: на стыке страниц пара не разваливается на две строки.
+            val page = Transfers.supplementSplitLegs(
+                page = transactions,
+                scopeIds = accountIds.toSet(),
+                linkedLegs = transactionDao::byLinkedId,
+            )
+            val collapsedTransactions = Transfers.collapse(page)
             val items = collapsedTransactions.map { tx ->
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
@@ -179,9 +186,11 @@ class HomeViewModel @Inject constructor(
                     currencySymbol = symbol,
                     isTransfer = TxType.fromWire(tx.type).isTransfer,
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
-                    isTransferPair = Transfers.isCollapsedPair(tx, transactions),
+                    isTransferPair = Transfers.isCollapsedPair(tx, page),
                 )
             }
+            // Признак следующей страницы считается по сырой странице: добранный
+            // партнёр в лимит не входит и новую страницу не открывает.
             items to (transactions.size >= limit)
         }
     }

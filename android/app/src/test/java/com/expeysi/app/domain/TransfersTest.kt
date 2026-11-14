@@ -1,22 +1,31 @@
 package com.expeysi.app.domain
 
 import com.expeysi.app.data.db.TransactionEntity
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-private fun leg(id: String, type: TxType, linkedId: String = "", accountId: String = "a1", counterAccountId: String = "a2") =
+private fun leg(
+    id: String,
+    type: TxType,
+    linkedId: String = "",
+    accountId: String = "a1",
+    counterAccountId: String = "a2",
+    date: Long = 0L,
+    updatedAt: Long = 0L,
+) =
     TransactionEntity(
         id = id,
         type = type.wire,
         amountMinor = 100_00L,
         accountId = accountId,
         categoryId = "",
-        date = 0L,
+        date = date,
         linkedId = linkedId,
         counterpartyAccountId = counterAccountId,
-        updatedAt = 0L,
+        updatedAt = updatedAt,
     )
 
 class TransfersTest {
@@ -119,5 +128,63 @@ class TransfersTest {
             leg("expense", TxType.EXPENSE),
         )
         operations.forEach { assertFalse(Transfers.isCollapsedPair(it, operations)) }
+    }
+
+    @Test
+    fun `граница страницы добирает партнёра и пара сворачивается`() = runTest {
+        // Нога списания — последний элемент страницы; нога зачисления — первый
+        // элемент за её границей, приходит запросом по связке.
+        val out = leg("out", TxType.TRANSFER_OUT, linkedId = "L1", date = 20, updatedAt = 2)
+        val inLeg = leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a2", counterAccountId = "a1", date = 10, updatedAt = 1)
+
+        val page = Transfers.supplementSplitLegs(
+            page = listOf(out),
+            scopeIds = setOf("a1", "a2"),
+            linkedLegs = { linkedId -> if (linkedId == "L1") listOf(out, inLeg) else emptyList() },
+        )
+
+        assertEquals(listOf("out", "in"), page.map { it.id })
+        assertEquals(listOf("out"), Transfers.collapse(page).map { it.id })
+        assertTrue(Transfers.isCollapsedPair(out, page))
+    }
+
+    @Test
+    fun `добранный партнёр занимает своё место в порядке страницы`() = runTest {
+        val fresh = leg("fresh", TxType.EXPENSE, date = 100)
+        val out = leg("out", TxType.TRANSFER_OUT, linkedId = "L1", date = 20)
+        val old = leg("old", TxType.EXPENSE, date = 5)
+        val inLeg = leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a2", counterAccountId = "a1", date = 10)
+
+        val page = Transfers.supplementSplitLegs(
+            page = listOf(fresh, out, old),
+            scopeIds = setOf("a1", "a2"),
+            linkedLegs = { listOf(inLeg) },
+        )
+
+        assertEquals(listOf("fresh", "out", "in", "old"), page.map { it.id })
+    }
+
+    @Test
+    fun `полная страница запросов по связкам не делает`() = runTest {
+        val pair = listOf(
+            leg("out", TxType.TRANSFER_OUT, linkedId = "L1", date = 20),
+            leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a2", counterAccountId = "a1", date = 10),
+        )
+
+        assertEquals(pair, Transfers.supplementSplitLegs(pair, setOf("a1", "a2"), { emptyList() }))
+    }
+
+    @Test
+    fun `партнёр вне скоупа страницы не добирается`() = runTest {
+        val out = leg("out", TxType.TRANSFER_OUT, linkedId = "L1", date = 20)
+        val inOtherBalance = leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a3", counterAccountId = "a1", date = 10)
+
+        val page = Transfers.supplementSplitLegs(
+            page = listOf(out),
+            scopeIds = setOf("a1"),
+            linkedLegs = { listOf(inOtherBalance) },
+        )
+
+        assertEquals(listOf("out"), page.map { it.id })
     }
 }

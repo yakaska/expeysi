@@ -41,6 +41,55 @@ object Transfers {
     }
 
     /**
+     * Достраивает страницу списка: нога, чей партнёр остался за границей страницы
+     * (лимит обрезал пару посередине), запрашивает партнёра по связке через
+     * [linkedLegs] — иначе на стыке страниц пара развалилась бы на две строки
+     * со знаком. Партнёр берётся живым и в скоупе [scopeIds]: нога с партнёром
+     * в другом скоупе остаётся одиночной со знаком. Страница пересортируется
+     * порядком запроса (дата и версия по убыванию) — вставленный партнёр
+     * занимает своё место, остальной порядок не меняется.
+     */
+    suspend fun supplementSplitLegs(
+        page: List<TransactionEntity>,
+        scopeIds: Set<String>,
+        linkedLegs: suspend (String) -> List<TransactionEntity>,
+    ): List<TransactionEntity> {
+        if (page.isEmpty()) return page
+        val partnerType = mapOf(
+            TxType.TRANSFER_OUT to TxType.TRANSFER_IN,
+            TxType.TRANSFER_IN to TxType.TRANSFER_OUT,
+        )
+        val onPageIds = page.mapTo(mutableSetOf()) { it.id }
+        val linkedIds = page.asSequence()
+            .map { it to TxType.fromWire(it.type) }
+            .filter { (leg, type) -> leg.linkedId.isNotEmpty() && partnerType.containsKey(type) }
+            .filter { (leg, type) ->
+                page.none { peer ->
+                    peer.id != leg.id &&
+                        peer.linkedId == leg.linkedId &&
+                        TxType.fromWire(peer.type) == partnerType[type]
+                }
+            }
+            .map { (leg, _) -> leg.linkedId }
+            .toSet()
+        if (linkedIds.isEmpty()) return page
+        val partners = linkedIds
+            .flatMap { linkedLegs(it) }
+            .filter { !it.deleted && it.id !in onPageIds && it.accountId in scopeIds }
+            .filter { leg ->
+                page.any { peer ->
+                    peer.linkedId == leg.linkedId &&
+                        TxType.fromWire(peer.type) == partnerType[TxType.fromWire(leg.type)]
+                }
+            }
+            .distinctBy { it.id }
+        if (partners.isEmpty()) return page
+        return (page + partners).sortedWith(
+            compareByDescending<TransactionEntity> { it.date }.thenByDescending { it.updatedAt },
+        )
+    }
+
+    /**
      * Подпись направления «откуда → куда»: для ноги-списания это сам счёт и
      * контрагент, для одинокой ноги зачисления — наоборот. Пустые имена
      * (контрагент ещё не доехал по синку) отбрасываются.
