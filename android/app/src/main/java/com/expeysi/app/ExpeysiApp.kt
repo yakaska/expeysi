@@ -8,6 +8,7 @@ import javax.inject.Inject
 @HiltAndroidApp
 class ExpeysiApp : Application() {
     @Inject lateinit var appForeground: AppForeground
+
     @Inject lateinit var syncEngine: SyncEngine
 
     override fun onCreate() {

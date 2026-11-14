@@ -19,8 +19,8 @@ import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
-import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.Transfers
+import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.UiText
 import com.expeysi.app.ui.home.TransactionItem
 import dagger.hilt.android.lifecycle.HiltViewModel

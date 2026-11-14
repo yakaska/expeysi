@@ -139,8 +139,7 @@ internal fun buildCsv(
 }
 
 /** Валюта счёта — валюта его баланса; в accounts.currencyCode живёт резервный дефолт. */
-private fun currencyOf(account: AccountEntity, balance: BalanceEntity?): String =
-    balance?.currencyCode ?: account.currencyCode
+private fun currencyOf(account: AccountEntity, balance: BalanceEntity?): String = balance?.currencyCode ?: account.currencyCode
 
 private fun serviceRow(
     account: AccountEntity,
@@ -148,27 +147,26 @@ private fun serviceRow(
     dateMillis: Long,
     zone: ZoneId,
     delimiter: Char,
-): String =
-    csvRow(
-        delimiter,
-        formatDate(dateMillis, zone),
-        "00:00",
-        account.name,
-        CsvFormat.OPENING_ROW_CATEGORY,
-        formatAmount(account.openingBalanceMinor),
-        currencyOf(account, balance),
-        "",
-        // У служебной строки категории нет.
-        "",
-        "",
-        account.iconKey,
-        account.colorKey,
-        balance?.name ?: "",
-        balance?.iconKey ?: "",
-        balance?.colorKey ?: "",
-        // Связка перевода есть только у ног переводов.
-        "",
-    )
+): String = csvRow(
+    delimiter,
+    formatDate(dateMillis, zone),
+    "00:00",
+    account.name,
+    CsvFormat.OPENING_ROW_CATEGORY,
+    formatAmount(account.openingBalanceMinor),
+    currencyOf(account, balance),
+    "",
+    // У служебной строки категории нет.
+    "",
+    "",
+    account.iconKey,
+    account.colorKey,
+    balance?.name ?: "",
+    balance?.iconKey ?: "",
+    balance?.colorKey ?: "",
+    // Связка перевода есть только у ног переводов.
+    "",
+)
 
 private fun transactionRow(
     tx: TransactionEntity,
@@ -216,8 +214,7 @@ private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.
     TxType.EXPENSE, TxType.TRANSFER_OUT -> -tx.amountMinor
 }
 
-private fun csvRow(delimiter: Char, vararg fields: String): String =
-    fields.joinToString(delimiter.toString()) { escape(it, delimiter) }
+private fun csvRow(delimiter: Char, vararg fields: String): String = fields.joinToString(delimiter.toString()) { escape(it, delimiter) }
 
 /** 123456 → "1234.56", -10010 → "-100.10": точка и два знака, без группировки. */
 internal fun formatAmount(minor: Long): String {
@@ -227,15 +224,12 @@ internal fun formatAmount(minor: Long): String {
 }
 
 /** RFC 4180: поле с разделителем, кавычкой или переводом строки — в кавычках, кавычки удваиваются. */
-internal fun escape(field: String, delimiter: Char = ';'): String =
-    if (field.none { it == delimiter || it == '"' || it == '\n' || it == '\r' }) {
-        field
-    } else {
-        "\"" + field.replace("\"", "\"\"") + "\""
-    }
+internal fun escape(field: String, delimiter: Char = ';'): String = if (field.none { it == delimiter || it == '"' || it == '\n' || it == '\r' }) {
+    field
+} else {
+    "\"" + field.replace("\"", "\"\"") + "\""
+}
 
-private fun formatDate(millis: Long, zone: ZoneId): String =
-    DATE_FORMAT.format(Instant.ofEpochMilli(millis).atZone(zone))
+private fun formatDate(millis: Long, zone: ZoneId): String = DATE_FORMAT.format(Instant.ofEpochMilli(millis).atZone(zone))
 
-private fun formatTime(millis: Long, zone: ZoneId): String =
-    TIME_FORMAT.format(Instant.ofEpochMilli(millis).atZone(zone))
+private fun formatTime(millis: Long, zone: ZoneId): String = TIME_FORMAT.format(Instant.ofEpochMilli(millis).atZone(zone))

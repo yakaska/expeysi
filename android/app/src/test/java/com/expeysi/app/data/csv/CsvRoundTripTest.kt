@@ -1,17 +1,17 @@
 package com.expeysi.app.data.csv
 
-import com.expeysi.app.data.importer.AccountKey
-import com.expeysi.app.data.importer.BudgetCsvParser
-import com.expeysi.app.data.importer.BalanceKey
-import com.expeysi.app.data.importer.resolveAccounts
-import com.expeysi.app.data.importer.resolveBalances
-import com.expeysi.app.data.importer.splitOpeningRows
 import com.expeysi.app.data.csv.CsvFormat.EXTENDED_HEADER
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.data.importer.AccountKey
+import com.expeysi.app.data.importer.BalanceKey
+import com.expeysi.app.data.importer.BudgetCsvParser
 import com.expeysi.app.data.importer.BudgetTransaction
+import com.expeysi.app.data.importer.resolveAccounts
+import com.expeysi.app.data.importer.resolveBalances
+import com.expeysi.app.data.importer.splitOpeningRows
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
@@ -29,8 +29,7 @@ private val UTC: ZoneId = ZoneId.of("UTC")
 
 private fun millis(iso: String): Long = Instant.parse(iso).toEpochMilli()
 
-private fun wallClock(millis: Long, zone: ZoneId): String =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm").format(Instant.ofEpochMilli(millis).atZone(zone))
+private fun wallClock(millis: Long, zone: ZoneId): String = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm").format(Instant.ofEpochMilli(millis).atZone(zone))
 
 /** Экспорт обязан читаться импортом «Бюджета»: остатки, операции и оформление сходятся. */
 class CsvRoundTripTest {

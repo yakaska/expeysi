@@ -403,7 +403,9 @@ fun HomeContent(
                         item(key = item.transaction.id) {
                             val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
                             // Одиночная нога зачисления показывается как доход, списание — как расход.
-                            val legIsIncome = isIncome || item.isTransfer && !item.isTransferPair &&
+                            val legIsIncome = isIncome ||
+                                item.isTransfer &&
+                                !item.isTransferPair &&
                                 TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
                             Column(modifier = Modifier.animateItem()) {
                                 if (index > 0) {
@@ -441,7 +443,11 @@ fun HomeContent(
                                                         item.accountName,
                                                         item.counterpartAccountName,
                                                     ).ifBlank { null }
-                                                } else if (showAccountName) item.accountName.ifBlank { null } else null,
+                                                } else if (showAccountName) {
+                                                    item.accountName.ifBlank { null }
+                                                } else {
+                                                    null
+                                                },
                                                 Instant.ofEpochMilli(item.transaction.date)
                                                     .atZone(zone)
                                                     .format(timeFormatter),

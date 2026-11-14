@@ -387,7 +387,9 @@ private fun HistoryRow(
     val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
     // Одиночная нога зачисления показывается как доход, списание — как расход;
     // свёрнутая пара и так нейтральна, знак ей не выставляется.
-    val legIsIncome = isIncome || item.isTransfer && !item.isTransferPair &&
+    val legIsIncome = isIncome ||
+        item.isTransfer &&
+        !item.isTransferPair &&
         TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
     Row(
         modifier = Modifier

@@ -1,7 +1,7 @@
 package com.expeysi.app.data
 
-import androidx.room.withTransaction
 import android.util.Log
+import androidx.room.withTransaction
 import com.expeysi.app.data.db.AppDatabase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore

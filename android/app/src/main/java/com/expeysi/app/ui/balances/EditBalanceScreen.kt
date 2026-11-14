@@ -372,5 +372,4 @@ private fun CurrencyRow(
     )
 }
 
-private fun currencySubtitle(symbol: String, code: String): String =
-    if (symbol.equals(code, ignoreCase = true)) code else "$code · $symbol"
+private fun currencySubtitle(symbol: String, code: String): String = if (symbol.equals(code, ignoreCase = true)) code else "$code · $symbol"

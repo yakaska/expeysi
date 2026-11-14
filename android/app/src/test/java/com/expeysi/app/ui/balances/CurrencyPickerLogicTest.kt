@@ -4,12 +4,12 @@ import com.expeysi.app.data.db.CurrencyEntity
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.CurrencyTier
 import com.expeysi.app.ui.common.CurrencyLabels
-import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.Locale
 
 class CurrencyPickerLogicTest {
 
@@ -46,8 +46,7 @@ class CurrencyPickerLogicTest {
         locale = ruLocale,
     ).flatMap { it.items }
 
-    private fun codes(sections: List<PickerSection>, kind: SectionKind): List<String>? =
-        sections.firstOrNull { it.kind == kind }?.items?.map { it.code }
+    private fun codes(sections: List<PickerSection>, kind: SectionKind): List<String>? = sections.firstOrNull { it.kind == kind }?.items?.map { it.code }
 
     @Test
     fun `секции без дубликатов и без скрытых валют`() {

@@ -148,8 +148,7 @@ class ExportViewModel @Inject constructor(
     }
 
     /** Диапазон дат из «Дополнительно»: начало и конец задаются вместе. */
-    fun onDateRangeChange(from: LocalDate, to: LocalDate) =
-        _state.update { it.copy(dateFrom = from, dateTo = to) }
+    fun onDateRangeChange(from: LocalDate, to: LocalDate) = _state.update { it.copy(dateFrom = from, dateTo = to) }
 
     fun onDateRangeClear() = _state.update { it.copy(dateFrom = null, dateTo = null) }
 
@@ -200,9 +199,7 @@ class ExportViewModel @Inject constructor(
         _state.update { it.copy(message = null, exportSucceeded = false) }
     }
 
-    private fun fromMillis(date: LocalDate?): Long? =
-        date?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+    private fun fromMillis(date: LocalDate?): Long? = date?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
 
-    private fun toExclusiveMillis(date: LocalDate?): Long? =
-        date?.plusDays(1)?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
+    private fun toExclusiveMillis(date: LocalDate?): Long? = date?.plusDays(1)?.atStartOfDay(zone)?.toInstant()?.toEpochMilli()
 }
