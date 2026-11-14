@@ -43,6 +43,17 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
         }
+
+        // Отладочный слепок release: тот же R8 и resource-шринкинг, но
+        // подписан debug-ключом, поэтому собирается без RELEASE_* секретов.
+        // Используется для локальной проверки правил R8 и CI smoke-задачи
+        // (.github/workflows/release-smoke.yml). Без applicationIdSuffix,
+        // чтобы google-services.json по-прежнему подходил com.expeysi.app.
+        create("releaseCheck") {
+            initWith(getByName("release"))
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += "release"
+        }
     }
 
     compileOptions {
