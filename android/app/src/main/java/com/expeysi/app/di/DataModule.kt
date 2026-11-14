@@ -7,20 +7,13 @@ import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.expeysi.app.data.analysis.AnalysisRepository
 import com.expeysi.app.data.analysis.RoomAnalysisRepository
+import com.expeysi.app.data.db.ALL_MIGRATIONS
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AppDatabase
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
-import com.expeysi.app.data.db.MIGRATION_1_2
-import com.expeysi.app.data.db.MIGRATION_2_3
-import com.expeysi.app.data.db.MIGRATION_3_4
-import com.expeysi.app.data.db.MIGRATION_4_5
-import com.expeysi.app.data.db.MIGRATION_5_6
-import com.expeysi.app.data.db.MIGRATION_6_7
-import com.expeysi.app.data.db.MIGRATION_7_8
-import com.expeysi.app.data.db.MIGRATION_8_9
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
@@ -48,16 +41,7 @@ object DataModule {
     ): AppDatabase {
         val seedScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         return Room.databaseBuilder(context, AppDatabase::class.java, "expeysi.db")
-            .addMigrations(
-                MIGRATION_1_2,
-                MIGRATION_2_3,
-                MIGRATION_3_4,
-                MIGRATION_4_5,
-                MIGRATION_5_6,
-                MIGRATION_6_7,
-                MIGRATION_7_8,
-                MIGRATION_8_9,
-            )
+            .addMigrations(*ALL_MIGRATIONS)
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     // Посев предзаписанных данных — только при создании БД,
