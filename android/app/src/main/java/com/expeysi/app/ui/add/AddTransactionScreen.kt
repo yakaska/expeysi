@@ -75,6 +75,7 @@ import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.MoneyTextField
+import com.expeysi.app.ui.icons.BalanceIcon
 import com.expeysi.app.ui.icons.CategoryIcon
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
@@ -240,24 +241,50 @@ fun AddTransactionScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LazyColumn {
-                items(accounts, key = { it.id }) { account ->
-                    ListItem(
-                        leadingContent = {
-                            CategoryIcon(account.iconKey, account.colorKey)
-                        },
-                        headlineContent = { Text(account.name) },
-                        supportingContent = {
-                            balances[account.balanceId]?.let { Text(it.name) }
-                        },
-                        modifier = Modifier.clickable {
-                            when {
-                                isTransfer && accountSheetForTo -> viewModel.onToAccountSelect(account.id)
-                                isTransfer -> viewModel.onFromAccountSelect(account.id)
-                                else -> viewModel.onAccountSelect(account.id)
+                // Счета сгруппированы по балансам: заголовок баланса, под ним
+                // с отступом его счета; баланс по имени в строке уже не нужен.
+                accountSheetGroups(accounts, balances).forEach { group ->
+                    if (group.balanceName.isNotBlank()) {
+                        item(key = "group-${group.balanceId}") {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp, top = 12.dp),
+                            ) {
+                                BalanceIcon(
+                                    name = group.balanceName,
+                                    iconKey = group.iconKey,
+                                    colorKey = group.colorKey,
+                                    size = 24.dp,
+                                )
+                                Text(
+                                    text = group.balanceName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
-                            showAccountSheet = false
-                        },
-                    )
+                        }
+                    }
+                    items(group.accounts, key = { it.id }) { account ->
+                        ListItem(
+                            leadingContent = {
+                                CategoryIcon(account.iconKey, account.colorKey)
+                            },
+                            headlineContent = { Text(account.name) },
+                            modifier = Modifier
+                                .padding(start = 20.dp)
+                                .clickable {
+                                    when {
+                                        isTransfer && accountSheetForTo -> viewModel.onToAccountSelect(account.id)
+                                        isTransfer -> viewModel.onFromAccountSelect(account.id)
+                                        else -> viewModel.onAccountSelect(account.id)
+                                    }
+                                    showAccountSheet = false
+                                },
+                        )
+                    }
                 }
             }
         }
