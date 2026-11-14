@@ -201,6 +201,10 @@
     <string name="add_transfer_amount_from">Deducted, %1$s</string>
     <!-- %1$s — символ валюты. -->
     <string name="add_transfer_amount_to">Credited, %1$s</string>
+    <!-- %1$s — символ счёта списания, %2$s — курс, %3$s — символ счёта получения; запись чисел не переводится. -->
+    <string name="add_transfer_rate_fmt" translatable="false">1 %1$s ≈ %2$s %3$s</string>
+    <!-- Обе ноги в одной валюте: курс один к одному. -->
+    <string name="add_transfer_rate_same" translatable="false">1 : 1</string>
     <string name="transfer_title">Transfer</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Opening balance: %1$s %2$s</string>
