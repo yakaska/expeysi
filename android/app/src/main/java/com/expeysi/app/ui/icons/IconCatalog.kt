@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Wallet
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -30,10 +31,14 @@ object IconCatalog {
 
     const val DEFAULT_KEY = "category"
 
+    /** Ключ иконки строки перевода в списках операций. */
+    const val TRANSFER_KEY = "swap_horiz"
+
     private val icons: Map<String, ImageVector> = mapOf(
         "wallet" to Icons.Filled.Wallet,
         "payments" to Icons.Filled.Payments,
         "credit_card" to Icons.Filled.CreditCard,
+        "swap_horiz" to Icons.Filled.SwapHoriz,
         "shopping_cart" to Icons.Filled.ShoppingCart,
         "directions_bus" to Icons.Filled.DirectionsBus,
         "home" to Icons.Filled.Home,

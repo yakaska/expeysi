@@ -20,6 +20,7 @@ fun MoneyTextField(
     onValueChange: (String) -> Unit,
     label: @Composable () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     trailingIcon: @Composable (() -> Unit)? = null,
 ) {
     var fieldValue by remember {
@@ -62,6 +63,7 @@ fun MoneyTextField(
             onValueChange(formatted)
         },
         modifier = modifier,
+        enabled = enabled,
         label = label,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
         singleLine = true,

@@ -149,7 +149,7 @@ fun ExportScreen(
                 }
                 Button(
                     onClick = { exportLauncher.launch(suggestedFileName()) },
-                    enabled = (state.includeIncome || state.includeExpense) && !state.inProgress,
+                    enabled = (state.includeIncome || state.includeExpense || state.includeTransfers) && !state.inProgress,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.export_button))
@@ -187,6 +187,12 @@ fun ExportScreen(
                         label = stringResource(R.string.export_type_expense, state.expenseCount),
                         checked = state.includeExpense,
                         onCheckedChange = viewModel::onExpenseChange,
+                    )
+                    TypeRow(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        label = stringResource(R.string.export_type_transfers, state.transferCount),
+                        checked = state.includeTransfers,
+                        onCheckedChange = viewModel::onTransfersChange,
                     )
                 }
                 Text(

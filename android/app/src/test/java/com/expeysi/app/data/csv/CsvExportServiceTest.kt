@@ -58,13 +58,13 @@ class CsvExportServiceTest {
         // создаёт, удалённые счёт и операция пропущены. Валюта — из баланса счёта.
         val expected = listOf(
             EXTENDED_HEADER,
-            "2026-02-01;00:00;Доллары;Начальный остаток;2500.00;USD;;;;savings;amber;Вьетнам;home;red",
-            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue",
-            "2025-12-31;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;green;Основной;payments;blue",
-            "2025-12-31;10:00;Наличные;Еда;-50.00;RUB;;restaurant;orange;payments;green;Основной;payments;blue",
-            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue",
-            "2026-01-05;22:30;Карта;Еда;-250.50;RUB;\"Магазин; «ужин»\";restaurant;orange;credit_card;blue;Основной;payments;blue",
-            "2026-01-07;12:00;Наличные;Старое;-70.00;RUB;;home;red;payments;green;Основной;payments;blue",
+            "2026-02-01;00:00;Доллары;Начальный остаток;2500.00;USD;;;;savings;amber;Вьетнам;home;red;",
+            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue;",
+            "2025-12-31;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;green;Основной;payments;blue;",
+            "2025-12-31;10:00;Наличные;Еда;-50.00;RUB;;restaurant;orange;payments;green;Основной;payments;blue;",
+            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
+            "2026-01-05;22:30;Карта;Еда;-250.50;RUB;\"Магазин; «ужин»\";restaurant;orange;credit_card;blue;Основной;payments;blue;",
+            "2026-01-07;12:00;Наличные;Старое;-70.00;RUB;;home;red;payments;green;Основной;payments;blue;",
             "",
         ).joinToString("\r\n")
         assertEquals(expected, file.text)
@@ -94,9 +94,9 @@ class CsvExportServiceTest {
         // выгружаются всегда.
         val expected = listOf(
             EXTENDED_HEADER,
-            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue",
-            "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue",
-            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue",
+            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue;",
+            "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue;",
+            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
             "",
         ).joinToString("\r\n")
         assertEquals(expected, file.text)
@@ -123,13 +123,80 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-02-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue",
-                "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue",
+                "2026-02-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
         )
         assertEquals(0, file.transactionCount)
+    }
+
+    @Test
+    fun `ноги перевода выгружаются расходом и доходом в категории Перевод`() {
+        val file = buildCsv(
+            accounts = listOf(
+                account("a1", "Карта", opening = 50_000, balanceId = "b1"),
+                account("a2", "Кошелёк", opening = 0, balanceId = "b1"),
+            ),
+            balances = balances,
+            categories = listOf(category("c2", "Зарплата", TxType.INCOME, iconKey = "work", colorKey = "green")),
+            transactions = listOf(
+                tx("t1", TxType.TRANSFER_OUT, 30_000, "a1", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a2"),
+                tx("t2", TxType.TRANSFER_IN, 30_000, "a2", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a1"),
+                tx("t3", TxType.INCOME, 150_000, "a1", "c2", millis("2026-01-02T06:04:00Z")),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME, TxType.EXPENSE, TxType.TRANSFER_OUT, TxType.TRANSFER_IN),
+        )
+
+        // Списание — минус, зачисление — плюс: остатки после реимпорта совпадают.
+        // Ноги несут общую связку и иконку перевода; служебная строка Кошелька
+        // не пишется (нулевой остаток), дата служебной строки Карты — ранняя
+        // его операция. У остальных строк связка пустая.
+        assertEquals(
+            listOf(
+                EXTENDED_HEADER,
+                "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-02;03:04;Карта;Перевод;-300.00;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
+                "2026-01-02;03:04;Кошелёк;Перевод;300.00;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
+                "2026-01-02;06:04;Карта;Зарплата;1500.00;RUB;;work;green;payments;blue;Основной;payments;blue;",
+                "",
+            ).joinToString("\r\n"),
+            file.text,
+        )
+        assertEquals(3, file.transactionCount)
+    }
+
+    @Test
+    fun `переводы не выгружаются без выбранного типа`() {
+        val file = buildCsv(
+            accounts = listOf(
+                account("a1", "Карта", opening = 50_000, balanceId = "b1"),
+            ),
+            balances = balances,
+            categories = listOf(category("c2", "Зарплата", TxType.INCOME, iconKey = "work", colorKey = "green")),
+            transactions = listOf(
+                tx("t1", TxType.TRANSFER_OUT, 30_000, "a1", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a2"),
+                tx("t2", TxType.TRANSFER_IN, 30_000, "a2", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a1"),
+                tx("t3", TxType.INCOME, 150_000, "a1", "c2", millis("2026-01-02T06:04:00Z")),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.INCOME),
+        )
+
+        assertEquals(
+            listOf(
+                EXTENDED_HEADER,
+                "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-02;06:04;Карта;Зарплата;1500.00;RUB;;work;green;payments;blue;Основной;payments;blue;",
+                "",
+            ).joinToString("\r\n"),
+            file.text,
+        )
+        assertEquals(1, file.transactionCount)
     }
 
     @Test
@@ -163,9 +230,9 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue",
-                "2026-01-01;00:00;Карта;Еда;-20.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
-                "2026-01-31;23:00;Карта;Еда;-40.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
+                "2026-01-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-01;00:00;Карта;Еда;-20.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
+                "2026-01-31;23:00;Карта;Еда;-40.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -196,8 +263,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-05;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue",
-                "2026-01-05;22:30;Карта;Еда;-250.50;RUB;;restaurant;orange;payments;blue;Основной;payments;blue",
+                "2026-01-05;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-05;22:30;Карта;Еда;-250.50;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -243,8 +310,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER.replace(';', ','),
-                "2026-01-05,00:00,Карта,Начальный остаток,500.00,RUB,,,,payments,blue,Основной,payments,blue",
-                "2026-01-05,22:30,Карта,Еда,-250.50,RUB,\"Магазин, «ужин»\",restaurant,orange,payments,blue,Основной,payments,blue",
+                "2026-01-05,00:00,Карта,Начальный остаток,500.00,RUB,,,,payments,blue,Основной,payments,blue,",
+                "2026-01-05,22:30,Карта,Еда,-250.50,RUB,\"Магазин, «ужин»\",restaurant,orange,payments,blue,Основной,payments,blue,",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -339,6 +406,8 @@ class CsvExportServiceTest {
         date: Long,
         note: String = "",
         deleted: Boolean = false,
+        linkedId: String = "",
+        counterpartyAccountId: String = "",
     ) = TransactionEntity(
         id = id,
         type = type.wire,
@@ -347,6 +416,8 @@ class CsvExportServiceTest {
         categoryId = categoryId,
         date = date,
         note = note,
+        linkedId = linkedId,
+        counterpartyAccountId = counterpartyAccountId,
         deleted = deleted,
         updatedAt = 0,
     )

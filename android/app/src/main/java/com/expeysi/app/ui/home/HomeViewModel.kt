@@ -25,6 +25,7 @@ import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.TxDayAmount
 import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
 import com.expeysi.app.ui.common.UiText
@@ -64,6 +65,14 @@ data class TransactionItem(
     val categoryColorKey: String,
     val accountName: String,
     val currencySymbol: String,
+    /** Нога перевода: рисуется иконкой перевода со подписью «откуда → куда». */
+    val isTransfer: Boolean = false,
+    val counterpartAccountName: String = "",
+    /**
+     * Строка свёрнутой пары, обе ноги которой видны в списке: рисуется нейтрально,
+     * без знака. Одиночная нога показывает движение денег счёта: плюс или минус.
+     */
+    val isTransferPair: Boolean = false,
 )
 
 data class ImportUiState(
@@ -157,7 +166,16 @@ class HomeViewModel @Inject constructor(
             val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
-            val items = transactions.map { tx ->
+            // Пары переводов внутри одного баланса показываются одной строкой.
+            // Нога, чей партнёр отрезан границей страницы, подтягивает его по
+            // связке: на стыке страниц пара не разваливается на две строки.
+            val page = Transfers.supplementSplitLegs(
+                page = transactions,
+                scopeIds = accountIds.toSet(),
+                linkedLegs = transactionDao::byLinkedId,
+            )
+            val collapsedTransactions = Transfers.collapse(page)
+            val items = collapsedTransactions.map { tx ->
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
                     transaction = tx,
@@ -166,8 +184,13 @@ class HomeViewModel @Inject constructor(
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
+                    isTransfer = TxType.fromWire(tx.type).isTransfer,
+                    counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
+                    isTransferPair = Transfers.isCollapsedPair(tx, page),
                 )
             }
+            // Признак следующей страницы считается по сырой странице: добранный
+            // партнёр в лимит не входит и новую страницу не открывает.
             items to (transactions.size >= limit)
         }
     }

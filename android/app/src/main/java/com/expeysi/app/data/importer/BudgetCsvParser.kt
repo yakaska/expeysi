@@ -28,6 +28,8 @@ data class BudgetTransaction(
     val balanceName: String? = null,
     val balanceIconKey: String? = null,
     val balanceColorKey: String? = null,
+    // Связка перевода: ноги одного перевода делят одно значение; null — колонки нет.
+    val transferLinkId: String? = null,
 )
 
 class BudgetCsvParser @Inject constructor() {
@@ -115,6 +117,7 @@ class BudgetCsvParser @Inject constructor() {
             balanceName = optionalValue(CsvFormat.BALANCE_NAME_COLUMN),
             balanceIconKey = optionalValue(CsvFormat.BALANCE_ICON_COLUMN),
             balanceColorKey = optionalValue(CsvFormat.BALANCE_COLOR_COLUMN),
+            transferLinkId = optionalValue(CsvFormat.TRANSFER_LINK_COLUMN),
         )
     }
 
@@ -194,6 +197,7 @@ class BudgetCsvParser @Inject constructor() {
             CsvFormat.BALANCE_NAME_COLUMN,
             CsvFormat.BALANCE_ICON_COLUMN,
             CsvFormat.BALANCE_COLOR_COLUMN,
+            CsvFormat.TRANSFER_LINK_COLUMN,
         )
     }
 }

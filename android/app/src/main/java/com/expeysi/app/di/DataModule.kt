@@ -20,6 +20,7 @@ import com.expeysi.app.data.db.MIGRATION_4_5
 import com.expeysi.app.data.db.MIGRATION_5_6
 import com.expeysi.app.data.db.MIGRATION_6_7
 import com.expeysi.app.data.db.MIGRATION_7_8
+import com.expeysi.app.data.db.MIGRATION_8_9
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
@@ -55,6 +56,7 @@ object DataModule {
                 MIGRATION_5_6,
                 MIGRATION_6_7,
                 MIGRATION_7_8,
+                MIGRATION_8_9,
             )
             .addCallback(object : RoomDatabase.Callback() {
                 override fun onCreate(db: SupportSQLiteDatabase) {

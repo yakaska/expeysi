@@ -9,6 +9,8 @@ import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.ui.icons.CategoryPalette
+import com.expeysi.app.ui.icons.IconCatalog
 import kotlinx.coroutines.flow.first
 import java.io.OutputStream
 import java.time.Instant
@@ -17,7 +19,7 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 import kotlin.math.abs
 
-/** Результат экспорта: [transactionCount] — выгружено обычных операций. */
+/** Результат экспорта: [transactionCount] — число выгруженных строк операций. */
 data class CsvExportResult(val transactionCount: Int)
 
 /** Файл экспорта: содержимое CSV без BOM и число операций в нём. */
@@ -164,6 +166,8 @@ private fun serviceRow(
         balance?.name ?: "",
         balance?.iconKey ?: "",
         balance?.colorKey ?: "",
+        // Связка перевода есть только у ног переводов.
+        "",
     )
 
 private fun transactionRow(
@@ -173,28 +177,43 @@ private fun transactionRow(
     category: CategoryEntity?,
     zone: ZoneId,
     delimiter: Char,
-): String = csvRow(
-    delimiter,
-    formatDate(tx.date, zone),
-    formatTime(tx.date, zone),
-    account.name,
-    category?.name ?: CsvFormat.FALLBACK_CATEGORY,
-    formatAmount(signedMinor(tx)),
-    currencyOf(account, balance),
-    tx.note,
-    category?.iconKey ?: "",
-    category?.colorKey ?: "",
-    account.iconKey,
-    account.colorKey,
-    balance?.name ?: "",
-    balance?.iconKey ?: "",
-    balance?.colorKey ?: "",
-)
+): String {
+    // Нога перевода несёт категорию «Перевод» вместо пустого categoryId: файл
+    // «Бюджета» пустую категорию не понимает. Связка и иконка перевода дают
+    // импорту приложения восстановить настоящий перевод, а читателю файла —
+    // увидеть оформление даже там, где категории нет.
+    val isTransfer = TxType.fromWire(tx.type).isTransfer
+    return csvRow(
+        delimiter,
+        formatDate(tx.date, zone),
+        formatTime(tx.date, zone),
+        account.name,
+        when {
+            isTransfer -> CsvFormat.TRANSFER_ROW_CATEGORY
+            else -> category?.name ?: CsvFormat.FALLBACK_CATEGORY
+        },
+        formatAmount(signedMinor(tx)),
+        currencyOf(account, balance),
+        tx.note,
+        if (isTransfer) IconCatalog.TRANSFER_KEY else category?.iconKey ?: "",
+        if (isTransfer) CategoryPalette.DEFAULT_KEY else category?.colorKey ?: "",
+        account.iconKey,
+        account.colorKey,
+        balance?.name ?: "",
+        balance?.iconKey ?: "",
+        balance?.colorKey ?: "",
+        if (isTransfer) tx.linkedId else "",
+    )
+}
 
-/** Доход пишется положительной суммой, расход — отрицательной, как в формате «Бюджета». */
+/**
+ * Доход пишется положительной суммой, расход — отрицательной, как в формате
+ * «Бюджета». Ноги перевода идут в ту же знаковую логику: списание — минус,
+ * зачисление — плюс, поэтому остатки счетов после реимпорта совпадают.
+ */
 private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.type)) {
-    TxType.INCOME -> tx.amountMinor
-    TxType.EXPENSE -> -tx.amountMinor
+    TxType.INCOME, TxType.TRANSFER_IN -> tx.amountMinor
+    TxType.EXPENSE, TxType.TRANSFER_OUT -> -tx.amountMinor
 }
 
 private fun csvRow(delimiter: Char, vararg fields: String): String =

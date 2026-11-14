@@ -54,6 +54,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -70,6 +71,7 @@ import androidx.compose.ui.window.PopupProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.domain.Currency
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.MoneyTextField
@@ -80,6 +82,10 @@ import java.time.format.DateTimeFormatter
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
 private val timeFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm")
 
+/** Поле суммы, для которого вызван калькулятор: обычное/списание или зачисление. */
+private const val CALCULATOR_FROM = 0
+private const val CALCULATOR_TO = 1
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddTransactionScreen(
@@ -87,7 +93,7 @@ fun AddTransactionScreen(
     onAddCategoryClick: (TxType) -> Unit,
     viewModel: AddTransactionViewModel = hiltViewModel(),
 ) {
-    val type by viewModel.type.collectAsStateWithLifecycle()
+    val mode by viewModel.mode.collectAsStateWithLifecycle()
     val amountText by viewModel.amountText.collectAsStateWithLifecycle()
     val accounts by viewModel.accounts.collectAsStateWithLifecycle()
     val categories by viewModel.categories.collectAsStateWithLifecycle()
@@ -95,6 +101,10 @@ fun AddTransactionScreen(
     val selectedCategoryId by viewModel.selectedCategoryId.collectAsStateWithLifecycle()
     val currencySymbols by viewModel.currencySymbols.collectAsStateWithLifecycle()
     val balances by viewModel.balances.collectAsStateWithLifecycle()
+    val fromAccountId by viewModel.fromAccountId.collectAsStateWithLifecycle()
+    val toAccountId by viewModel.toAccountId.collectAsStateWithLifecycle()
+    val fromAmountText by viewModel.fromAmountText.collectAsStateWithLifecycle()
+    val toAmountText by viewModel.toAmountText.collectAsStateWithLifecycle()
     val date by viewModel.date.collectAsStateWithLifecycle()
     val time by viewModel.time.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
@@ -111,9 +121,15 @@ fun AddTransactionScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showAccountSheet by remember { mutableStateOf(false) }
+    // Выбор счёта в шторке: обычный/«со счёта» или «на счёт» в переводе.
+    var accountSheetForTo by rememberSaveable { mutableStateOf(false) }
+    // Для какого поля суммы открыт калькулятор.
+    var calculatorTarget by rememberSaveable { mutableIntStateOf(CALCULATOR_FROM) }
     val showCategorySheet by viewModel.showCategorySheet.collectAsStateWithLifecycle()
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var showCalculator by rememberSaveable { mutableStateOf(false) }
+
+    val isTransfer = mode == AddMode.TRANSFER
 
     LaunchedEffect(note) {
         if (noteFieldValue.text != note) {
@@ -126,11 +142,20 @@ fun AddTransactionScreen(
     }
 
     if (showCalculator) {
+        val calculatorValue = when {
+            calculatorTarget == CALCULATOR_TO -> toAmountText
+            isTransfer -> fromAmountText
+            else -> amountText
+        }
         CalculatorDialog(
-            initialValue = amountText,
+            initialValue = calculatorValue,
             onDismiss = { showCalculator = false },
             onApply = { result ->
-                viewModel.onAmountChange(result)
+                when {
+                    calculatorTarget == CALCULATOR_TO -> viewModel.onToAmountChange(result)
+                    isTransfer -> viewModel.onFromAmountChange(result)
+                    else -> viewModel.onAmountChange(result)
+                }
                 showCalculator = false
             },
         )
@@ -204,7 +229,13 @@ fun AddTransactionScreen(
             sheetState = rememberModalBottomSheetState(),
         ) {
             Text(
-                stringResource(R.string.common_account),
+                stringResource(
+                    when {
+                        isTransfer && accountSheetForTo -> R.string.add_transfer_to
+                        isTransfer -> R.string.add_transfer_from
+                        else -> R.string.common_account
+                    },
+                ),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
@@ -219,7 +250,11 @@ fun AddTransactionScreen(
                             balances[account.balanceId]?.let { Text(it.name) }
                         },
                         modifier = Modifier.clickable {
-                            viewModel.onAccountSelect(account.id)
+                            when {
+                                isTransfer && accountSheetForTo -> viewModel.onToAccountSelect(account.id)
+                                isTransfer -> viewModel.onFromAccountSelect(account.id)
+                                else -> viewModel.onAccountSelect(account.id)
+                            }
                             showAccountSheet = false
                         },
                     )
@@ -236,7 +271,7 @@ fun AddTransactionScreen(
             sheetGesturesEnabled = categorySheetState.currentValue == SheetValue.Expanded,
         ) {
             Text(
-                if (type == TxType.EXPENSE) {
+                if (mode == AddMode.EXPENSE) {
                     stringResource(R.string.add_category_expense)
                 } else {
                     stringResource(R.string.add_category_income)
@@ -266,7 +301,7 @@ fun AddTransactionScreen(
                             Icon(Icons.Filled.Add, contentDescription = null)
                         },
                         headlineContent = { Text(stringResource(R.string.add_add_category_row)) },
-                        modifier = Modifier.clickable { onAddCategoryClick(type) },
+                        modifier = Modifier.clickable { onAddCategoryClick(mode.txType ?: TxType.EXPENSE) },
                     )
                 }
             }
@@ -274,11 +309,21 @@ fun AddTransactionScreen(
     }
 
     val selectedAccount = accounts.firstOrNull { it.id == selectedAccountId }
+    val fromAccount = accounts.firstOrNull { it.id == fromAccountId }
+    val toAccount = accounts.firstOrNull { it.id == toAccountId }
+
+    /** Символ валюты счёта = валюта его баланса; без счёта — валюта по умолчанию. */
+    fun currencySymbolOf(account: AccountEntity?): String =
+        account
+            ?.let { balances[it.balanceId]?.currencyCode }
+            ?.let { currencySymbols[it] ?: it }
+            ?: Currency.DEFAULT
+
     val selectedCategory = categories.firstOrNull { it.id == selectedCategoryId }
-    val amountSymbol = selectedAccount
-        ?.let { balances[it.balanceId]?.currencyCode }
-        ?.let { currencySymbols[it] ?: it }
-        ?: Currency.DEFAULT
+
+    val amountSymbol = currencySymbolOf(selectedAccount)
+    val fromSymbol = currencySymbolOf(fromAccount)
+    val toSymbol = currencySymbolOf(toAccount)
 
     Scaffold(
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -325,17 +370,17 @@ fun AddTransactionScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TxType.entries.forEachIndexed { index, txType ->
+                AddMode.entries.forEachIndexed { index, modeItem ->
                     SegmentedButton(
-                        selected = type == txType,
-                        onClick = { viewModel.onTypeChange(txType) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = TxType.entries.size),
+                        selected = mode == modeItem,
+                        onClick = { viewModel.onModeChange(modeItem) },
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = AddMode.entries.size),
                     ) {
                         Text(
-                            if (txType == TxType.EXPENSE) {
-                                stringResource(R.string.operation_type_expense)
-                            } else {
-                                stringResource(R.string.operation_type_income)
+                            when (modeItem) {
+                                AddMode.EXPENSE -> stringResource(R.string.operation_type_expense)
+                                AddMode.INCOME -> stringResource(R.string.operation_type_income)
+                                AddMode.TRANSFER -> stringResource(R.string.add_mode_transfer)
                             },
                         )
                     }
@@ -389,37 +434,75 @@ fun AddTransactionScreen(
                         }
                     }
 
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.common_account)) },
-                        supportingContent = {
-                            Text(selectedAccount?.name ?: stringResource(R.string.common_select))
-                        },
-                        leadingContent = {
-                            selectedAccount?.let {
-                                CategoryIcon(it.iconKey, it.colorKey)
-                            }
-                        },
-                        trailingContent = {
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                        },
-                        modifier = Modifier.clickable { showAccountSheet = true },
-                    )
+                    if (isTransfer) {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.add_transfer_from)) },
+                            supportingContent = {
+                                Text(fromAccount?.name ?: stringResource(R.string.common_select))
+                            },
+                            leadingContent = {
+                                fromAccount?.let { CategoryIcon(it.iconKey, it.colorKey) }
+                            },
+                            trailingContent = {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                accountSheetForTo = false
+                                showAccountSheet = true
+                            },
+                        )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.add_transfer_to)) },
+                            supportingContent = {
+                                Text(toAccount?.name ?: stringResource(R.string.common_select))
+                            },
+                            leadingContent = {
+                                toAccount?.let { CategoryIcon(it.iconKey, it.colorKey) }
+                            },
+                            trailingContent = {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                accountSheetForTo = true
+                                showAccountSheet = true
+                            },
+                        )
+                    } else {
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.common_account)) },
+                            supportingContent = {
+                                Text(selectedAccount?.name ?: stringResource(R.string.common_select))
+                            },
+                            leadingContent = {
+                                selectedAccount?.let {
+                                    CategoryIcon(it.iconKey, it.colorKey)
+                                }
+                            },
+                            trailingContent = {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable {
+                                accountSheetForTo = false
+                                showAccountSheet = true
+                            },
+                        )
 
-                    ListItem(
-                        headlineContent = { Text(stringResource(R.string.add_category)) },
-                        supportingContent = {
-                            Text(selectedCategory?.name ?: stringResource(R.string.common_select))
-                        },
-                        leadingContent = {
-                            selectedCategory?.let {
-                                CategoryIcon(it.iconKey, it.colorKey)
-                            }
-                        },
-                        trailingContent = {
-                            Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                        },
-                        modifier = Modifier.clickable { viewModel.setCategorySheetVisible(true) },
-                    )
+                        ListItem(
+                            headlineContent = { Text(stringResource(R.string.add_category)) },
+                            supportingContent = {
+                                Text(selectedCategory?.name ?: stringResource(R.string.common_select))
+                            },
+                            leadingContent = {
+                                selectedCategory?.let {
+                                    CategoryIcon(it.iconKey, it.colorKey)
+                                }
+                            },
+                            trailingContent = {
+                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
+                            },
+                            modifier = Modifier.clickable { viewModel.setCategorySheetVisible(true) },
+                        )
+                    }
                 }
             }
 
@@ -432,18 +515,57 @@ fun AddTransactionScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    MoneyTextField(
-                        value = amountText,
-                        onValueChange = viewModel::onAmountChange,
-                        modifier = Modifier.fillMaxWidth(),
-                        // %1$s — символ валюты.
-                        label = { Text(stringResource(R.string.add_amount_label, amountSymbol)) },
-                        trailingIcon = {
-                            IconButton(onClick = { showCalculator = true }) {
-                                Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
-                            }
-                        },
-                    )
+                    if (isTransfer) {
+                        MoneyTextField(
+                            value = fromAmountText,
+                            onValueChange = viewModel::onFromAmountChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            // %1$s — символ валюты.
+                            label = { Text(stringResource(R.string.add_transfer_amount_from, fromSymbol)) },
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    calculatorTarget = CALCULATOR_FROM
+                                    showCalculator = true
+                                }) {
+                                    Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+                                }
+                            },
+                        )
+                        // Нога, ещё не дошедшая по синку, правится только по своей стороне
+                        // суммы, поэтому поле зачисления заблокировано до её появления.
+                        MoneyTextField(
+                            value = toAmountText,
+                            onValueChange = viewModel::onToAmountChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            // %1$s — символ валюты.
+                            label = { Text(stringResource(R.string.add_transfer_amount_to, toSymbol)) },
+                            enabled = viewModel.isTransferInLegPresent,
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    calculatorTarget = CALCULATOR_TO
+                                    showCalculator = true
+                                }) {
+                                    Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+                                }
+                            },
+                        )
+                    } else {
+                        MoneyTextField(
+                            value = amountText,
+                            onValueChange = viewModel::onAmountChange,
+                            modifier = Modifier.fillMaxWidth(),
+                            // %1$s — символ валюты.
+                            label = { Text(stringResource(R.string.add_amount_label, amountSymbol)) },
+                            trailingIcon = {
+                                IconButton(onClick = {
+                                    calculatorTarget = CALCULATOR_FROM
+                                    showCalculator = true
+                                }) {
+                                    Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+                                }
+                            },
+                        )
+                    }
                     Box {
                         OutlinedTextField(
                             value = noteFieldValue,

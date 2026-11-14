@@ -21,11 +21,13 @@ object CsvFormat {
     const val BALANCE_NAME_COLUMN = "Название баланса"
     const val BALANCE_ICON_COLUMN = "Иконка баланса"
     const val BALANCE_COLOR_COLUMN = "Цвет баланса"
+    const val TRANSFER_LINK_COLUMN = "Связка перевода"
 
-    /** Полный заголовок файла экспорта Expeysi: обязательные колонки плюс оформление. */
+    /** Полный заголовок файла экспорта Expeysi: обязательные колонки плюс оформление и связка. */
     const val EXTENDED_HEADER =
         "$HEADER;$CATEGORY_ICON_COLUMN;$CATEGORY_COLOR_COLUMN;$ACCOUNT_ICON_COLUMN;" +
-            "$ACCOUNT_COLOR_COLUMN;$BALANCE_NAME_COLUMN;$BALANCE_ICON_COLUMN;$BALANCE_COLOR_COLUMN"
+            "$ACCOUNT_COLOR_COLUMN;$BALANCE_NAME_COLUMN;$BALANCE_ICON_COLUMN;$BALANCE_COLOR_COLUMN;" +
+            "$TRANSFER_LINK_COLUMN"
 
     /**
      * Зарезервированное имя категории служебной строки начального остатка.
@@ -35,6 +37,15 @@ object CsvFormat {
      * при переимпорте превратились бы в остатки.
      */
     const val OPENING_ROW_CATEGORY = "Начальный остаток"
+
+    /**
+     * Имя категории строк ног перевода в файле. В отличие от [OPENING_ROW_CATEGORY]
+     * имя НЕ зарезервировано: пара ног со связкой [TRANSFER_LINK_COLUMN] восстанавливается
+     * импортом в настоящий перевод без категории, а в деградировавших случаях
+     * (одиночная нога или файл старой версии без связки) категория «Перевод»
+     * остаётся у пары обычных операций «расход + доход».
+     */
+    const val TRANSFER_ROW_CATEGORY = "Перевод"
 
     /** Имя категории для операции со «сгоревшим» id категории (в норме не случается). */
     const val FALLBACK_CATEGORY = "Без категории"

@@ -1,5 +1,7 @@
 package com.expeysi.app.data.sync
 
+import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.domain.TxType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
@@ -8,12 +10,82 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private const val GRACE_TEST_MILLIS = 100L
 
+private fun leg(
+    type: TxType,
+    linkedId: String,
+    updatedAt: Long,
+    deleted: Boolean = false,
+    updatedBy: String = "",
+) = TransactionEntity(
+    id = "leg-${type.wire}-$updatedAt",
+    type = type.wire,
+    amountMinor = 100_00L,
+    accountId = "acc",
+    categoryId = "",
+    date = updatedAt,
+    linkedId = linkedId,
+    counterpartyAccountId = "other",
+    deleted = deleted,
+    updatedAt = updatedAt,
+    updatedBy = updatedBy,
+)
+
 class SyncEngineTest {
+
+    @Test
+    fun `надгробие партнёра хоронит въехавшую ногу перевода`() {
+        val incoming = leg(TxType.TRANSFER_IN, linkedId = "L1", updatedAt = 50)
+        val sibling = leg(TxType.TRANSFER_OUT, linkedId = "L1", updatedAt = 100, deleted = true, updatedBy = "deleter")
+
+        val tombstone = transferLegTombstone(incoming, listOf(sibling))!!
+
+        assertTrue(tombstone.deleted)
+        // Версия и автор берутся из удаления: надгробие должно победить
+        // документом не старше въехавшей ноги и на других устройствах.
+        assertEquals(100L, tombstone.updatedAt)
+        assertEquals("deleter", tombstone.updatedBy)
+        assertEquals(incoming.id, tombstone.id)
+        assertTrue(tombstone.linkedId == "L1")
+    }
+
+    @Test
+    fun `живой партнёр ногу не хоронит`() {
+        val incoming = leg(TxType.TRANSFER_IN, linkedId = "L1", updatedAt = 50)
+        val sibling = leg(TxType.TRANSFER_OUT, linkedId = "L1", updatedAt = 100)
+
+        assertNull(transferLegTombstone(incoming, listOf(sibling)))
+    }
+
+    @Test
+    fun `надгробие партнёра старше въехавшей ноги не хоронит`() {
+        val incoming = leg(TxType.TRANSFER_IN, linkedId = "L1", updatedAt = 50)
+        val sibling = leg(TxType.TRANSFER_OUT, linkedId = "L1", updatedAt = 10, deleted = true)
+
+        assertNull(transferLegTombstone(incoming, listOf(sibling)))
+    }
+
+    @Test
+    fun `нога пустой связки и уже удалённая нога не хоронятся`() {
+        val deleted = leg(TxType.TRANSFER_OUT, linkedId = "L1", updatedAt = 100, deleted = true)
+        val unlinked = leg(TxType.TRANSFER_IN, linkedId = "", updatedAt = 50)
+
+        assertNull(transferLegTombstone(unlinked, listOf(deleted)))
+        assertNull(transferLegTombstone(deleted, listOf(deleted)))
+    }
+
+    @Test
+    fun `параллельные ноги другой связки не мешают надгробию`() {
+        val incoming = leg(TxType.TRANSFER_IN, linkedId = "L1", updatedAt = 50)
+        val otherPair = leg(TxType.TRANSFER_OUT, linkedId = "L2", updatedAt = 100, deleted = true)
+
+        assertNull(transferLegTombstone(incoming, listOf(incoming, otherPair)))
+    }
 
     @Test
     fun `отсутствующий удалённый документ требует загрузки`() {

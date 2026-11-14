@@ -123,6 +123,15 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
     }
 }
 
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Поля ног перевода: связка пары и счёт на другой стороне; у обычных
+        // операций значения пустые, существующим записям их добавляет дефолт.
+        db.execSQL("ALTER TABLE transactions ADD COLUMN linkedId TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN counterpartyAccountId TEXT NOT NULL DEFAULT ''")
+    }
+}
+
 @Database(
     entities = [
         AccountEntity::class,
@@ -131,7 +140,7 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         CurrencyEntity::class,
         BalanceEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

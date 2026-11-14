@@ -1,9 +1,12 @@
 package com.expeysi.app.data.importer
 
+import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.domain.TxType
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -93,6 +96,146 @@ class BudgetImportServiceTest {
             importedBalanceName("Бюджет (RUB)", setOf("импорт Бюджет (RUB)")),
         )
     }
+
+    @Test
+    fun `парные строки файла восстанавливаются ногами перевода`() {
+        val legs = transferLegsOf(
+            listOf(
+                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1", note = "отпуск"),
+                item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1", note = "отпуск"),
+            ),
+            accounts,
+            nowMillis = 77,
+        )
+
+        assertEquals(2, legs.size)
+        val out = legs.first()
+        val inLeg = legs.last()
+        assertEquals(TxType.TRANSFER_OUT.wire, out.type)
+        assertEquals("acc1", out.accountId)
+        assertEquals(30_000L, out.amountMinor)
+        assertEquals("отпуск", out.note)
+        // У ног перевода категории нет: строка «Перевод» в файл служебная.
+        assertEquals("", out.categoryId)
+        assertEquals(TxType.TRANSFER_IN.wire, inLeg.type)
+        assertEquals("acc2", inLeg.accountId)
+        // Контрагенты ссылаются друг на друга, связка общая и свежая.
+        assertEquals("acc2", out.counterpartyAccountId)
+        assertEquals("acc1", inLeg.counterpartyAccountId)
+        assertEquals(77L, out.updatedAt)
+        assertEquals(out.linkedId, inLeg.linkedId)
+        assertTrue(out.linkedId.isNotEmpty())
+    }
+
+    @Test
+    fun `вырожденная связка без зачисления не реконструируется`() {
+        val out = listOf(item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"))
+        assertTrue(transferLegsOf(out, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `вырожденная связка без списания не реконструируется`() {
+        val inRow = listOf(item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"))
+        assertTrue(transferLegsOf(inRow, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `три строки связки целиком остаются операциями`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+            item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `два списания в одной связке целиком остаются операциями`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `списание и зачисление на одном счете не реконструируются`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `вырожденная связка импортируется строками один к одному`() {
+        // Как в BudgetImportService.import: группа без валидной пары идёт
+        // обычными операциями — каждая строка файла становится операцией
+        // своего знака, число операций равно числу строк, а остатки счетов
+        // складываются с арифметикой CSV без потерь и без надстроек.
+        val rows = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+            item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+        assertTrue(transferLegsOf(rows, accounts, nowMillis = 77).isEmpty())
+
+        assertEquals(rows.size, 3)
+        val signed = { name: String ->
+            rows.filter { it.accountName == name }
+                .sumOf { if (it.type == TxType.EXPENSE) -it.amountMinor else it.amountMinor }
+        }
+        assertEquals(-30_000L, signed("Карта"))
+        assertEquals(30_000L, signed("Кошелёк"))
+    }
+
+    @Test
+    fun `повторная загрузка того же файла даёт независимую связку`() {
+        val rows = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
+            item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+        val firstLink = transferLegsOf(rows, accounts, nowMillis = 77).first().linkedId
+        val secondLink = transferLegsOf(rows, accounts, nowMillis = 77).first().linkedId
+
+        assertNotEquals(firstLink, secondLink)
+    }
+
+    private val accounts = mapOf(
+        AccountKey("Карта", "RUB", null) to account("acc1"),
+        AccountKey("Кошелёк", "RUB", null) to account("acc2"),
+    )
+
+    private fun item(
+        accountName: String,
+        type: TxType,
+        amountMinor: Long,
+        transferLinkId: String? = null,
+        note: String = "",
+    ) = BudgetTransaction(
+        accountName = accountName,
+        categoryName = "Перевод",
+        type = type,
+        amountMinor = amountMinor,
+        currencyCode = "RUB",
+        date = 5,
+        note = note,
+        transferLinkId = transferLinkId,
+    )
+
+    private fun account(id: String) = AccountEntity(
+        id = id,
+        name = id,
+        iconKey = "payments",
+        colorKey = "blue",
+        openingBalanceMinor = 0,
+        currencyCode = "RUB",
+        balanceId = "b",
+        updatedAt = 0,
+    )
 
     private fun tx(categoryIconKey: String?, categoryColorKey: String?) = BudgetTransaction(
         accountName = "Карта",
