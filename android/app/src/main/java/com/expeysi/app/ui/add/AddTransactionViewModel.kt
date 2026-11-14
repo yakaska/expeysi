@@ -420,6 +420,8 @@ class AddTransactionViewModel @Inject constructor(
                 }
             }
             transactionDao.upsertAll(legs)
+            // Ноги уходят по одному set() не атомарно, но недогрузка не теряется:
+            // офлайн-очередь Firestore и uploadMissingLocal() следующей сессии добирают.
             legs.forEach { syncEngine.uploadTransaction(it) }
             _saved.value = true
         }
@@ -454,6 +456,7 @@ class AddTransactionViewModel @Inject constructor(
         val now = System.currentTimeMillis()
         val deleted = legs.map { it.copy(deleted = true, updatedAt = now) }
         transactionDao.upsertAll(deleted)
+        // См. saveTransfer: недогруженное надгробие добирают офлайн-очередь Firestore и uploadMissingLocal().
         deleted.forEach { syncEngine.uploadTransaction(it) }
     }
 }
