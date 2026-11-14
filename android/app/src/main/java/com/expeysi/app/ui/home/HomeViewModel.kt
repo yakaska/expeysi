@@ -25,6 +25,7 @@ import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.TxDayAmount
 import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
 import com.expeysi.app.ui.common.UiText
@@ -64,6 +65,14 @@ data class TransactionItem(
     val categoryColorKey: String,
     val accountName: String,
     val currencySymbol: String,
+    /** Нога перевода: рисуется иконкой перевода со подписью «откуда → куда». */
+    val isTransfer: Boolean = false,
+    val counterpartAccountName: String = "",
+    /**
+     * Строка свёрнутой пары, обе ноги которой видны в списке: рисуется нейтрально,
+     * без знака. Одиночная нога показывает движение денег счёта: плюс или минус.
+     */
+    val isTransferPair: Boolean = false,
 )
 
 data class ImportUiState(
@@ -157,7 +166,9 @@ class HomeViewModel @Inject constructor(
             val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
-            val items = transactions.map { tx ->
+            // Пары переводов внутри одного баланса показываются одной строкой.
+            val collapsedTransactions = Transfers.collapse(transactions)
+            val items = collapsedTransactions.map { tx ->
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
                     transaction = tx,
@@ -166,6 +177,9 @@ class HomeViewModel @Inject constructor(
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
+                    isTransfer = TxType.fromWire(tx.type).isTransfer,
+                    counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
+                    isTransferPair = Transfers.isCollapsedPair(tx, transactions),
                 )
             }
             items to (transactions.size >= limit)

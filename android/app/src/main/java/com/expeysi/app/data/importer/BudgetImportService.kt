@@ -58,7 +58,18 @@ class BudgetImportService @Inject constructor(
                 CategoryKey(normalizeBudgetCategoryName(it.name), TxType.fromWire(it.type))
             }.toMutableMap()
 
-        val transactions = operations.map { item ->
+        // Строки со связкой перевода восстанавливаются парой ног transfer_out /
+        // transfer_in; вырожденная связка (партнёр отфильтрован из выгрузки)
+        // остаётся обычной операцией, как и файлы без колонки связки.
+        val (linkedRows, plainRows) = operations.partition { !it.transferLinkId.isNullOrEmpty() }
+        val transferLegs = mutableListOf<TransactionEntity>()
+        val degenerateRows = mutableListOf<BudgetTransaction>()
+        linkedRows.groupBy { it.transferLinkId!!.trim() }.forEach { (_, group) ->
+            val legs = transferLegsOf(group, accountByKey, now)
+            if (legs.isEmpty()) degenerateRows += group else transferLegs += legs
+        }
+
+        val transactions = (plainRows + degenerateRows).map { item ->
             val categoryKey = CategoryKey(normalizeBudgetCategoryName(item.categoryName), item.type)
             val category = categoryByName.getOrPut(categoryKey) {
                 CategoryEntity(
@@ -86,7 +97,7 @@ class BudgetImportService @Inject constructor(
                 note = item.note,
                 updatedAt = now,
             )
-        }
+        } + transferLegs
 
         database.withTransaction {
             database.balanceDao().upsertAll(balanceByKey.values.toList())
@@ -140,6 +151,54 @@ internal fun restyledCategory(
 }
 
 internal fun normalizeBudgetCategoryName(name: String): String = name.trim().lowercase().replace('ё', 'е')
+
+/**
+ * Восстанавливает перевод из строк файла одной связки: строка расхода — нога
+ * списания счёта-источника, строка дохода — нога зачисления получателя; суммы
+ * парсер уже хранит без знака. Идентификаторы ног и связка свежие: копия
+ * импорта независима от пар в живых данных и от других загрузок того же файла,
+ * а счёт-контрагент каждой ноги — второй счёт пары. [categoryId] пустой:
+ * у ног перевода категории нет, категория «Перевод» из строки отбрасывается.
+ * Пустой список — связка вырожденная (только списание или только зачисление):
+ * строки остаются обычными операциями.
+ */
+internal fun transferLegsOf(
+    rows: List<BudgetTransaction>,
+    accountByKey: Map<AccountKey, AccountEntity>,
+    nowMillis: Long,
+): List<TransactionEntity> {
+    val out = rows.firstOrNull { it.type == TxType.EXPENSE } ?: return emptyList()
+    val inRow = rows.firstOrNull { it.type == TxType.INCOME } ?: return emptyList()
+    val outAccount = accountByKey.getValue(out.accountKey())
+    val inAccount = accountByKey.getValue(inRow.accountKey())
+    val linkedId = UUID.randomUUID().toString()
+    return listOf(
+        TransactionEntity(
+            id = UUID.randomUUID().toString(),
+            type = TxType.TRANSFER_OUT.wire,
+            amountMinor = out.amountMinor,
+            accountId = outAccount.id,
+            categoryId = "",
+            date = out.date,
+            note = out.note,
+            linkedId = linkedId,
+            counterpartyAccountId = inAccount.id,
+            updatedAt = nowMillis,
+        ),
+        TransactionEntity(
+            id = UUID.randomUUID().toString(),
+            type = TxType.TRANSFER_IN.wire,
+            amountMinor = inRow.amountMinor,
+            accountId = inAccount.id,
+            categoryId = "",
+            date = inRow.date,
+            note = inRow.note,
+            linkedId = linkedId,
+            counterpartyAccountId = outAccount.id,
+            updatedAt = nowMillis,
+        ),
+    )
+}
 
 /**
  * Делит разобранные строки на служебные начальные остатки и обычные операции.

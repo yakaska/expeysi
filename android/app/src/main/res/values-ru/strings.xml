@@ -157,6 +157,7 @@
     <!-- %1$d — количество операций данного типа в выгрузке. -->
     <string name="export_type_income">Доход (%1$d)</string>
     <string name="export_type_expense">Расход (%1$d)</string>
+    <string name="export_type_transfers">Переводы (%1$d)</string>
     <string name="export_advanced">Дополнительно</string>
     <string name="export_date_range">Диапазон дат</string>
     <string name="export_date_not_set">Не выбран</string>
@@ -191,6 +192,14 @@
     <string name="add_add_category_row">Добавить новую категорию</string>
     <string name="operation_type_expense">Расход</string>
     <string name="operation_type_income">Доход</string>
+    <string name="add_mode_transfer">Перевод</string>
+    <string name="add_transfer_from">Со счёта</string>
+    <string name="add_transfer_to">На счёт</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="add_transfer_amount_from">Списано, %1$s</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="add_transfer_amount_to">Зачислено, %1$s</string>
+    <string name="transfer_title">Перевод</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Начальный остаток: %1$s %2$s</string>
     <string name="account_delete_title">Удалить счёт?</string>

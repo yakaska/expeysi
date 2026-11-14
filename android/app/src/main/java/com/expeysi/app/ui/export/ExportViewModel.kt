@@ -32,21 +32,23 @@ data class AccountOption(
 )
 
 /**
- * Состояние экспорта: [includeIncome]/[includeExpense] — типы операций,
- * [incomeCount]/[expenseCount] — числа операций с учётом фильтров
- * [dateFrom]/[dateTo] и [selectedAccountIds] (список [accounts] показывается в
- * «Дополнительно»), [delimiter] и [writeBom] — оформление CSV-файла,
+ * Состояние экспорта: [includeIncome]/[includeExpense]/[includeTransfers] — типы
+ * операций, [incomeCount]/[expenseCount]/[transferCount] — числа операций с учётом
+ * фильтров [dateFrom]/[dateTo] и [selectedAccountIds] (список [accounts] показывается
+ * в «Дополнительно»), [delimiter] и [writeBom] — оформление CSV-файла,
  * [message] — разовый текст для снекбара (null — показан), [exportSucceeded] —
  * успех последнего экспорта.
  */
 data class ExportUiState(
     val includeIncome: Boolean = true,
     val includeExpense: Boolean = true,
+    val includeTransfers: Boolean = true,
     val inProgress: Boolean = false,
     val message: UiText? = null,
     val exportSucceeded: Boolean = false,
     val incomeCount: Int = 0,
     val expenseCount: Int = 0,
+    val transferCount: Int = 0,
     val accounts: List<AccountOption> = emptyList(),
     val selectedAccountIds: Set<String> = emptySet(),
     val accountSelectionInitialized: Boolean = false,
@@ -120,6 +122,7 @@ class ExportViewModel @Inject constructor(
                     it.copy(
                         incomeCount = visible.count { tx -> TxType.fromWire(tx.type) == TxType.INCOME },
                         expenseCount = visible.count { tx -> TxType.fromWire(tx.type) == TxType.EXPENSE },
+                        transferCount = visible.count { tx -> TxType.fromWire(tx.type).isTransfer },
                     )
                 }
             }
@@ -130,6 +133,8 @@ class ExportViewModel @Inject constructor(
     fun onIncomeChange(include: Boolean) = _state.update { it.copy(includeIncome = include) }
 
     fun onExpenseChange(include: Boolean) = _state.update { it.copy(includeExpense = include) }
+
+    fun onTransfersChange(include: Boolean) = _state.update { it.copy(includeTransfers = include) }
 
     /** Выбор счетов в «Дополнительно». */
     fun onAccountToggle(accountId: String, selected: Boolean) = _state.update {
@@ -163,6 +168,10 @@ class ExportViewModel @Inject constructor(
         val types = buildSet {
             if (state.includeIncome) add(TxType.INCOME)
             if (state.includeExpense) add(TxType.EXPENSE)
+            if (state.includeTransfers) {
+                add(TxType.TRANSFER_OUT)
+                add(TxType.TRANSFER_IN)
+            }
         }
         if (types.isEmpty()) return
         viewModelScope.launch {

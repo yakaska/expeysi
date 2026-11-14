@@ -60,11 +60,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.domain.Money
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
+import com.expeysi.app.ui.icons.IconCatalog
 import com.expeysi.app.ui.theme.LocalFinanceColors
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -341,9 +343,12 @@ private fun TransactionList(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
     ) {
         grouped.forEach { (date, groupItems) ->
-            val (incomeItems, expenseItems) = groupItems.partition {
-                TxType.fromWire(it.transaction.type) == TxType.INCOME
-            }
+            val incomeMinor = groupItems
+                .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
+                .sumOf { it.transaction.amountMinor }
+            val expenseMinor = groupItems
+                .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
+                .sumOf { it.transaction.amountMinor }
             stickyHeader(key = "date-$date") {
                 DayGroupHeader(
                     dateLabel = when (date) {
@@ -351,8 +356,8 @@ private fun TransactionList(
                         today.minusDays(1) -> stringResource(R.string.home_yesterday)
                         else -> date.format(dayHeaderFormatter)
                     },
-                    incomeMinor = incomeItems.sumOf { it.transaction.amountMinor },
-                    expenseMinor = expenseItems.sumOf { it.transaction.amountMinor },
+                    incomeMinor = incomeMinor,
+                    expenseMinor = expenseMinor,
                     currencySymbol = groupItems.first().currencySymbol,
                     modifier = Modifier.padding(vertical = 8.dp),
                 )
@@ -380,6 +385,10 @@ private fun HistoryRow(
     onClick: () -> Unit,
 ) {
     val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
+    // Одиночная нога зачисления показывается как доход, списание — как расход;
+    // свёрнутая пара и так нейтральна, знак ей не выставляется.
+    val legIsIncome = isIncome || item.isTransfer && !item.isTransferPair &&
+        TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -387,19 +396,31 @@ private fun HistoryRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+        CategoryIcon(
+            if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
+            item.categoryColorKey,
+        )
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                if (item.isTransfer) {
+                    stringResource(R.string.transfer_title)
+                } else {
+                    item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
+                },
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
                 listOfNotNull(
-                    item.accountName.ifBlank { null },
+                    if (item.isTransfer) {
+                        Transfers.directionLabel(item.transaction, item.accountName, item.counterpartAccountName)
+                            .ifBlank { null }
+                    } else {
+                        item.accountName.ifBlank { null }
+                    },
                     Instant.ofEpochMilli(item.transaction.date)
                         .atZone(ZoneId.systemDefault())
                         .format(dateFormatter),
@@ -410,10 +431,16 @@ private fun HistoryRow(
             )
         }
         Text(
-            text = (if (isIncome) "+" else "−") +
-                "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
+            text = when {
+                // Свёрнутая пара нейтральна: это перемещение, а не доход и не расход.
+                item.isTransferPair -> "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
+                // Одиночная нога показывает движение денег счёта: зачисление — плюс,
+                // списание — минус, как у доходов и расходов.
+                else -> (if (legIsIncome) "+" else "−") +
+                    "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
+            },
             style = MaterialTheme.typography.titleMedium,
-            color = if (isIncome) {
+            color = if (legIsIncome) {
                 LocalFinanceColors.current.income
             } else {
                 MaterialTheme.colorScheme.onSurface

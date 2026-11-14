@@ -251,6 +251,8 @@ class SyncEngine @Inject constructor(
         "categoryId" to value.categoryId,
         "date" to value.date,
         "note" to value.note,
+        "linkedId" to value.linkedId,
+        "counterpartyAccountId" to value.counterpartyAccountId,
         "deleted" to value.deleted,
         "updatedAt" to value.updatedAt,
         "updatedBy" to (authRepository.userId ?: value.updatedBy),
@@ -411,6 +413,9 @@ class SyncEngine @Inject constructor(
             categoryId = document.getString("categoryId") ?: return,
             date = document.getLong("date") ?: return,
             note = document.getString("note") ?: "",
+            // Поля перевода: у документов до фичи их нет — резолвятся в пустые.
+            linkedId = document.getString("linkedId") ?: "",
+            counterpartyAccountId = document.getString("counterpartyAccountId") ?: "",
             deleted = document.getBoolean("deleted") ?: false,
             updatedAt = document.getLong("updatedAt") ?: 0,
             updatedBy = document.getString("updatedBy") ?: "",

@@ -20,6 +20,7 @@ import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TxType
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.ui.common.UiText
 import com.expeysi.app.ui.home.TransactionItem
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -177,13 +178,19 @@ class HistoryViewModel @Inject constructor(
             .filter { TxType.fromWire(it.type) in f.types }
             .filter { f.categoryIds == null || it.categoryId in f.categoryIds }
 
-        val entries = filtered.map {
-            AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
-        }
+        // Разбивки по категориям и счетам — только потоки денег; ноги переводов
+        // в донышках анализов и в итогах доходов/расходов не участвуют.
+        val entries = filtered
+            .filterNot { TxType.fromWire(it.type).isTransfer }
+            .map {
+                AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
+            }
 
-        val items = filtered
+        val scopedTransactions = filtered
             .filter { detail == null || it.categoryId == detail.categoryId }
             .filter { detail?.accountId == null || it.accountId == detail?.accountId }
+        val items = scopedTransactions
+            .let(Transfers::collapse)
             .map { tx ->
                 val category = categoryById[tx.categoryId]
                 TransactionItem(
@@ -193,6 +200,9 @@ class HistoryViewModel @Inject constructor(
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
+                    isTransfer = TxType.fromWire(tx.type).isTransfer,
+                    counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
+                    isTransferPair = Transfers.isCollapsedPair(tx, scopedTransactions),
                 )
             }
 

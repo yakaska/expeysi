@@ -71,6 +71,20 @@ class BudgetCsvParserTest {
     }
 
     @Test
+    fun `связка перевода читается из колонки файла`() {
+        val transactions = parse(
+            "${HEADER.trimEnd()};Иконка категории;Цвет категории;Иконка счета;Цвет счета;" +
+                "Название баланса;Иконка баланса;Цвет баланса;Связка перевода\n" +
+                "2026-01-02;03:04;Карта;Перевод;-300.50;RUB;;swap_horiz;default;credit_card;blue;Основной;payments;blue;L1\n" +
+                "2026-01-02;03:04;Кошелёк;Перевод;300.50;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;\n",
+        )
+
+        assertEquals("L1", transactions.first().transferLinkId)
+        // Пустое поле связки — операция вне перевода.
+        assertEquals(null, transactions.last().transferLinkId)
+    }
+
+    @Test
     fun `без колонок оформления атрибуты не заполнены`() {
         val transactions = parse(HEADER + "2026-01-02;03:04;Наличные;Еда;-100;VND;\n")
         val tx = transactions.single()
