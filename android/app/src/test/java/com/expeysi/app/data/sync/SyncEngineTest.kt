@@ -1,6 +1,7 @@
 package com.expeysi.app.data.sync
 
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -100,6 +101,34 @@ class SyncEngineTest {
     @Test
     fun `равные версии пропускаются`() {
         assertFalse(needsUpload(localUpdatedAt = 100, remoteUpdatedAt = 100))
+    }
+
+    @Test
+    fun `местная копия той же версии различает эру документа`() {
+        assertEquals(Money.SCALE, localScaleVerdict(12_345_600L, 1000, 1000, 12_345_600L))
+        assertEquals(Money.LEGACY_SCALE, localScaleVerdict(12_345_600L, 1000, 1000, 123_456L))
+    }
+
+    @Test
+    fun `без местной копии той же версии эра не определяется`() {
+        assertNull(localScaleVerdict(null, 0, 1000, 123_456L))
+        assertNull(localScaleVerdict(123_456L, 999, 1000, 123_456L))
+        assertNull(localScaleVerdict(777L, 1000, 1000, 123_456L))
+    }
+
+    @Test
+    fun `немаркированный документ той же версии ждёт метку`() {
+        val fields = mapOf<String, Any?>("amountMinor" to 150L)
+        assertTrue(needsScaleMark(fields, localUpdatedAt = 100, remoteUpdatedAt = 100))
+    }
+
+    @Test
+    fun `немаркированный документ иной версии и маркированный метку не ждут`() {
+        val fields = mapOf<String, Any?>("amountMinor" to 150L)
+        assertFalse(needsScaleMark(fields, localUpdatedAt = 100, remoteUpdatedAt = 101))
+        assertFalse(needsScaleMark(fields, localUpdatedAt = 100, remoteUpdatedAt = null))
+        val marked = fields + ("amountScale" to Money.SCALE)
+        assertFalse(needsScaleMark(marked, localUpdatedAt = 100, remoteUpdatedAt = 100))
     }
 
     @Test

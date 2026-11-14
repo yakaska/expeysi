@@ -6,7 +6,8 @@ import java.math.RoundingMode
 /**
  * Простейший калькулятор: операции выполняются последовательно слева направо,
  * без приоритета умножения (как на карманном калькуляторе).
- * Результаты округляются до 2 знаков — сумма всё равно хранится в копейках.
+ * Результаты округляются до четырёх знаков после запятой — столько же, сколько
+ * точность ввода сумм. Хвостовые нули результата срезаются на показе.
  * [expression] хранит ход текущего вычисления («100 − 40 + 10 =») для показа в интерфейсе.
  */
 class Calculator {
@@ -153,7 +154,7 @@ class Calculator {
         return true
     }
 
-    private fun format(value: Double): String = BigDecimal(value).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
+    private fun format(value: Double): String = BigDecimal(value).setScale(4, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString()
 
     companion object {
         /** Технический маркер ошибки в display; локализованный текст рисует UI из ресурсов (calc_error). */

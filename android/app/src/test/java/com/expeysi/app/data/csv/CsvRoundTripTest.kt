@@ -58,16 +58,16 @@ class CsvRoundTripTest {
     @Test
     fun `экспорт читается обратно с остатками операциями и оформлением`() {
         val accounts = listOf(
-            account("a1", "Карта", opening = 50_000, balanceId = "b1", iconKey = "credit_card"),
-            account("a2", "Наличные", opening = -10_000, balanceId = "b1", colorKey = "green"),
-            account("a3", "Сейф", opening = 2_000_000, balanceId = "b1"),
-            account("a4", "Bucks", opening = 30_000, balanceId = "b2"),
+            account("a1", "Карта", opening = 5_000_000, balanceId = "b1", iconKey = "credit_card"),
+            account("a2", "Наличные", opening = -1_000_000, balanceId = "b1", colorKey = "green"),
+            account("a3", "Сейф", opening = 200_000_000, balanceId = "b1"),
+            account("a4", "Bucks", opening = 3_000_000, balanceId = "b2"),
         )
         val transactions = listOf(
-            tx("t1", TxType.INCOME, 150_000, "a1", "c2", millis("2026-01-02T03:04:00Z")),
-            tx("t2", TxType.EXPENSE, 25_050, "a1", "c1", millis("2026-01-05T22:30:00Z"), note = "Магазин; «ужин»"),
-            tx("t3", TxType.EXPENSE, 5_000, "a2", "c1", millis("2025-12-31T10:00:00Z")),
-            tx("t4", TxType.INCOME, 1_000_000, "a4", "c2", millis("2026-01-06T09:00:00Z")),
+            tx("t1", TxType.INCOME, 15_000_000, "a1", "c2", millis("2026-01-02T03:04:00Z")),
+            tx("t2", TxType.EXPENSE, 2_505_000, "a1", "c1", millis("2026-01-05T22:30:00Z"), note = "Магазин; «ужин»"),
+            tx("t3", TxType.EXPENSE, 500_000, "a2", "c1", millis("2025-12-31T10:00:00Z")),
+            tx("t4", TxType.INCOME, 100_000_000, "a4", "c2", millis("2026-01-06T09:00:00Z")),
         )
         val file = buildCsv(
             accounts = accounts,
@@ -89,10 +89,10 @@ class CsvRoundTripTest {
         // в разных балансах не сливаются.
         assertEquals(
             mapOf(
-                AccountKey("Карта", "RUB", "Основной") to 50_000L,
-                AccountKey("Наличные", "RUB", "Основной") to -10_000L,
-                AccountKey("Сейф", "RUB", "Основной") to 2_000_000L,
-                AccountKey("Bucks", "USD", "Вьетнам") to 30_000L,
+                AccountKey("Карта", "RUB", "Основной") to 5_000_000L,
+                AccountKey("Наличные", "RUB", "Основной") to -1_000_000L,
+                AccountKey("Сейф", "RUB", "Основной") to 200_000_000L,
+                AccountKey("Bucks", "USD", "Вьетнам") to 3_000_000L,
             ),
             opening,
         )
@@ -110,7 +110,7 @@ class CsvRoundTripTest {
             ),
             operations.map { Triple(it.accountName, it.categoryName, it.type) }.toSet(),
         )
-        assertEquals("Магазин; «ужин»", operations.first { it.type == TxType.EXPENSE && it.amountMinor == 25_050L }.note)
+        assertEquals("Магазин; «ужин»", operations.first { it.type == TxType.EXPENSE && it.amountMinor == 2_505_000L }.note)
         // Оформление: счёт, категория и баланс из колонок экспорта.
         assertEquals("credit_card", operations.first { it.accountName == "Карта" }.accountIconKey)
         assertEquals("restaurant", operations.first { it.categoryName == "Еда" }.categoryIconKey)
@@ -145,12 +145,12 @@ class CsvRoundTripTest {
         assertEquals("Карта", mapped.name)
         assertEquals("credit_card", mapped.iconKey)
         assertEquals("blue", mapped.colorKey)
-        assertEquals(50_000L, mapped.openingBalanceMinor)
+        assertEquals(5_000_000L, mapped.openingBalanceMinor)
         assertEquals("RUB", mapped.currencyCode)
         assertEquals(resolvedBalances.getValue(BalanceKey("Основной", "RUB")).id, mapped.balanceId)
         val bucksAccount = resolvedAccounts.getValue(AccountKey("Bucks", "USD", "Вьетнам"))
         assertEquals("USD", bucksAccount.currencyCode)
-        assertEquals(30_000L, bucksAccount.openingBalanceMinor)
+        assertEquals(3_000_000L, bucksAccount.openingBalanceMinor)
         assertEquals(resolvedBalances.getValue(BalanceKey("Вьетнам", "USD")).id, bucksAccount.balanceId)
         // Баланс каждого счёта после переимпорта сходится: остаток + доходы − расходы
         // считаем до и после, а не одну и ту же формулу дважды.
@@ -233,13 +233,13 @@ class CsvRoundTripTest {
         // Аддитивный импорт: счета не переиспользуются — каждая загрузка кладёт
         // свежую копию с оформлением и остатком из файла, привязанную к новому
         // балансу той же загрузки.
-        val first = resolveAccounts(items, balanceByKey, openingByKey = mapOf(key to 50_000L), nowMillis = 0)
+        val first = resolveAccounts(items, balanceByKey, openingByKey = mapOf(key to 5_000_000L), nowMillis = 0)
             .getValue(key)
-        val second = resolveAccounts(items, balanceByKey, openingByKey = mapOf(key to 50_000L), nowMillis = 1)
+        val second = resolveAccounts(items, balanceByKey, openingByKey = mapOf(key to 5_000_000L), nowMillis = 1)
             .getValue(key)
         assertEquals("credit_card", first.iconKey)
         assertEquals("teal", first.colorKey)
-        assertEquals(50_000L, first.openingBalanceMinor)
+        assertEquals(5_000_000L, first.openingBalanceMinor)
         assertEquals(balanceByKey.getValue(BalanceKey("Основной", "RUB")).id, first.balanceId)
         UUID.fromString(first.id)
         UUID.fromString(second.id)
@@ -281,7 +281,8 @@ class CsvRoundTripTest {
                 ),
             ),
         )
-        assertEquals(20_000L, opening[AccountKey("Карта", "RUB", "Основной")])
+        // «100.00» замещается «200.00»: в новом масштабе это 2 000 000.
+        assertEquals(2_000_000L, opening[AccountKey("Карта", "RUB", "Основной")])
         assertEquals(1, operations.size)
     }
 

@@ -4,6 +4,15 @@ import kotlin.math.abs
 
 object Money {
 
+    /** Масштаб хранения: столько минимальных единиц в одной основной единице валюты. */
+    const val SCALE = 10_000L
+
+    /** Знаков дробной части после запятой в основной единице: 1/10 000. */
+    const val SCALE_DIGITS = 4
+
+    /** Прежний масштаб хранения (сотые доли валюты) до перехода на 1/10 000. */
+    const val LEGACY_SCALE = 100L
+
     /** Неразрывный пробел: группировка разрядов и связь числа с единицей порядка. */
     private const val NON_BREAKING_SPACE = "\u00A0"
 
@@ -17,16 +26,16 @@ object Money {
     /** Числовая часть и порядок компактной записи; суффикс порядка резолвится в UI-слое. */
     data class CompactAmount(val digits: String, val scale: Scale)
 
-    /** "123,45" или "123.45" → 12345. Мусор → null. */
+    /** "12,3456" или "12.34" → 123456. Мусор или больше четырёх знаков дробной части → null. */
     fun parseToMinor(text: String): Long? {
         val cleaned = compact(text).replace(',', '.')
-        if (!Regex("""^-?\d+(\.\d{1,2})?$""").matches(cleaned)) return null
+        if (!Regex("""^-?\d+(\.\d{1,4})?$""").matches(cleaned)) return null
         val negative = cleaned.startsWith("-")
         val absText = cleaned.removePrefix("-")
         val dot = absText.indexOf('.')
-        val rubles = if (dot == -1) absText else absText.substring(0, dot)
-        val kopecks = if (dot == -1) "0" else absText.substring(dot + 1)
-        val minor = rubles.toLong() * 100 + kopecks.padEnd(2, '0').toLong()
+        val major = if (dot == -1) absText else absText.substring(0, dot)
+        val fraction = if (dot == -1) "0" else absText.substring(dot + 1)
+        val minor = major.toLong() * SCALE + fraction.padEnd(SCALE_DIGITS, '0').toLong()
         return if (negative) -minor else minor
     }
 
@@ -51,29 +60,33 @@ object Money {
         return sign + grouped + fraction
     }
 
-    /** 123456 → "1 234,56". */
+    /**
+     * Только значащие знаки: "12,34", не "12,3400"; "12,311", не "12,3110";
+     * целая сумма — без запятой ("12"). Нули дробной части срезаны, поэтому
+     * format(minor) == formatAuto(minor); оба оставлены для ясности вызовов.
+     */
     fun format(minor: Long): String {
         val negative = minor < 0
         val absolute = abs(minor)
-        val rubles = grouped(absolute / 100)
-        val kopecks = (absolute % 100).toString().padStart(2, '0')
+        val whole = grouped(absolute / SCALE)
+        val fraction = (absolute % SCALE).toString().padStart(SCALE_DIGITS, '0').trimEnd('0')
         val sign = if (negative) "-" else ""
-        return "$sign$rubles,$kopecks"
+        return if (fraction.isEmpty()) "$sign$whole" else "$sign$whole,$fraction"
     }
 
-    /** 123456 → "1 234": целые основные единицы без копеек, группы разрядов — неразрывный пробел. */
+    /** 123456 → "12": целые основные единицы без дробной части, группы разрядов — неразрывный пробел. */
     fun formatWhole(minor: Long): String {
-        val major = minor / 100
+        val major = minor / SCALE
         val sign = if (major < 0) "-" else ""
         return sign + grouped(abs(major), NON_BREAKING_SPACE)
     }
 
-    /** Целая сумма — без копеек ("58 000"), с дробной частью — как в format() ("1 234,56"). */
-    fun formatAuto(minor: Long): String = if (minor % 100 == 0L) formatWhole(minor) else format(minor)
+    /** Целая сумма — без дробной части ("58 000"), с дробной — только значащие знаки ("12,34"). */
+    fun formatAuto(minor: Long): String = if (minor % SCALE == 0L) formatWhole(minor) else format(minor)
 
     /**
      * Компактный вид одной строкой: до миллиона основных единиц — целое число либо
-     * дробная часть, если она есть ("1 234,56"); от миллиона — один знак после
+     * дробная часть, если она есть ("1 234,5678"); от миллиона — один знак после
      * запятой и единица из ресурсов UI-слоя ("6,7 млн"; 999,95 млн → "1 млрд"
      * вместо "1000,0 млн"). Знак минус сохраняется.
      */
@@ -93,13 +106,13 @@ object Money {
 
     /**
      * Компактный вид для сводок. Суммы от миллиона основных единиц — с одним знаком
-     * после запятой ("6,7" + Scale.MILLION), ниже порога — обычное число без нулевой
-     * дробной части ("1 234"), с дробью — как в format().
+     * после запятой ("6,7" + Scale.MILLION), ниже порога — целые числа без нулевой
+     * дробной части ("1 234"), с дробью — только значащие знаки ("1 234,56").
      */
     fun compact(minor: Long): CompactAmount {
         val sign = if (minor < 0) "-" else ""
         val absolute = abs(minor)
-        val major = absolute / 100
+        val major = absolute / SCALE
         val scale = when {
             major >= Scale.BILLION.majorUnits -> Scale.BILLION
             major >= Scale.MILLION.majorUnits -> Scale.MILLION
@@ -107,7 +120,7 @@ object Money {
         }
         return when (scale) {
             Scale.NONE -> {
-                val digits = if (minor % 100 == 0L) grouped(major, NON_BREAKING_SPACE) else format(absolute)
+                val digits = if (minor % SCALE == 0L) grouped(major, NON_BREAKING_SPACE) else format(absolute)
                 CompactAmount(sign + digits, Scale.NONE)
             }
             else -> compactScaled(sign, absolute, scale)
@@ -116,7 +129,7 @@ object Money {
 
     /** Округлённый до одного знака minor / масштаб; при переходе через порядок масштаб повышается. */
     private tailrec fun compactScaled(sign: String, minor: Long, scale: Scale): CompactAmount {
-        val unitMinor = scale.majorUnits * 100
+        val unitMinor = scale.majorUnits * SCALE
         /*
          * (minor * 10 + unitMinor / 2) / unitMinor переполняет long на больших minor,
          * поэтому деление выполнено до умножения; minor >= 0, кроме Long.MIN_VALUE.

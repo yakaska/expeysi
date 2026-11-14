@@ -44,6 +44,7 @@
     <string name="history_mode_accounts">Счета</string>
     <string name="history_back_groups_cd">К группам</string>
     <string name="history_expand_cd">Развернуть</string>
+    <string name="history_edit_account">Изменить счёт</string>
     <string name="home_top_categories">Расходы по категориям</string>
     <string name="home_total">Итого</string>
     <string name="home_empty_title">Пока пусто</string>
@@ -145,7 +146,7 @@
     <string name="import_error_bad_currency">Строка %1$d: некорректная валюта</string>
     <string name="import_error_bad_amount">Строка %1$d: некорректная сумма</string>
     <string name="import_error_zero_amount">Строка %1$d: нулевая сумма</string>
-    <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
+    <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше четырёх знаков</string>
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
     <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->

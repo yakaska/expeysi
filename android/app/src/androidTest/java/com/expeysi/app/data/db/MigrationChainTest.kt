@@ -14,9 +14,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Полный путь 2→9: база собирается из самой старой коммитнутой схемы (2.json)
+ * Полный путь 2→10: база собирается из самой старой коммитнутой схемы (2.json)
  * и открывается через databaseBuilder со всем списком ALL_MIGRATIONS — тем же,
- * что регистрирует DataModule. 1→2 пути не входит: `1.json` не коммитился.
+ * что регистрирует DataModule. Путь 1→2 не входит: `1.json` не коммитился.
  */
 @RunWith(AndroidJUnit4::class)
 class MigrationChainTest {
@@ -56,17 +56,21 @@ class MigrationChainTest {
             .build()
 
         runBlocking {
-            // Первый DAO-запрос открывает базу и прогоняет все миграции 2→9.
+            // Первый DAO-запрос открывает базу и прогоняет все миграции 2→10.
             val account = db.accountDao().byId(PresetData.ACCOUNT_CASH_ID)
             assertNotNull(account)
-            assertEquals(1500L, account!!.openingBalanceMinor)
+            // 9→10 пересчитал масштаб сумм (сотые доли → десятитысячные, ×100),
+            // метки времени не тронул: журнал пересчитывается при чтении.
+            assertEquals(150_000L, account!!.openingBalanceMinor)
+            assertEquals(1L, account.updatedAt)
             assertEquals("RUB", account.currencyCode)
             // 3→4 привязал счёт к созданному под его валюту балансу.
             assertEquals(PresetData.BALANCE_MAIN_ID, account.balanceId)
 
             val transaction = db.transactionDao().byId("t1")
             assertNotNull(transaction)
-            assertEquals(500L, transaction!!.amountMinor)
+            assertEquals(50_000L, transaction!!.amountMinor)
+            assertEquals(1L, transaction.updatedAt)
             assertEquals(PresetData.ACCOUNT_CASH_ID, transaction.accountId)
             // 8→9 добавил полям перевода пустые дефолты у обычных операций.
             assertEquals("", transaction.linkedId)

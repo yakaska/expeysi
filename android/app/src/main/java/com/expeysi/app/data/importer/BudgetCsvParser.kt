@@ -1,6 +1,7 @@
 package com.expeysi.app.data.importer
 
 import com.expeysi.app.data.csv.CsvFormat
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import java.io.InputStream
 import java.math.BigDecimal
@@ -88,7 +89,7 @@ class BudgetCsvParser @Inject constructor() {
         }
         if (amount.signum() == 0) throw BudgetImportException(BudgetImportError.ZERO_AMOUNT, line = line)
         val amountMinor = try {
-            amount.abs().movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
+            amount.abs().movePointRight(Money.SCALE_DIGITS).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
         } catch (_: ArithmeticException) {
             throw BudgetImportException(BudgetImportError.AMOUNT_TOO_LARGE, line = line)
         }

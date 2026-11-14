@@ -44,6 +44,8 @@ data class HistoryDetail(val categoryId: String, val accountId: String? = null)
 data class HistoryUiState(
     val title: UiText = UiText.Plain(""),
     val isAccountMode: Boolean = false,
+    /** Не null в режиме истории одного счёта: оттуда можно открыть его правку. */
+    val accountId: String? = null,
     val accounts: List<AccountEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val items: List<TransactionItem> = emptyList(),
@@ -209,6 +211,7 @@ class HistoryViewModel @Inject constructor(
         HistoryUiState(
             title = title,
             isAccountMode = isAccountMode,
+            accountId = accountId,
             accounts = if (isAccountMode) emptyList() else scopeAccounts,
             categories = data.categories,
             items = items,
