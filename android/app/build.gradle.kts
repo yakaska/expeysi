@@ -21,6 +21,7 @@ android {
         targetSdk = 36
         versionCode = 2
         versionName = "0.1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
@@ -51,6 +52,14 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    sourceSets {
+        // Схемы Room идут ассетами androidTest: MigrationTestHelper читает из них
+        // v8 и v9 при валидации миграции 8→9.
+        getByName("androidTest") {
+            assets.srcDir("$projectDir/schemas")
+        }
     }
 }
 
@@ -112,4 +121,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+
+    androidTestImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.runner)
 }
