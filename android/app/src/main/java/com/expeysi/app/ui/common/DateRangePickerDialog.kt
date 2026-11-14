@@ -98,8 +98,6 @@ fun DateRangePickerDialog(
  * Конвенция пикеров дат проекта — миллисекунды полуночи в UTC
  * (как в AddTransactionViewModel).
  */
-private fun LocalDate.toUtcMidnightMillis(): Long =
-    atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+private fun LocalDate.toUtcMidnightMillis(): Long = atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
-private fun fromUtcMidnightMillis(millis: Long): LocalDate =
-    Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+private fun fromUtcMidnightMillis(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()

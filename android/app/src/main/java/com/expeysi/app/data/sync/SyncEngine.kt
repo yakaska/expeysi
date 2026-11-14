@@ -21,6 +21,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.channels.awaitClose
@@ -37,7 +38,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.retryWhen
 import kotlinx.coroutines.flow.transformLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import java.util.concurrent.ConcurrentHashMap
@@ -455,12 +455,14 @@ private class RemoteState {
     /** Смена семьи или её повторный выбор: снимки прежней семьи больше неактуальны. */
     fun reset() = collections.values.forEach { it.clear() }
 
-    private fun collection(name: String): MutableMap<String, RemoteDocument> =
-        collections.getOrPut(name) { ConcurrentHashMap() }
+    private fun collection(name: String): MutableMap<String, RemoteDocument> = collections.getOrPut(name) { ConcurrentHashMap() }
 
     /** Замена снимков коллекции содержимым нового полного события. */
     fun replace(name: String, documents: Map<String, RemoteDocument>) {
-        collection(name).apply { clear(); putAll(documents) }
+        collection(name).apply {
+            clear()
+            putAll(documents)
+        }
     }
 
     fun updatedAt(name: String, id: String): Long? = collection(name)[id]?.updatedAt
@@ -503,14 +505,15 @@ internal fun sameFields(local: Map<String, Any?>, remote: Map<String, Any?>): Bo
         val other = remote[key] ?: return false
         if (value is Number && other is Number) {
             if (value.toLong() != other.toLong()) return false
-        } else if (value != other) return false
+        } else if (value != other) {
+            return false
+        }
     }
     return true
 }
 
 /** Пауза переподключения слушателя: 5 с, 10 с, 20 с… до потолка. */
-internal fun backoffMillis(failureStreak: Int): Long =
-    (RETRY_DELAY_START_MILLIS shl failureStreak.coerceAtMost(RETRY_SHIFT_MAX)).coerceAtMost(RETRY_DELAY_MAX_MILLIS)
+internal fun backoffMillis(failureStreak: Int): Long = (RETRY_DELAY_START_MILLIS shl failureStreak.coerceAtMost(RETRY_SHIFT_MAX)).coerceAtMost(RETRY_DELAY_MAX_MILLIS)
 
 /**
  * Окно синхронизации по видимости приложения: на переднем плане — true; ушедшее
@@ -521,17 +524,16 @@ internal fun backoffMillis(failureStreak: Int): Long =
  * внутри окна не переиздаёт true: повторное значение не должно пересобирать
  * сессию синхронизации.
  */
-internal fun graceDetach(foreground: Flow<Boolean>, graceMillis: Long): Flow<Boolean> =
-    foreground.transformLatest { isForeground ->
-        if (isForeground) {
-            emit(true)
-            awaitCancellation()
-        } else {
-            delay(graceMillis)
-            emit(false)
-            awaitCancellation()
-        }
-    }.distinctUntilChanged()
+internal fun graceDetach(foreground: Flow<Boolean>, graceMillis: Long): Flow<Boolean> = foreground.transformLatest { isForeground ->
+    if (isForeground) {
+        emit(true)
+        awaitCancellation()
+    } else {
+        delay(graceMillis)
+        emit(false)
+        awaitCancellation()
+    }
+}.distinctUntilChanged()
 
 /** Порог ожидания подтверждения одного батча загрузки импорта. */
 private const val IMPORT_UPLOAD_TIMEOUT_MILLIS = 20_000L

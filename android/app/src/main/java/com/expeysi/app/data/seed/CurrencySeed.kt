@@ -264,8 +264,7 @@ object CurrencySeed {
     private val yearsPattern = Regex("\\(\\d{4}([–—-]\\d{4})?\\)")
 
     /** Устаревшая ли валюта: скрывается в пикере баланса. */
-    fun isDeprecated(row: CurrencyRow): Boolean =
-        row.code in deprecatedCodes || yearsPattern.containsMatchIn(row.name)
+    fun isDeprecated(row: CurrencyRow): Boolean = row.code in deprecatedCodes || yearsPattern.containsMatchIn(row.name)
 
     /** Спец-коды, не являющиеся валютами: металлы, фонды, тестовые и неизвестные. */
     private val hiddenCodes: Set<String> = setOf(

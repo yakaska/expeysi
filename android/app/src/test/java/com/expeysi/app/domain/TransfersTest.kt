@@ -15,18 +15,17 @@ private fun leg(
     counterAccountId: String = "a2",
     date: Long = 0L,
     updatedAt: Long = 0L,
-) =
-    TransactionEntity(
-        id = id,
-        type = type.wire,
-        amountMinor = 100_00L,
-        accountId = accountId,
-        categoryId = "",
-        date = date,
-        linkedId = linkedId,
-        counterpartyAccountId = counterAccountId,
-        updatedAt = updatedAt,
-    )
+) = TransactionEntity(
+    id = id,
+    type = type.wire,
+    amountMinor = 100_00L,
+    accountId = accountId,
+    categoryId = "",
+    date = date,
+    linkedId = linkedId,
+    counterpartyAccountId = counterAccountId,
+    updatedAt = updatedAt,
+)
 
 class TransfersTest {
 

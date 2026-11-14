@@ -237,9 +237,13 @@ class AddTransactionViewModel @Inject constructor(
     ) { from, to, fromAmount, toAmount ->
         val out = Money.parseToMinor(fromAmount)
         val inMinor = Money.parseToMinor(toAmount)
-        from != null && to != null && from != to &&
-            out != null && out > 0 &&
-            inMinor != null && inMinor > 0
+        from != null &&
+            to != null &&
+            from != to &&
+            out != null &&
+            out > 0 &&
+            inMinor != null &&
+            inMinor > 0
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val canSave: StateFlow<Boolean> = combine(

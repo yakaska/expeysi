@@ -189,9 +189,7 @@ internal fun rangeLabel(range: DateRangeFilter): String {
 }
 
 /** Начало диапазона пикеру: millis хранятся в системной зоне (см. DateRangeFilter.ofDays). */
-private fun DateRangeFilter.startLocalDate(): LocalDate =
-    Instant.ofEpochMilli(startMillis).atZone(ZoneId.systemDefault()).toLocalDate()
+private fun DateRangeFilter.startLocalDate(): LocalDate = Instant.ofEpochMilli(startMillis).atZone(ZoneId.systemDefault()).toLocalDate()
 
 /** Конец диапазона пикеру: миллисекунда конца дня, у последнего дня — от неё же. */
-private fun DateRangeFilter.endLocalDate(): LocalDate =
-    Instant.ofEpochMilli(endMillisExclusive - 1).atZone(ZoneId.systemDefault()).toLocalDate()
+private fun DateRangeFilter.endLocalDate(): LocalDate = Instant.ofEpochMilli(endMillisExclusive - 1).atZone(ZoneId.systemDefault()).toLocalDate()

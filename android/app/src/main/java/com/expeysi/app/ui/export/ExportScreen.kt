@@ -51,7 +51,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -406,7 +405,6 @@ private fun suggestedFileName(): String = "expeysi-" + LocalDate.now().format(FI
 private val FILE_DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd")
 
 /** Метка диапазона: «01.01.26–05.02.26», как у шторки периода. */
-private fun exportRangeLabel(from: LocalDate, to: LocalDate): String =
-    from.format(RANGE_DAY_FORMAT) + "–" + to.format(RANGE_DAY_FORMAT)
+private fun exportRangeLabel(from: LocalDate, to: LocalDate): String = from.format(RANGE_DAY_FORMAT) + "–" + to.format(RANGE_DAY_FORMAT)
 
 private val RANGE_DAY_FORMAT = DateTimeFormatter.ofPattern("dd.MM.yy")

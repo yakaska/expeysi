@@ -313,11 +313,10 @@ fun AddTransactionScreen(
     val toAccount = accounts.firstOrNull { it.id == toAccountId }
 
     /** Символ валюты счёта = валюта его баланса; без счёта — валюта по умолчанию. */
-    fun currencySymbolOf(account: AccountEntity?): String =
-        account
-            ?.let { balances[it.balanceId]?.currencyCode }
-            ?.let { currencySymbols[it] ?: it }
-            ?: Currency.DEFAULT
+    fun currencySymbolOf(account: AccountEntity?): String = account
+        ?.let { balances[it.balanceId]?.currencyCode }
+        ?.let { currencySymbols[it] ?: it }
+        ?: Currency.DEFAULT
 
     val selectedCategory = categories.firstOrNull { it.id == selectedCategoryId }
 

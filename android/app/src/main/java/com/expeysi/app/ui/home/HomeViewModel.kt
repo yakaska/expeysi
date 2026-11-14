@@ -22,10 +22,10 @@ import com.expeysi.app.data.importer.BudgetImportException
 import com.expeysi.app.data.importer.BudgetImportService
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.Periods
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxDayAmount
 import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
-import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
 import com.expeysi.app.ui.common.UiText

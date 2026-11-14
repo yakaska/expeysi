@@ -89,6 +89,21 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+// room-migration-jvm 2.8 сериализует bundle-схемы через kotlinx.serialization 1.8,
+// а lifecycle-viewmodel-compose 2.9.4 своей зависимостью снижает его до 1.7.3 —
+// AGP consistent-resolution закрепляет 1.7.3 strict-констрейнтом и на
+// androidTest-classpath, из-за чего миграционные тесты падают с
+// AbstractMethodError ещё до запуска миграций. Поднимаем семейство
+// kotlinx-serialization только на androidTest-конфигурациях.
+// https://issuetracker.google.com/issues/447154195
+configurations.matching { it.name.contains("AndroidTest") && it.name.contains("RuntimeClasspath") }.configureEach {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlinx" && requested.name.startsWith("kotlinx-serialization-")) {
+            useVersion("1.8.1")
+        }
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
