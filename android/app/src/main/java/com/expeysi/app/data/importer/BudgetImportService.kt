@@ -59,8 +59,9 @@ class BudgetImportService @Inject constructor(
             }.toMutableMap()
 
         // Строки со связкой перевода восстанавливаются парой ног transfer_out /
-        // transfer_in; вырожденная связка (партнёр отфильтрован из выгрузки)
-        // остаётся обычной операцией, как и файлы без колонки связки.
+        // transfer_in; группа без валидной пары (одинокая нога, лишние ноги той
+        // же связки, обе стороны на одном счёте) целиком остаётся обычными
+        // операциями — строки файла не выбрасываются.
         val (linkedRows, plainRows) = operations.partition { !it.transferLinkId.isNullOrEmpty() }
         val transferLegs = mutableListOf<TransactionEntity>()
         val degenerateRows = mutableListOf<BudgetTransaction>()
@@ -159,18 +160,24 @@ internal fun normalizeBudgetCategoryName(name: String): String = name.trim().low
  * импорта независима от пар в живых данных и от других загрузок того же файла,
  * а счёт-контрагент каждой ноги — второй счёт пары. [categoryId] пустой:
  * у ног перевода категории нет, категория «Перевод» из строки отбрасывается.
- * Пустой список — связка вырожденная (только списание или только зачисление):
- * строки остаются обычными операциями.
+ * Пустой список — связка вырожденная, и ВСЕ её строки остаются обычными
+ * операциями: не ровно один расход и один доход, либо обе стороны на одном
+ * счёте. Строки группы целиком импортируются своими знаками — ни одна строка
+ * файла не выбрасывается, остатки складываются по арифметике CSV.
  */
 internal fun transferLegsOf(
     rows: List<BudgetTransaction>,
     accountByKey: Map<AccountKey, AccountEntity>,
     nowMillis: Long,
 ): List<TransactionEntity> {
-    val out = rows.firstOrNull { it.type == TxType.EXPENSE } ?: return emptyList()
-    val inRow = rows.firstOrNull { it.type == TxType.INCOME } ?: return emptyList()
+    val outs = rows.filter { it.type == TxType.EXPENSE }
+    val ins = rows.filter { it.type == TxType.INCOME }
+    if (outs.size != 1 || ins.size != 1) return emptyList()
+    val out = outs.single()
+    val inRow = ins.single()
     val outAccount = accountByKey.getValue(out.accountKey())
     val inAccount = accountByKey.getValue(inRow.accountKey())
+    if (outAccount.id == inAccount.id) return emptyList()
     val linkedId = UUID.randomUUID().toString()
     return listOf(
         TransactionEntity(

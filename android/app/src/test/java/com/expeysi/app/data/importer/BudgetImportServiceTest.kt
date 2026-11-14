@@ -140,6 +140,59 @@ class BudgetImportServiceTest {
     }
 
     @Test
+    fun `три строки связки целиком остаются операциями`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+            item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `два списания в одной связке целиком остаются операциями`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `списание и зачисление на одном счете не реконструируются`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+    }
+
+    @Test
+    fun `вырожденная связка импортируется строками один к одному`() {
+        // Как в BudgetImportService.import: группа без валидной пары идёт
+        // обычными операциями — каждая строка файла становится операцией
+        // своего знака, число операций равно числу строк, а остатки счетов
+        // складываются с арифметикой CSV без потерь и без надстроек.
+        val rows = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 20_000, transferLinkId = "L1"),
+            item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+        )
+        assertTrue(transferLegsOf(rows, accounts, nowMillis = 77).isEmpty())
+
+        assertEquals(rows.size, 3)
+        val signed = { name: String ->
+            rows.filter { it.accountName == name }
+                .sumOf { if (it.type == TxType.EXPENSE) -it.amountMinor else it.amountMinor }
+        }
+        assertEquals(-30_000L, signed("Карта"))
+        assertEquals(30_000L, signed("Кошелёк"))
+    }
+
+    @Test
     fun `повторная загрузка того же файла даёт независимую связку`() {
         val rows = listOf(
             item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
