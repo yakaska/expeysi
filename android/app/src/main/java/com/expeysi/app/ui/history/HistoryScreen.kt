@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -83,6 +84,8 @@ fun HistoryScreen(
     onBack: () -> Unit,
     onAddClick: (TxType?) -> Unit,
     onItemClick: (String) -> Unit,
+    /** Правка счёта в режиме истории счёта; тот же экран, что и через «Счета» в drawer. */
+    onEditAccountClick: (String) -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -208,6 +211,16 @@ fun HistoryScreen(
                             Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.common_back),
                         )
+                    }
+                },
+                actions = {
+                    state.accountId?.let { accountId ->
+                        IconButton(onClick = { onEditAccountClick(accountId) }) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = stringResource(R.string.history_edit_account),
+                            )
+                        }
                     }
                 },
             )

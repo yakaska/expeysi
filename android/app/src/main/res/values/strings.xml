@@ -46,6 +46,7 @@
     <string name="history_mode_accounts">Accounts</string>
     <string name="history_back_groups_cd">Back to groups</string>
     <string name="history_expand_cd">Expand</string>
+    <string name="history_edit_account">Edit account</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
