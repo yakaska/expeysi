@@ -58,13 +58,13 @@ class CsvExportServiceTest {
         // создаёт, удалённые счёт и операция пропущены. Валюта — из баланса счёта.
         val expected = listOf(
             EXTENDED_HEADER,
-            "2026-02-01;00:00;Доллары;Начальный остаток;2500.0000;USD;;;;savings;amber;Вьетнам;home;red;",
-            "2026-01-02;00:00;Карта;Начальный остаток;500.0000;RUB;;;;credit_card;blue;Основной;payments;blue;",
-            "2025-12-31;00:00;Наличные;Начальный остаток;-100.0000;RUB;;;;payments;green;Основной;payments;blue;",
-            "2025-12-31;10:00;Наличные;Еда;-50.0000;RUB;;restaurant;orange;payments;green;Основной;payments;blue;",
-            "2026-01-02;03:04;Карта;Зарплата;1500.0000;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
-            "2026-01-05;22:30;Карта;Еда;-250.5000;RUB;\"Магазин; «ужин»\";restaurant;orange;credit_card;blue;Основной;payments;blue;",
-            "2026-01-07;12:00;Наличные;Старое;-70.0000;RUB;;home;red;payments;green;Основной;payments;blue;",
+            "2026-02-01;00:00;Доллары;Начальный остаток;2500.00;USD;;;;savings;amber;Вьетнам;home;red;",
+            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue;",
+            "2025-12-31;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;green;Основной;payments;blue;",
+            "2025-12-31;10:00;Наличные;Еда;-50.00;RUB;;restaurant;orange;payments;green;Основной;payments;blue;",
+            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
+            "2026-01-05;22:30;Карта;Еда;-250.50;RUB;\"Магазин; «ужин»\";restaurant;orange;credit_card;blue;Основной;payments;blue;",
+            "2026-01-07;12:00;Наличные;Старое;-70.00;RUB;;home;red;payments;green;Основной;payments;blue;",
             "",
         ).joinToString("\r\n")
         assertEquals(expected, file.text)
@@ -94,9 +94,9 @@ class CsvExportServiceTest {
         // выгружаются всегда.
         val expected = listOf(
             EXTENDED_HEADER,
-            "2026-01-02;00:00;Карта;Начальный остаток;500.0000;RUB;;;;credit_card;blue;Основной;payments;blue;",
-            "2026-02-01;00:00;Наличные;Начальный остаток;-100.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-            "2026-01-02;03:04;Карта;Зарплата;1500.0000;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
+            "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;credit_card;blue;Основной;payments;blue;",
+            "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue;",
+            "2026-01-02;03:04;Карта;Зарплата;1500.00;RUB;;work;green;credit_card;blue;Основной;payments;blue;",
             "",
         ).joinToString("\r\n")
         assertEquals(expected, file.text)
@@ -123,8 +123,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-02-01;00:00;Карта;Начальный остаток;500.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-                "2026-02-01;00:00;Наличные;Начальный остаток;-100.0000;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-02-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-02-01;00:00;Наличные;Начальный остаток;-100.00;RUB;;;;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -158,10 +158,10 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-02;00:00;Карта;Начальный остаток;500.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-                "2026-01-02;03:04;Карта;Перевод;-300.0000;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
-                "2026-01-02;03:04;Кошелёк;Перевод;300.0000;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
-                "2026-01-02;06:04;Карта;Зарплата;1500.0000;RUB;;work;green;payments;blue;Основной;payments;blue;",
+                "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-02;03:04;Карта;Перевод;-300.00;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
+                "2026-01-02;03:04;Кошелёк;Перевод;300.00;RUB;;swap_horiz;default;payments;blue;Основной;payments;blue;L1",
+                "2026-01-02;06:04;Карта;Зарплата;1500.00;RUB;;work;green;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -190,8 +190,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-02;00:00;Карта;Начальный остаток;500.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-                "2026-01-02;06:04;Карта;Зарплата;1500.0000;RUB;;work;green;payments;blue;Основной;payments;blue;",
+                "2026-01-02;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-02;06:04;Карта;Зарплата;1500.00;RUB;;work;green;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -230,9 +230,9 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-01;00:00;Карта;Начальный остаток;500.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-                "2026-01-01;00:00;Карта;Еда;-20.0000;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
-                "2026-01-31;23:00;Карта;Еда;-40.0000;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
+                "2026-01-01;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-01;00:00;Карта;Еда;-20.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
+                "2026-01-31;23:00;Карта;Еда;-40.00;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -263,8 +263,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER,
-                "2026-01-05;00:00;Карта;Начальный остаток;500.0000;RUB;;;;payments;blue;Основной;payments;blue;",
-                "2026-01-05;22:30;Карта;Еда;-250.5000;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
+                "2026-01-05;00:00;Карта;Начальный остаток;500.00;RUB;;;;payments;blue;Основной;payments;blue;",
+                "2026-01-05;22:30;Карта;Еда;-250.50;RUB;;restaurant;orange;payments;blue;Основной;payments;blue;",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -310,8 +310,8 @@ class CsvExportServiceTest {
         assertEquals(
             listOf(
                 EXTENDED_HEADER.replace(';', ','),
-                "2026-01-05,00:00,Карта,Начальный остаток,500.0000,RUB,,,,payments,blue,Основной,payments,blue,",
-                "2026-01-05,22:30,Карта,Еда,-250.5000,RUB,\"Магазин, «ужин»\",restaurant,orange,payments,blue,Основной,payments,blue,",
+                "2026-01-05,00:00,Карта,Начальный остаток,500.00,RUB,,,,payments,blue,Основной,payments,blue,",
+                "2026-01-05,22:30,Карта,Еда,-250.50,RUB,\"Магазин, «ужин»\",restaurant,orange,payments,blue,Основной,payments,blue,",
                 "",
             ).joinToString("\r\n"),
             file.text,
@@ -328,12 +328,14 @@ class CsvExportServiceTest {
     }
 
     @Test
-    fun `сумма пишется с точкой и четырьмя знаками`() {
-        assertEquals("0.0000", formatAmount(0))
+    fun `сумма пишется с точкой минимум два знака`() {
+        assertEquals("0.00", formatAmount(0))
         assertEquals("0.0005", formatAmount(5))
-        assertEquals("0.0100", formatAmount(100))
+        assertEquals("0.01", formatAmount(100))
+        assertEquals("0.001", formatAmount(10))
+        assertEquals("1234.56", formatAmount(12_345_600))
         assertEquals("1234.5678", formatAmount(12_345_678))
-        assertEquals("-100.1000", formatAmount(-1_001_000))
+        assertEquals("-100.10", formatAmount(-1_001_000))
     }
 
     @Test

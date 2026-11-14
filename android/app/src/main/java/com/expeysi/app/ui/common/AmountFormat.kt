@@ -19,13 +19,14 @@ object AmountFormat {
     /**
      * Курс перевода: сколько начислений приходится на единицу списания.
      * До трёх значащих цифр, крупный курс — целым числом ("1,25" → "25 000"),
-     * нули дробной части срезаются.
+     * нули дробной части срезаются. Суммы приходят в минимальных единицах
+     * ([Money.SCALE]), отношение масштабов не зависит.
      */
     fun rate(toMinor: Long, fromMinor: Long): String {
         require(fromMinor > 0 && toMinor > 0)
         val integerPart = toMinor / fromMinor
         val precision = MathContext(max(3, integerPart.toString().length), RoundingMode.HALF_UP)
-        val ratio = BigDecimal.valueOf(toMinor, 2).divide(BigDecimal.valueOf(fromMinor, 2), precision)
+        val ratio = BigDecimal.valueOf(toMinor, Money.SCALE_DIGITS).divide(BigDecimal.valueOf(fromMinor, Money.SCALE_DIGITS), precision)
         val plain = ratio.stripTrailingZeros().toPlainString()
         val dot = plain.indexOf('.')
         val integer = if (dot == -1) plain else plain.substring(0, dot)

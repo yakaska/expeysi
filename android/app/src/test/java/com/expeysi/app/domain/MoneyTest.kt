@@ -34,12 +34,12 @@ class MoneyTest {
     }
 
     @Test
-    fun `форматирование с группировкой и значащими знаками`() {
-        assertEquals("0", Money.format(0))
+    fun `форматирование с группировкой и минимумом двух знаков`() {
+        assertEquals("0,00", Money.format(0))
         assertEquals("0,0105", Money.format(105))
         assertEquals("1,05", Money.format(10_500))
         assertEquals("12,3456", Money.format(123_456))
-        assertEquals("-5", Money.format(-50_000))
+        assertEquals("-5,00", Money.format(-50_000))
         assertEquals("-0,05", Money.format(-500))
         assertEquals("123 456,789", Money.format(1_234_567_890L))
     }
@@ -85,11 +85,13 @@ class MoneyTest {
     }
 
     @Test
-    fun `только значащие знаки без нулевых хвостов`() {
+    fun `минимум два знака дальше только значащие`() {
         assertEquals("12,34", Money.format(123_400))
+        assertEquals("12,30", Money.format(123_000))
         assertEquals("12,311", Money.format(123_110))
-        assertEquals("123,4", Money.format(1_234_000))
-        assertEquals("123,4", Money.formatAuto(1_234_000))
+        assertEquals("123,40", Money.format(1_234_000))
+        assertEquals("123,40", Money.formatAuto(1_234_000))
+        assertEquals("1 234,00", Money.format(12_340_000))
     }
 
     @Test
@@ -167,15 +169,15 @@ class MoneyTest {
     }
 
     @Test
-    fun `автоформатирование показывает только значащие знаки`() {
+    fun `автоформатирование целых без дробной части`() {
         assertEquals("0", Money.formatAuto(0))
         assertEquals("1", Money.formatAuto(10_000L))
-        assertEquals("1,5", Money.formatAuto(15_000L))
+        assertEquals("1,50", Money.formatAuto(15_000L))
         assertEquals("12,34", Money.formatAuto(123_400))
         assertEquals("12,311", Money.formatAuto(123_110))
         assertEquals("1 234,56", Money.formatAuto(12_345_600))
         assertEquals("58\u00A0000", Money.formatAuto(580_000_000L))
-        assertEquals("-1,5", Money.formatAuto(-15_000L))
+        assertEquals("-1,50", Money.formatAuto(-15_000L))
         assertEquals("-58\u00A0000", Money.formatAuto(-580_000_000L))
     }
 

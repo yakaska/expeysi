@@ -217,11 +217,14 @@ private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.
 
 private fun csvRow(delimiter: Char, vararg fields: String): String = fields.joinToString(delimiter.toString()) { escape(it, delimiter) }
 
-/** 12345678 → "1234.5678", -1001000 → "-100.1000": точка и четыре знака, без группировки. */
+/** 12345678 → "1234.5678", -1001000 → "-100.10": точка, минимум два знака, без группировки. */
 internal fun formatAmount(minor: Long): String {
     val sign = if (minor < 0) "-" else ""
     val absolute = abs(minor)
-    return "$sign${absolute / Money.SCALE}.${(absolute % Money.SCALE).toString().padStart(Money.SCALE_DIGITS, '0')}"
+    val fraction = (absolute % Money.SCALE).toString().padStart(Money.SCALE_DIGITS, '0').trimEnd('0')
+        .ifEmpty { "00" }
+        .let { if (it.length < 2) it + "0" else it }
+    return "$sign${absolute / Money.SCALE}.$fraction"
 }
 
 /** RFC 4180: поле с разделителем, кавычкой или переводом строки — в кавычках, кавычки удваиваются. */

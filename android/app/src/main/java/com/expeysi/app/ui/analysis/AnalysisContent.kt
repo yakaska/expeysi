@@ -47,6 +47,7 @@ import com.expeysi.app.data.analysis.AnalysisAccount
 import com.expeysi.app.data.analysis.CategoryStat
 import com.expeysi.app.data.analysis.CategorySummary
 import com.expeysi.app.domain.HistoryPeriod
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.AmountFormat
 import com.expeysi.app.ui.common.categoriesLabel
@@ -344,7 +345,7 @@ private fun DonutBlock(
     }
     val typeLabel =
         stringResource(if (state.type == TxType.EXPENSE) R.string.home_expenses else R.string.home_income)
-    val amountPart = "${AmountFormat.amount(total)} ${rublesLabel(total / 100)}"
+    val amountPart = "${AmountFormat.amount(total)} ${rublesLabel(total / Money.SCALE)}"
     val description = if (state.period.kind == AnalysisPeriodKind.MONTHS) {
         stringResource(
             R.string.analysis_chart_cd,
