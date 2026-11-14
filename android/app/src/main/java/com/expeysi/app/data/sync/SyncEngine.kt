@@ -422,7 +422,21 @@ class SyncEngine @Inject constructor(
         )
         val local = transactionDao.byId(value.id)
         when {
-            local == null || value.updatedAt > local.updatedAt -> transactionDao.upsert(value)
+            local == null || value.updatedAt > local.updatedAt -> {
+                // Второй телефон мог стереть пару, пока эта нога не доехала:
+                // надгробие партнёра той же связки хоронит въезжающую ногу.
+                val tombstone = if (value.linkedId.isEmpty()) {
+                    null
+                } else {
+                    transferLegTombstone(value, transactionDao.byLinkedIdIncludingDeleted(value.linkedId))
+                }
+                if (tombstone == null) {
+                    transactionDao.upsert(value)
+                } else {
+                    transactionDao.upsert(tombstone)
+                    uploadTransaction(tombstone)
+                }
+            }
             value.updatedAt < local.updatedAt -> uploadTransaction(local)
         }
     }
@@ -455,6 +469,23 @@ private class RemoteState {
 }
 
 internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
+
+/**
+ * Надгробие для въехавшей ноги перевода: партнёр той же связки уже удалён
+ * локально (пара стёрта до того, как нога доехала до Firestore), и ногу хоронят
+ * вместе с ним — флаг `deleted`, версия и автор берутся из надгробия партнёра,
+ * а надгробие сразу отправляется в Firestore. Всё остальное слиянию не
+ * подчиняется: ноги без связки и уже удалённый документ идут по обычному
+ * last-write-wins, а надгробие партнёра старше въехавшей ноги не хоронит —
+ * значит, ногу правили позже удаления.
+ */
+internal fun transferLegTombstone(value: TransactionEntity, legs: List<TransactionEntity>): TransactionEntity? {
+    if (value.linkedId.isEmpty() || value.deleted) return null
+    val deletion = legs.firstOrNull {
+        it.id != value.id && it.linkedId == value.linkedId && it.deleted && it.updatedAt >= value.updatedAt
+    } ?: return null
+    return value.copy(deleted = true, updatedAt = deletion.updatedAt, updatedBy = deletion.updatedBy)
+}
 
 internal fun <T> firestoreBatches(values: List<T>): List<List<T>> = values.chunked(500)
 

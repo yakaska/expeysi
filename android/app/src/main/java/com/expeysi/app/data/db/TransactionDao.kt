@@ -39,6 +39,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE linkedId = :linkedId AND deleted = 0")
     suspend fun byLinkedId(linkedId: String): List<TransactionEntity>
 
+    /** Все ноги с одной связкой, включая удалённые: поиск надгробий пары при слиянии. */
+    @Query("SELECT * FROM transactions WHERE linkedId = :linkedId")
+    suspend fun byLinkedIdIncludingDeleted(linkedId: String): List<TransactionEntity>
+
     @Query("SELECT * FROM transactions WHERE accountId IN (:accountIds)")
     suspend fun byAccountIds(accountIds: List<String>): List<TransactionEntity>
 
