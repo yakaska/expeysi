@@ -8,6 +8,7 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -216,11 +217,11 @@ private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.
 
 private fun csvRow(delimiter: Char, vararg fields: String): String = fields.joinToString(delimiter.toString()) { escape(it, delimiter) }
 
-/** 123456 → "1234.56", -10010 → "-100.10": точка и два знака, без группировки. */
+/** 12345678 → "1234.5678", -1001000 → "-100.1000": точка и четыре знака, без группировки. */
 internal fun formatAmount(minor: Long): String {
     val sign = if (minor < 0) "-" else ""
     val absolute = abs(minor)
-    return "$sign${absolute / 100}.${(absolute % 100).toString().padStart(2, '0')}"
+    return "$sign${absolute / Money.SCALE}.${(absolute % Money.SCALE).toString().padStart(Money.SCALE_DIGITS, '0')}"
 }
 
 /** RFC 4180: поле с разделителем, кавычкой или переводом строки — в кавычках, кавычки удваиваются. */

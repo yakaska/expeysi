@@ -41,11 +41,11 @@ class CalculatorTest {
     }
 
     @Test
-    fun `деление округляется до двух знаков`() {
+    fun `деление округляется до четырёх знаков`() {
         val calc = Calculator()
         type(calc, "10/3")
         calc.equals()
-        assertEquals("3.33", calc.display)
+        assertEquals("3.3333", calc.display)
     }
 
     @Test
@@ -102,6 +102,17 @@ class CalculatorTest {
         calc.clear()
         assertEquals("0", calc.display)
         assertEquals("0", calc.resultText())
+    }
+
+    @Test
+    fun `хвостовые нули результата срезаются`() {
+        val calc = Calculator()
+        type(calc, "0.5*2")
+        calc.equals()
+        assertEquals("1", calc.display)
+        type(calc, "0.25*2")
+        calc.equals()
+        assertEquals("0.5", calc.display)
     }
 
     @Test

@@ -46,6 +46,7 @@
     <string name="history_mode_accounts">Accounts</string>
     <string name="history_back_groups_cd">Back to groups</string>
     <string name="history_expand_cd">Expand</string>
+    <string name="history_edit_account">Edit account</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
@@ -147,7 +148,7 @@
     <string name="import_error_bad_currency">Line %1$d: invalid currency</string>
     <string name="import_error_bad_amount">Line %1$d: invalid amount</string>
     <string name="import_error_zero_amount">Line %1$d: the amount is zero</string>
-    <string name="import_error_amount_too_large">Line %1$d: the amount is too large or has more than two decimal places</string>
+    <string name="import_error_amount_too_large">Line %1$d: the amount is too large or has more than four decimal places</string>
     <string name="import_error_bad_date">Line %1$d: invalid date or time</string>
     <string name="import_error_unclosed_quote">Line %1$d: unclosed quote</string>
     <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
@@ -201,6 +202,10 @@
     <string name="add_transfer_amount_from">Deducted, %1$s</string>
     <!-- %1$s — символ валюты. -->
     <string name="add_transfer_amount_to">Credited, %1$s</string>
+    <!-- %1$s — символ счёта списания, %2$s — курс, %3$s — символ счёта получения; запись чисел не переводится. -->
+    <string name="add_transfer_rate_fmt" translatable="false">1 %1$s ≈ %2$s %3$s</string>
+    <!-- Обе ноги в одной валюте: курс один к одному. -->
+    <string name="add_transfer_rate_same" translatable="false">1 : 1</string>
     <string name="transfer_title">Transfer</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Opening balance: %1$s %2$s</string>

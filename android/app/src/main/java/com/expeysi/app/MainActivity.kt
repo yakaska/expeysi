@@ -391,6 +391,7 @@ private fun AppNavigation() {
                         }
                     },
                     onItemClick = { id -> navController.navigate("edit/$id") },
+                    onEditAccountClick = { id -> navController.navigate("accounts/edit/$id") },
                 )
             }
             composable(

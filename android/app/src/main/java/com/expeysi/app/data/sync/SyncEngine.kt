@@ -12,6 +12,7 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.domain.Money
 import com.google.firebase.firestore.CollectionReference
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -110,7 +111,11 @@ class SyncEngine @Inject constructor(
             }
         }
         accounts.forEach {
-            if (needsUpload(it.updatedAt, remote.updatedAt(COLLECTION_ACCOUNTS, it.id))) {
+            val remoteUpdatedAt = remote.updatedAt(COLLECTION_ACCOUNTS, it.id)
+            if (
+                needsUpload(it.updatedAt, remoteUpdatedAt) ||
+                needsScaleMark(remote.fields(COLLECTION_ACCOUNTS, it.id), it.updatedAt, remoteUpdatedAt)
+            ) {
                 stage(COLLECTION_ACCOUNTS, it.id, accountFields(it))
             }
         }
@@ -120,7 +125,11 @@ class SyncEngine @Inject constructor(
             }
         }
         transactions.forEach {
-            if (needsUpload(it.updatedAt, remote.updatedAt(COLLECTION_TRANSACTIONS, it.id))) {
+            val remoteUpdatedAt = remote.updatedAt(COLLECTION_TRANSACTIONS, it.id)
+            if (
+                needsUpload(it.updatedAt, remoteUpdatedAt) ||
+                needsScaleMark(remote.fields(COLLECTION_TRANSACTIONS, it.id), it.updatedAt, remoteUpdatedAt)
+            ) {
                 stage(COLLECTION_TRANSACTIONS, it.id, transactionFields(it))
             }
         }
@@ -230,9 +239,12 @@ class SyncEngine @Inject constructor(
         "iconKey" to value.iconKey,
         "colorKey" to value.colorKey,
         "openingBalanceMinor" to value.openingBalanceMinor,
+        "amountScale" to Money.SCALE,
         "balanceId" to value.balanceId,
         "deleted" to value.deleted,
         "updatedAt" to value.updatedAt,
+        // Прежние сборки поле не пишут: без него масштаб авторства не классифицируется.
+        "updatedBy" to (authRepository.userId ?: ""),
     )
 
     private fun categoryFields(value: CategoryEntity) = mapOf(
@@ -247,6 +259,7 @@ class SyncEngine @Inject constructor(
     private fun transactionFields(value: TransactionEntity) = mapOf(
         "type" to value.type,
         "amountMinor" to value.amountMinor,
+        "amountScale" to Money.SCALE,
         "accountId" to value.accountId,
         "categoryId" to value.categoryId,
         "date" to value.date,
@@ -352,6 +365,32 @@ class SyncEngine @Inject constructor(
             }
     }
 
+    /**
+     * Сумма документа журнала в текущем масштабе. Развилка эр решается только
+     * доказательствами, наугад пересчитывать нельзя (см. [localScaleVerdict]):
+     * метка масштаба, собственные записи устройства, уже установленный масштаб
+     * автора правки и, наконец, местная копия той же версии.
+     */
+    private fun journalAmountMinor(
+        remoteAmount: Long,
+        remoteScale: Long?,
+        remoteWriter: String,
+        remoteUpdatedAt: Long,
+        localAmount: Long?,
+        localUpdatedAt: Long?,
+    ): Long {
+        val scale = when {
+            remoteScale != null -> Money.SCALE
+            // Свои записи устройство делает только в текущем масштабе.
+            remoteWriter.isNotEmpty() && remoteWriter == authRepository.userId -> Money.SCALE
+            else -> remote.writerScale(remoteWriter)
+                ?: localScaleVerdict(localAmount, localUpdatedAt, remoteUpdatedAt, remoteAmount)
+                    ?.also { remote.classifyWriter(remoteWriter, it) }
+                ?: Money.LEGACY_SCALE
+        }
+        return remoteAmount * (Money.SCALE / scale)
+    }
+
     private suspend fun mergeBalance(document: DocumentSnapshot) {
         val value = BalanceEntity(
             id = document.id,
@@ -370,17 +409,24 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun mergeAccount(document: DocumentSnapshot) {
+        val local = accountDao.byId(document.id)
         val value = AccountEntity(
             id = document.id,
             name = document.getString("name") ?: return,
             iconKey = document.getString("iconKey") ?: "",
             colorKey = document.getString("colorKey") ?: "default",
-            openingBalanceMinor = document.getLong("openingBalanceMinor") ?: 0,
+            openingBalanceMinor = journalAmountMinor(
+                remoteAmount = document.getLong("openingBalanceMinor") ?: 0,
+                remoteScale = document.getLong("amountScale"),
+                remoteWriter = document.getString("updatedBy") ?: "",
+                remoteUpdatedAt = document.getLong("updatedAt") ?: 0,
+                localAmount = local?.openingBalanceMinor,
+                localUpdatedAt = local?.updatedAt,
+            ),
             balanceId = document.getString("balanceId") ?: return,
             deleted = document.getBoolean("deleted") ?: false,
             updatedAt = document.getLong("updatedAt") ?: 0,
         )
-        val local = accountDao.byId(value.id)
         when {
             local == null || value.updatedAt > local.updatedAt -> accountDao.upsert(value)
             value.updatedAt < local.updatedAt -> uploadAccount(local)
@@ -405,10 +451,19 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun mergeTransaction(document: DocumentSnapshot) {
+        val remoteAmount = document.getLong("amountMinor") ?: return
+        val local = transactionDao.byId(document.id)
         val value = TransactionEntity(
             id = document.id,
             type = document.getString("type") ?: return,
-            amountMinor = document.getLong("amountMinor") ?: return,
+            amountMinor = journalAmountMinor(
+                remoteAmount = remoteAmount,
+                remoteScale = document.getLong("amountScale"),
+                remoteWriter = document.getString("updatedBy") ?: "",
+                remoteUpdatedAt = document.getLong("updatedAt") ?: 0,
+                localAmount = local?.amountMinor,
+                localUpdatedAt = local?.updatedAt,
+            ),
             accountId = document.getString("accountId") ?: return,
             categoryId = document.getString("categoryId") ?: return,
             date = document.getLong("date") ?: return,
@@ -420,7 +475,6 @@ class SyncEngine @Inject constructor(
             updatedAt = document.getLong("updatedAt") ?: 0,
             updatedBy = document.getString("updatedBy") ?: "",
         )
-        val local = transactionDao.byId(value.id)
         when {
             local == null || value.updatedAt > local.updatedAt -> {
                 // Второй телефон мог стереть пару, пока эта нога не доехала:
@@ -452,8 +506,18 @@ private data class RemoteDocument(
 private class RemoteState {
     private val collections = ConcurrentHashMap<String, MutableMap<String, RemoteDocument>>()
 
+    /**
+     * Масштаб сумм, в котором автор правки писал документы: классификация
+     * совпадением немаркированного документа с местной копией той же версии.
+     * Виден только внутри сессии: при следующем запуске она выводится заново.
+     */
+    private val writerScales = ConcurrentHashMap<String, Long>()
+
     /** Смена семьи или её повторный выбор: снимки прежней семьи больше неактуальны. */
-    fun reset() = collections.values.forEach { it.clear() }
+    fun reset() {
+        collections.values.forEach { it.clear() }
+        writerScales.clear()
+    }
 
     private fun collection(name: String): MutableMap<String, RemoteDocument> = collections.getOrPut(name) { ConcurrentHashMap() }
 
@@ -468,9 +532,46 @@ private class RemoteState {
     fun updatedAt(name: String, id: String): Long? = collection(name)[id]?.updatedAt
 
     fun fields(name: String, id: String): Map<String, Any?>? = collection(name)[id]?.fields
+
+    fun writerScale(updatedBy: String): Long? = writerScales[updatedBy]
+
+    fun classifyWriter(updatedBy: String, scale: Long) {
+        if (updatedBy.isNotEmpty()) writerScales[updatedBy] = scale
+    }
 }
 
 internal fun needsUpload(localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = remoteUpdatedAt == null || localUpdatedAt > remoteUpdatedAt
+
+/**
+ * Документ ждёт проставления метки масштаба: удалённая копия той же версии, что
+ * и локальная, а метки в ней ещё нет. Запись локальной копии с меткой содержимого
+ * не меняет и версию не двигает, поэтому слиянию безвредна; перезапись закрепляет
+ * текущее прочтение суммы за журналом, после которого эра документа больше не
+ * определяется наугад.
+ */
+internal fun needsScaleMark(fields: Map<String, Any?>?, localUpdatedAt: Long, remoteUpdatedAt: Long?): Boolean = fields != null && remoteUpdatedAt == localUpdatedAt && "amountScale" !in fields
+
+/**
+ * Какой масштаб у суммы немаркированного документа журнала. Наугад пересчитывать
+ * нельзя: ×100 на документе в сотых долях восстанавливает верную сумму, а на
+ * документе в десятитысячных разувеличивает её в 100 раз. Доказательство —
+ * местная копия той же версии: пересчитанная и исходная суммы совпасть с местной
+ * могут только обе для нуля, поэтому совпадение указывает эру точно. Классификация
+ * автора правки по такому совпадению (внутри сессии синка) перекрывает остальные
+ * случаи, а копий той же версии и известных авторов не хватило — остаётся
+ * прежний масштаб: немаркированные записи пишут сборки до десятитысячных.
+ */
+internal fun localScaleVerdict(
+    localAmount: Long?,
+    localUpdatedAt: Long?,
+    remoteUpdatedAt: Long,
+    remoteAmount: Long,
+): Long? = when {
+    localAmount == null || localUpdatedAt == null || localUpdatedAt != remoteUpdatedAt -> null
+    localAmount == remoteAmount -> Money.SCALE
+    localAmount == remoteAmount * (Money.SCALE / Money.LEGACY_SCALE) -> Money.LEGACY_SCALE
+    else -> null
+}
 
 /**
  * Надгробие для въехавшей ноги перевода: партнёр той же связки уже удалён

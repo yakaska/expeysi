@@ -20,13 +20,13 @@ class BudgetCsvParserTest {
         )
 
         assertEquals(3, transactions.size)
-        assertEquals(800_000_000L, transactions.first().amountMinor)
+        assertEquals(80_000_000_000L, transactions.first().amountMinor)
         assertEquals(TxType.EXPENSE, transactions.first().type)
         assertEquals("Жилье", transactions.first().categoryName)
         assertEquals("Квартира", transactions.first().note)
         assertEquals("VND", transactions.first().currencyCode)
-        assertEquals(1_000_000_000L, transactions.first { it.type == TxType.INCOME }.amountMinor)
-        assertEquals(3_333_330L, transactions.last().amountMinor)
+        assertEquals(100_000_000_000L, transactions.first { it.type == TxType.INCOME }.amountMinor)
+        assertEquals(333_333_000L, transactions.last().amountMinor)
     }
 
     @Test
@@ -36,7 +36,7 @@ class BudgetCsvParserTest {
                 "2026-01-02;03:04;Наличные;Еда;-1.2e+03;VND;\"Магазин; \"\"ужин\"\"\"\n",
         )
 
-        assertEquals(120_000L, transactions.single().amountMinor)
+        assertEquals(12_000_000L, transactions.single().amountMinor)
         assertEquals("Магазин; \"ужин\"", transactions.single().note)
     }
 
@@ -124,10 +124,10 @@ class BudgetCsvParserTest {
 
         assertEquals(2, transactions.size)
         assertEquals("Наличные", transactions.first().accountName)
-        assertEquals(10_000L, transactions.first().amountMinor)
+        assertEquals(1_000_000L, transactions.first().amountMinor)
         assertEquals(TxType.EXPENSE, transactions.first().type)
         assertEquals("Карта, запасная", transactions.last().accountName)
-        assertEquals(20_000L, transactions.last().amountMinor)
+        assertEquals(2_000_000L, transactions.last().amountMinor)
         assertEquals(TxType.INCOME, transactions.last().type)
         assertEquals("Магазин, «ужин»", transactions.last().note)
     }
