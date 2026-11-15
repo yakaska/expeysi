@@ -5,6 +5,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Column
@@ -43,9 +44,12 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -61,19 +65,17 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.domain.Money
-import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
-import com.expeysi.app.ui.icons.IconCatalog
 import com.expeysi.app.ui.theme.LocalFinanceColors
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.launch
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
 private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM")
@@ -119,15 +121,17 @@ fun HistoryScreen(
         if (state.detail == null) showChips = true
     }
 
-    val modes = remember(state.isAccountMode) {
+    val modes = remember(state.isAccountMode, state.isTransferOnly) {
         buildList {
             add(HistoryViewMode.LIST to R.string.history_mode_transactions)
-            add(HistoryViewMode.CATEGORIES to R.string.history_mode_categories)
-            if (!state.isAccountMode) add(HistoryViewMode.ACCOUNTS to R.string.history_mode_accounts)
+            if (!state.isTransferOnly) {
+                add(HistoryViewMode.CATEGORIES to R.string.history_mode_categories)
+                if (!state.isAccountMode) add(HistoryViewMode.ACCOUNTS to R.string.history_mode_accounts)
+            }
         }
     }
     var pageCount by remember { mutableStateOf(modes.size) }
-    LaunchedEffect(state.isAccountMode) {
+    LaunchedEffect(state.isAccountMode, state.isTransferOnly) {
         pageCount = modes.size
     }
 
@@ -245,7 +249,10 @@ fun HistoryScreen(
                             }
                         }
                     } else {
-                        onAddClick(selectedTypes.singleOrNull())
+                        onAddClick(
+                            // В отчёте переводов FAB открывает добавление сразу в режиме «Перевод».
+                            if (state.isTransferOnly) TxType.TRANSFER_OUT else selectedTypes.singleOrNull(),
+                        )
                     }
                 },
             ) {
@@ -264,7 +271,7 @@ fun HistoryScreen(
                 .padding(innerPadding)
                 .nestedScroll(scrollConnection),
         ) {
-            AnimatedVisibility(visible = showChips && state.detail == null) {
+            AnimatedVisibility(visible = showChips && state.detail == null && modes.size > 1) {
                 SingleChoiceSegmentedButtonRow(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -298,7 +305,12 @@ fun HistoryScreen(
                             style = MaterialTheme.typography.titleMedium,
                         )
                     }
-                    TransactionList(state.items, onItemClick, detailListState)
+                    TransactionList(
+                        state.items,
+                        onItemClick,
+                        detailListState,
+                        accountId = state.accountId,
+                    )
                 }
                 else -> HorizontalPager(
                     state = pagerState,
@@ -317,7 +329,13 @@ fun HistoryScreen(
                             },
                             listState = accountsListState,
                         )
-                        else -> TransactionList(state.items, onItemClick, historyListState)
+                        else -> TransactionList(
+                            state.items,
+                            onItemClick,
+                            historyListState,
+                            transferOnly = state.isTransferOnly,
+                            accountId = state.accountId,
+                        )
                     }
                 }
             }
@@ -340,6 +358,14 @@ private fun TransactionList(
     items: List<TransactionItem>,
     onItemClick: (String) -> Unit,
     listState: LazyListState,
+    /** Отчёт переводов: все операции — переводы, дата видна из стик-заголовка дня. */
+    transferOnly: Boolean = false,
+    /**
+     * Счёт, история которого показана: суммы переводов получают знак и цвет
+     * относительно него, серии не сворачиваются — суммировать движение денег
+     * разных счетов некорректно.
+     */
+    accountId: String? = null,
 ) {
     if (items.isEmpty()) {
         EmptyHistoryText()
@@ -350,41 +376,106 @@ private fun TransactionList(
     val grouped = items.groupBy { item ->
         Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
     }
+    // Раскрытие серий переводов переживает повороты и пересборку состояния.
+    val expandedGroups = rememberSaveable(
+        saver = listSaver(
+            save = { it.toList() },
+            restore = { mutableStateListOf<String>().apply { addAll(it) } },
+        ),
+    ) { mutableStateListOf<String>() }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
     ) {
-        grouped.forEach { (date, groupItems) ->
-            val incomeMinor = groupItems
-                .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
-                .sumOf { it.transaction.amountMinor }
-            val expenseMinor = groupItems
-                .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
-                .sumOf { it.transaction.amountMinor }
+        grouped.forEach { (date, dayItems) ->
             stickyHeader(key = "date-$date") {
-                DayGroupHeader(
-                    dateLabel = when (date) {
-                        today -> stringResource(R.string.home_today)
-                        today.minusDays(1) -> stringResource(R.string.home_yesterday)
-                        else -> date.format(dayHeaderFormatter)
-                    },
-                    incomeMinor = incomeMinor,
-                    expenseMinor = expenseMinor,
-                    currencySymbol = groupItems.first().currencySymbol,
-                    modifier = Modifier.padding(vertical = 8.dp),
-                )
+                val dateLabel = when (date) {
+                    today -> stringResource(R.string.home_today)
+                    today.minusDays(1) -> stringResource(R.string.home_yesterday)
+                    else -> date.format(dayHeaderFormatter)
+                }
+                if (!transferOnly) {
+                    DayGroupHeader(
+                        dateLabel = dateLabel,
+                        incomeMinor = dayItems
+                            .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
+                            .sumOf { it.transaction.amountMinor },
+                        expenseMinor = dayItems
+                            .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
+                            .sumOf { it.transaction.amountMinor },
+                        currencySymbol = dayItems.first().currencySymbol,
+                        modifier = Modifier.padding(vertical = 8.dp),
+                    )
+                } else {
+                    Text(
+                        dateLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(vertical = 8.dp),
+                    )
+                }
             }
-            groupItems.forEachIndexed { index, item ->
-                item(key = item.transaction.id) {
-                    Column(modifier = Modifier.animateItem()) {
-                        if (index > 0) {
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            val entries = if (accountId != null) {
+                // История счёта: знаки относительно счёта, серии не сворачиваются.
+                dayItems.map { HistoryListEntry.Single(it) }
+            } else {
+                groupItems(dayItems)
+            }
+            entries.forEachIndexed { index, entry ->
+                when (entry) {
+                    is HistoryListEntry.Single -> item(key = entry.item.transaction.id) {
+                        Column(modifier = Modifier.animateItem()) {
+                            if (index > 0) {
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                            }
+                            HistoryRow(
+                                item = entry.item,
+                                accountId = accountId,
+                                onClick = { onItemClick(entry.item.transaction.id) },
+                            )
                         }
-                        HistoryRow(
-                            item = item,
-                            onClick = { onItemClick(item.transaction.id) },
-                        )
+                    }
+                    is HistoryListEntry.Group -> {
+                        item(key = "group-${entry.id}") {
+                            Column(modifier = Modifier.animateItem()) {
+                                if (index > 0) {
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                }
+                                TransferGroupRow(
+                                    items = entry.items,
+                                    expanded = entry.id in expandedGroups,
+                                    onToggle = {
+                                        if (entry.id in expandedGroups) {
+                                            expandedGroups.remove(entry.id)
+                                        } else {
+                                            expandedGroups.add(entry.id)
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        // Члены раскрытой серии — отдельные элементы списка со своими ключами.
+                        if (entry.id in expandedGroups) {
+                            entry.items.forEach { member ->
+                                item(key = member.transaction.id) {
+                                    Column(modifier = Modifier.animateItem()) {
+                                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                        // Линия слева визуально связывает карточки членов с серией.
+                                        TransferGroupChildRow {
+                                            HistoryRow(
+                                                item = member,
+                                                accountId = accountId,
+                                                onClick = { onItemClick(member.transaction.id) },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -395,15 +486,24 @@ private fun TransactionList(
 @Composable
 private fun HistoryRow(
     item: TransactionItem,
+    accountId: String?,
     onClick: () -> Unit,
 ) {
+    // Перевод рисуется карточкой с обеими сторонами и суммами ног; строка ниже —
+    // обычные доходы и расходы и фолбэк для переводов без карточки (ноги без связки).
+    if (item.isTransfer) {
+        item.transferCard?.let { card ->
+            // Свёрнутая пара, обе ноги которой видны, нейтральна даже в истории
+            // счёта; одиночная нога показывает движение денег счёта знаком и цветом.
+            TransferCardRow(
+                card = card,
+                signed = accountId != null && !item.isTransferPair,
+                onClick = onClick,
+            )
+            return
+        }
+    }
     val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
-    // Одиночная нога зачисления показывается как доход, списание — как расход;
-    // свёрнутая пара и так нейтральна, знак ей не выставляется.
-    val legIsIncome = isIncome ||
-        item.isTransfer &&
-        !item.isTransferPair &&
-        TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -411,34 +511,20 @@ private fun HistoryRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIcon(
-            if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
-            item.categoryColorKey,
-        )
+        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                if (item.isTransfer) {
-                    stringResource(R.string.transfer_title)
-                } else {
-                    item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
-                },
+                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
                 listOfNotNull(
-                    if (item.isTransfer) {
-                        Transfers.directionLabel(item.transaction, item.accountName, item.counterpartAccountName)
-                            .ifBlank { null }
-                    } else {
-                        item.accountName.ifBlank { null }
-                    },
-                    Instant.ofEpochMilli(item.transaction.date)
-                        .atZone(ZoneId.systemDefault())
-                        .format(dateFormatter),
+                    item.accountName.ifBlank { null },
+                    dateTextOf(item.transaction.date),
                     item.transaction.note.ifBlank { null },
                 ).joinToString(" · "),
                 style = MaterialTheme.typography.bodySmall,
@@ -446,16 +532,10 @@ private fun HistoryRow(
             )
         }
         Text(
-            text = when {
-                // Свёрнутая пара нейтральна: это перемещение, а не доход и не расход.
-                item.isTransferPair -> "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
-                // Одиночная нога показывает движение денег счёта: зачисление — плюс,
-                // списание — минус, как у доходов и расходов.
-                else -> (if (legIsIncome) "+" else "−") +
-                    "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
-            },
+            text = (if (isIncome) "+" else "−") +
+                "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
             style = MaterialTheme.typography.titleMedium,
-            color = if (legIsIncome) {
+            color = if (isIncome) {
                 LocalFinanceColors.current.income
             } else {
                 MaterialTheme.colorScheme.onSurface
@@ -463,6 +543,11 @@ private fun HistoryRow(
         )
     }
 }
+
+/** Полная дата операции «дд.ММ чч:мм». */
+private fun dateTextOf(millis: Long): String = Instant.ofEpochMilli(millis)
+    .atZone(ZoneId.systemDefault())
+    .format(dateFormatter)
 
 @Composable
 private fun CategoriesView(
@@ -599,9 +684,6 @@ private fun AccountsView(
                             Text(
                                 text = category?.name ?: stringResource(R.string.report_uncategorized),
                                 style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .padding(start = 16.dp),
                             )
                             Text(
                                 text = "${Money.formatAuto(if (categoryTotal.expenseMinor == 0L) categoryTotal.incomeMinor else categoryTotal.expenseMinor)} ${state.currencySymbol}",

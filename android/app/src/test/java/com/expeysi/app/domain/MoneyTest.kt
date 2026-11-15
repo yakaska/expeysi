@@ -205,4 +205,100 @@ class MoneyTest {
         Money.compact(Long.MIN_VALUE)
         assertEquals("92 233 720 368 547 758,07", Money.formatCompact(Long.MAX_VALUE, "млн", "млрд"))
     }
+
+    @Test
+    fun `дробность берётся из кода валюты`() {
+        assertEquals(0, Money.digits("VND"))
+        assertEquals(2, Money.digits("USD"))
+        assertEquals(2, Money.digits("RUB"))
+        assertEquals(2, Money.digits("EUR"))
+        // Неизвестный код и пустая строка — две дробные части по умолчанию.
+        assertEquals(2, Money.digits("ABC"))
+        assertEquals(2, Money.digits(""))
+    }
+
+    @Test
+    fun `сумма форматируется с дробностью валюты`() {
+        // Донг хранится целыми: сотые доли в базе — разряды суммы, не дробные части.
+        assertEquals("50\u00A0000", Money.formatAmount(5_000_000, "VND"))
+        assertEquals("1,23", Money.formatAmount(123, "USD"))
+        assertEquals("1 234,56", Money.formatAmount(123_456, "RUB"))
+        assertEquals("1,50", Money.formatAmount(150, "ABC"))
+    }
+
+    @Test
+    fun `курс форматируется в дробности слабой валюты`() {
+        // Слабая валюта целая — курс целым числом с неразрывными пробелами.
+        assertEquals("25\u00A0000", Money.formatFactor(25_000.0, "VND"))
+        // Слабая валюта с двумя знаками — курс с копейками.
+        assertEquals("98,00", Money.formatFactor(98.0, "USD"))
+        assertEquals("1,03", Money.formatFactor(1.029, "USD"))
+    }
+
+    @Test
+    fun `курс пары не зависит от направления перевода`() {
+        // 2 500 000 000 донгов ↔ 100 000 центов: база — доллар, курс в донгах.
+        val vndToUsd = Money.rateQuote(
+            sentMinor = 2_500_000_000,
+            sentCode = "VND",
+            sentSymbol = "₫",
+            receivedMinor = 100_000,
+            receivedCode = "USD",
+            receivedSymbol = "$",
+        )
+        val usdToVnd = Money.rateQuote(
+            sentMinor = 100_000,
+            sentCode = "USD",
+            sentSymbol = "$",
+            receivedMinor = 2_500_000_000,
+            receivedCode = "VND",
+            receivedSymbol = "₫",
+        )
+        assertEquals(RateQuote(baseSymbol = "$", factorText = "25\u00A0000", quotedSymbol = "₫"), vndToUsd)
+        assertEquals(vndToUsd, usdToVnd)
+    }
+
+    @Test
+    fun `курс дешёвой валюты инвертируется к сильной`() {
+        // 196 рублей за 2 доллара: база — доллар, курс «1 $ = 98,00 ₽».
+        val rubToUsd = Money.rateQuote(
+            sentMinor = 19_600,
+            sentCode = "RUB",
+            sentSymbol = "₽",
+            receivedMinor = 200,
+            receivedCode = "USD",
+            receivedSymbol = "$",
+        )
+        assertEquals(RateQuote(baseSymbol = "$", factorText = "98,00", quotedSymbol = "₽"), rubToUsd)
+    }
+
+    @Test
+    fun `крохотный курс разворачивается к сильной валюте`() {
+        // 10 000 рублей дают 1 доллар: прямой курс округлился бы до «1 ₽ = 0,00 $».
+        val quote = Money.rateQuote(
+            sentMinor = 1_000_000,
+            sentCode = "RUB",
+            sentSymbol = "₽",
+            receivedMinor = 100,
+            receivedCode = "USD",
+            receivedSymbol = "$",
+        )
+        assertEquals(RateQuote(baseSymbol = "$", factorText = "10 000,00", quotedSymbol = "₽"), quote)
+    }
+
+    @Test
+    fun `курс не считается без сумм и символов`() {
+        assertNull(
+            Money.rateQuote(0, "USD", "$", 100, "VND", "₫"),
+        )
+        assertNull(
+            Money.rateQuote(100, "USD", "$", 0, "VND", "₫"),
+        )
+        assertNull(
+            Money.rateQuote(100, "USD", "", 100, "VND", "₫"),
+        )
+        assertNull(
+            Money.rateQuote(100, "USD", "$", 100, "VND", " "),
+        )
+    }
 }

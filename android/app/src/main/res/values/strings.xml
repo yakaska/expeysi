@@ -47,6 +47,7 @@
     <string name="history_back_groups_cd">Back to groups</string>
     <string name="history_expand_cd">Expand</string>
     <string name="history_edit_account">Edit account</string>
+    <string name="history_transfer_fee_chip">+ fee %1$s</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
@@ -59,6 +60,7 @@
     <string name="drawer_category_comparison">Category comparison</string>
     <string name="drawer_expenses_report">Expenses</string>
     <string name="drawer_incomes_report">Income</string>
+    <string name="drawer_transfers_report">Transfers</string>
     <string name="drawer_data_export">Export</string>
     <string name="drawer_data_import">Import</string>
     <string name="report_total_income">Total received</string>
@@ -259,5 +261,9 @@
     <plurals name="common_rubles">
         <item quantity="one">%1$d ruble</item>
         <item quantity="other">%1$d rubles</item>
+    </plurals>
+    <plurals name="history_transfer_group_count">
+        <item quantity="one">%1$d transfer</item>
+        <item quantity="other">%1$d transfers</item>
     </plurals>
 </resources>

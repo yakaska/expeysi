@@ -45,6 +45,7 @@
     <string name="history_back_groups_cd">К группам</string>
     <string name="history_expand_cd">Развернуть</string>
     <string name="history_edit_account">Изменить счёт</string>
+    <string name="history_transfer_fee_chip">+ комиссия %1$s</string>
     <string name="home_top_categories">Расходы по категориям</string>
     <string name="home_total">Итого</string>
     <string name="home_empty_title">Пока пусто</string>
@@ -57,6 +58,7 @@
     <string name="drawer_category_comparison">Сравнение категорий</string>
     <string name="drawer_expenses_report">Расходы</string>
     <string name="drawer_incomes_report">Доходы</string>
+    <string name="drawer_transfers_report">Переводы</string>
     <string name="drawer_data_export">Экспорт</string>
     <string name="drawer_data_import">Импорт</string>
     <string name="report_total_income">Всего получено</string>
@@ -261,5 +263,11 @@
         <item quantity="few">%1$d рубля</item>
         <item quantity="many">%1$d рублей</item>
         <item quantity="other">%1$d рубля</item>
+    </plurals>
+    <plurals name="history_transfer_group_count">
+        <item quantity="one">%1$d перевод</item>
+        <item quantity="few">%1$d перевода</item>
+        <item quantity="many">%1$d переводов</item>
+        <item quantity="other">%1$d перевода</item>
     </plurals>
 </resources>

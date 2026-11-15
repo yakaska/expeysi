@@ -42,7 +42,8 @@ object PresetData {
     )
 
     val accounts: List<PresetAccount> = listOf(
-        PresetAccount(ACCOUNT_CASH_ID, "Наличные", "payments", "green"),
+        // «Наличные» — янтарный по умолчанию: красный читается как ошибка и расход.
+        PresetAccount(ACCOUNT_CASH_ID, "Наличные", "payments", "amber"),
         PresetAccount(ACCOUNT_CARD_ID, "Карта", "credit_card", "blue"),
     )
 

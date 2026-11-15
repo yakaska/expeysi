@@ -1,6 +1,8 @@
 package com.expeysi.app.domain
 
+import java.util.Currency
 import kotlin.math.abs
+import kotlin.math.roundToLong
 
 object Money {
 
@@ -72,6 +74,67 @@ object Money {
     fun formatAuto(minor: Long): String = if (minor % 100 == 0L) formatWhole(minor) else format(minor)
 
     /**
+     * Дробность суммы по ISO-коду валюты: defaultFractionDigits из java.util.Currency
+     * (VND — 0, USD и RUB — 2), но не больше двух — суммы в базе хранятся с двумя
+     * знаками. Неизвестный или особый код — две дробные части.
+     */
+    fun digits(code: String): Int = runCatching {
+        Currency.getInstance(code).defaultFractionDigits
+    }
+        .getOrNull()
+        ?.coerceIn(0, 2)
+        ?: 2
+
+    /** Сумма в основных единицах с дробностью валюты: VND — "50 000", USD — "1,23". */
+    fun formatAmount(minor: Long, code: String): String = when (digits(code)) {
+        0 -> formatWhole(minor)
+        else -> format(minor)
+    }
+
+    /**
+     * Число-курс в дробности слабой валюты: VND — целые с округлением ("25 000"),
+     * у остальных — два знака ("98,00").
+     */
+    fun formatFactor(factor: Double, quotedCode: String): String = when (digits(quotedCode)) {
+        0 -> formatWhole((factor * 100).roundToLong())
+        else -> format((factor * 100).roundToLong())
+    }
+
+    /**
+     * Курс пары по суммам ног. База — единица более ценной валюты, направление
+     * перевода не влияет: VND→USD и USD→VND дают одинаковый курс «1 $ = 25 000 ₫».
+     * Курс берётся из сохранённых сумм — они точны для этого перевода. null — при
+     * пустых суммах или символах.
+     */
+    fun rateQuote(
+        sentMinor: Long,
+        sentCode: String,
+        sentSymbol: String,
+        receivedMinor: Long,
+        receivedCode: String,
+        receivedSymbol: String,
+    ): RateQuote? {
+        if (sentMinor <= 0L || receivedMinor <= 0L || sentSymbol.isBlank() || receivedSymbol.isBlank()) {
+            return null
+        }
+        // Сколько полученной валюты даёт одна единица отправленной.
+        val forward = receivedMinor.toDouble() / sentMinor.toDouble()
+        return if (forward >= 1.0) {
+            RateQuote(
+                baseSymbol = sentSymbol,
+                factorText = formatFactor(forward, receivedCode),
+                quotedSymbol = receivedSymbol,
+            )
+        } else {
+            RateQuote(
+                baseSymbol = receivedSymbol,
+                factorText = formatFactor(sentMinor.toDouble() / receivedMinor.toDouble(), sentCode),
+                quotedSymbol = sentSymbol,
+            )
+        }
+    }
+
+    /**
      * Компактный вид одной строкой: до миллиона основных единиц — целое число либо
      * дробная часть, если она есть ("1 234,56"); от миллиона — один знак после
      * запятой и единица из ресурсов UI-слоя ("6,7 млн"; 999,95 млн → "1 млрд"
@@ -141,3 +204,13 @@ object Money {
         it.isWhitespace() || Character.isSpaceChar(it)
     }
 }
+
+/**
+ * Курс обмена для строки «1 %1$s = %2$s %3$s»: база — единица более ценной
+ * валюты пары, фактор — сколько единиц слабой валюты в одной базовой.
+ */
+data class RateQuote(
+    val baseSymbol: String,
+    val factorText: String,
+    val quotedSymbol: String,
+)

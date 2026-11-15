@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
@@ -66,6 +67,7 @@ fun HomeNavigationDrawer(
     onCategoryComparisonClick: () -> Unit,
     onExpensesReportClick: () -> Unit,
     onIncomesReportClick: () -> Unit,
+    onTransfersReportClick: () -> Unit,
     onImportClick: () -> Unit,
     onExportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
@@ -142,6 +144,13 @@ fun HomeNavigationDrawer(
                         selected = false,
                         icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
                         onClick = onIncomesReportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_transfers_report)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null) },
+                        onClick = onTransfersReportClick,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     DrawerSection(stringResource(R.string.drawer_section_analytics))

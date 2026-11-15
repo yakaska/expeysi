@@ -142,6 +142,16 @@ private fun AppNavigation() {
                 }
             }
         },
+        onTransfersReportClick = {
+            scope.launch {
+                drawerState.close()
+                homeUiState.selectedBalance?.let { balance ->
+                    navController.navigate(
+                        "history/balance/${balance.id}?type=transfer&days=${homeUiState.periodDays}",
+                    )
+                }
+            }
+        },
         onImportClick = {
             scope.launch {
                 drawerState.close()
