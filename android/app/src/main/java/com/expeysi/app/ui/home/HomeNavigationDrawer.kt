@@ -1,6 +1,15 @@
 package com.expeysi.app.ui.home
 
+import android.Manifest
+import android.app.LocaleManager
+import android.content.Context
+import android.content.pm.PackageManager
+import android.content.res.Resources
+import android.os.Build
+import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -16,6 +25,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.DarkMode
@@ -30,6 +40,7 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -38,8 +49,11 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,6 +69,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -62,6 +77,10 @@ import com.expeysi.app.R
 import com.expeysi.app.data.ThemeMode
 import com.expeysi.app.ui.common.rememberClipboardCopy
 import com.expeysi.app.ui.theme.ThemeViewModel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.text.DateFormat as JavaTextDateFormat
 
 /** Дисплейный шрифт со стилизацией «под иврит» для имени приложения в шапке drawer. */
 private val SholomFontFamily = FontFamily(Font(R.font.sholom))
@@ -88,12 +107,35 @@ fun HomeNavigationDrawer(
     var showLeaveConfirmation by remember { mutableStateOf(false) }
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showReminderPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.home_family_code_copied)
     val copyLabel = stringResource(R.string.common_copy)
     val copyToClipboard = rememberClipboardCopy()
     val themeViewModel: ThemeViewModel = hiltViewModel()
     val themeMode by themeViewModel.mode.collectAsStateWithLifecycle()
+    val reminderViewModel: ReminderViewModel = hiltViewModel()
+    val reminderState by reminderViewModel.state.collectAsStateWithLifecycle()
+    val permissionDeniedMessage = stringResource(R.string.reminder_permission_denied)
+    // Разрешение на уведомления спрашиваем при включении тоглера на Android 13+;
+    // отказ оставляет напоминание выключенным и объясняет это тостом.
+    val requestNotificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            reminderViewModel.setEnabled(true)
+        } else {
+            Toast.makeText(context, permissionDeniedMessage, Toast.LENGTH_LONG).show()
+        }
+    }
+    val onReminderToggle: (Boolean) -> Unit = { enabled ->
+        when {
+            !enabled -> reminderViewModel.setEnabled(false)
+            reminderNeedsNotificationPermission(context) ->
+                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+            else -> reminderViewModel.setEnabled(true)
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -217,6 +259,35 @@ fun HomeNavigationDrawer(
                         onClick = { showThemePicker = true },
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
+                    NavigationDrawerItem(
+                        label = {
+                            // Время выбранного напоминания второй строкой: supporting-текста
+                            // у NavigationDrawerItem в этой версии material3 нет. Время
+                            // показывается в формате устройства (12/24-hour).
+                            Column {
+                                Text(stringResource(R.string.drawer_reminder))
+                                Text(
+                                    formatDeviceTime(
+                                        context,
+                                        reminderState.hour,
+                                        reminderState.minute,
+                                    ),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.Alarm, contentDescription = null) },
+                        onClick = { showReminderPicker = true },
+                        badge = {
+                            Switch(
+                                checked = reminderState.enabled,
+                                onCheckedChange = onReminderToggle,
+                            )
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
                     DrawerSection(stringResource(R.string.drawer_section_misc))
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.history_mode_categories)) },
@@ -290,6 +361,17 @@ fun HomeNavigationDrawer(
             onSelect = { selected ->
                 showThemePicker = false
                 themeViewModel.setMode(selected)
+            },
+        )
+    }
+    if (showReminderPicker) {
+        ReminderTimePickerDialog(
+            initialHour = reminderState.hour,
+            initialMinute = reminderState.minute,
+            onDismiss = { showReminderPicker = false },
+            onSelect = { hour, minute ->
+                showReminderPicker = false
+                reminderViewModel.setTime(hour, minute)
             },
         )
     }
@@ -375,6 +457,101 @@ private fun ThemePickerDialog(
         },
         confirmButton = {},
     )
+}
+
+/** Диалог выбора времени напоминания: время применяется сразу, включённость не трогается. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onSelect: (hour: Int, minute: Int) -> Unit,
+) {
+    // Формат пикера должен совпадать с форматом часов устройства: 12-hour с AM/PM
+    // или 24-hour — по настройке, а без неё по локали устройства.
+    val pickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = deviceUses24Hour(LocalContext.current),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_reminder)) },
+        text = { TimePicker(state = pickerState) },
+        confirmButton = {
+            TextButton(
+                onClick = { onSelect(pickerState.hour, pickerState.minute) },
+            ) { Text(stringResource(R.string.common_ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    )
+}
+
+/**
+ * Время в формате устройства (как часы в системной панели): настройка «24-часовой
+ * формат», а без неё — короткий локализованный шаблон. Локаль берём системную,
+ * а не контекста: у приложения свой per-app язык, и его подмена не должна
+ * менять формат часов.
+ */
+private fun formatDeviceTime(context: Context, hour: Int, minute: Int): String {
+    val pattern = if (deviceUses24Hour(context)) "HH:mm" else "h:mm a"
+    val formatter = SimpleDateFormat(pattern, deviceLocale(context))
+    val moment = Calendar.getInstance().apply {
+        set(Calendar.HOUR_OF_DAY, hour)
+        set(Calendar.MINUTE, minute)
+        set(Calendar.SECOND, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.time
+    return formatter.format(moment)
+}
+
+/** 24h или 12h: системная настройка TIME_12_24, если задана, иначе —
+ *  правила локали устройства. Формат не зависит от языка приложения. */
+private fun deviceUses24Hour(context: Context): Boolean {
+    val setting = Settings.System.getString(context.contentResolver, Settings.System.TIME_12_24)
+    if (setting != null) {
+        return setting == "24"
+    }
+    return is24HourLocale(deviceLocale(context))
+}
+
+/**
+ * Локаль устройства, а не приложения: per-app язык не должен влиять на
+ * формат часов. LocaleManager.systemLocales даёт именно системный список;
+ * Resources.getSystem() на новых API тоже подменяется per-app языком, поэтому
+ * годится только как fallback до Android 13, где такого механизма не было.
+ */
+private fun deviceLocale(context: Context): Locale {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val systemLocales = context.getSystemService(LocaleManager::class.java)?.systemLocales
+        if (systemLocales != null && !systemLocales.isEmpty) {
+            return systemLocales[0]
+        }
+    }
+    return Resources.getSystem().configuration.locales[0]
+}
+
+/** Эквивалент скрытого DateFormat.is24HourLocale: H или k первым в коротком шаблоне — 24h. */
+private fun is24HourLocale(locale: Locale): Boolean {
+    val format = JavaTextDateFormat.getTimeInstance(JavaTextDateFormat.SHORT, locale)
+    val pattern = (format as? SimpleDateFormat)?.toPattern().orEmpty()
+    return pattern.firstOrNull() == 'H' || pattern.firstOrNull() == 'k'
+}
+
+/**
+ * POST_NOTIFICATIONS — рантайм-разрешение Android 13+; до 13-го уведомления
+ * включены по умолчанию и запрос не нужен.
+ */
+private fun reminderNeedsNotificationPermission(context: Context): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+        // До Android 13 уведомления включены по умолчанию, запрос не нужен.
+        return false
+    }
+    return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+        PackageManager.PERMISSION_GRANTED
 }
 
 @Composable
