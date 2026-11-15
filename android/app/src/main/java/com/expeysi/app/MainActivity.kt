@@ -114,7 +114,7 @@ private fun AppNavigation() {
                 navController.navigate("analysis")
             }
         },
-        onTransactionComparisonClick = {
+        onCategoryComparisonClick = {
             scope.launch {
                 drawerState.close()
                 navController.navigate("category-report")
@@ -138,6 +138,16 @@ private fun AppNavigation() {
                 homeUiState.selectedBalance?.let { balance ->
                     navController.navigate(
                         "history/balance/${balance.id}?type=${TxType.INCOME.wire}&days=${homeUiState.periodDays}",
+                    )
+                }
+            }
+        },
+        onTransfersReportClick = {
+            scope.launch {
+                drawerState.close()
+                homeUiState.selectedBalance?.let { balance ->
+                    navController.navigate(
+                        "history/balance/${balance.id}?type=transfer&days=${homeUiState.periodDays}",
                     )
                 }
             }

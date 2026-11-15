@@ -19,10 +19,15 @@ import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
+import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.UiText
+import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.home.TransactionItem
+import com.expeysi.app.ui.home.TransferAccount
+import com.expeysi.app.ui.home.TransferCard
+import com.expeysi.app.ui.home.TransferSide
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,6 +41,9 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import javax.inject.Inject
+
+/** Псевдотип «перевод» в аргументе type: обе ноги перевода, {transfer_out, transfer_in}. */
+private const val TRANSFER_TYPES_WIRE = "transfer"
 
 enum class HistoryViewMode { LIST, CATEGORIES, ACCOUNTS }
 
@@ -55,6 +63,7 @@ data class HistoryUiState(
     val categoryTotals: List<CategoryTotal> = emptyList(),
     val accountTotals: List<AccountTotal> = emptyList(),
     val isIncomeOnly: Boolean = false,
+    val isTransferOnly: Boolean = false,
     val totalExpenseMinor: Long = 0,
     val totalIncomeMinor: Long = 0,
     val currencySymbol: String = "",
@@ -102,7 +111,12 @@ class HistoryViewModel @Inject constructor(
     val customRange: StateFlow<DateRangeFilter?> = _customRange.asStateFlow()
 
     private val _selectedTypes = MutableStateFlow(
-        savedStateHandle.get<String>("type")?.let { setOf(TxType.fromWire(it)) } ?: TxType.entries.toSet(),
+        // «transfer» — псевдотип отчёта «Переводы»: обе ноги, реальное хранение TxType не знает.
+        when (val wire = savedStateHandle.get<String>("type")) {
+            TRANSFER_TYPES_WIRE -> setOf(TxType.TRANSFER_OUT, TxType.TRANSFER_IN)
+            null -> TxType.entries.toSet()
+            else -> setOf(TxType.fromWire(wire))
+        },
     )
     val selectedTypes: StateFlow<Set<TxType>> = _selectedTypes.asStateFlow()
 
@@ -182,15 +196,30 @@ class HistoryViewModel @Inject constructor(
 
         // Разбивки по категориям и счетам — только потоки денег; ноги переводов
         // в донышках анализов и в итогах доходов/расходов не участвуют.
+        // Исключение — комиссия перевода: реальная потеря денег, входит в
+        // расходы как псевдо-категория TransferFees.CATEGORY_ID на счёте-источнике.
+        val feeEntries = if (TxType.EXPENSE in f.types && f.categoryIds == null) {
+            filtered
+                .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT && it.feeMinor > 0 }
+                .map { AggEntry(TransferFees.CATEGORY_ID, it.accountId, TxType.EXPENSE, it.feeMinor) }
+        } else {
+            emptyList()
+        }
         val entries = filtered
             .filterNot { TxType.fromWire(it.type).isTransfer }
             .map {
                 AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
-            }
+            } + feeEntries
 
         val scopedTransactions = filtered
             .filter { detail == null || it.categoryId == detail.categoryId }
             .filter { detail?.accountId == null || it.accountId == detail?.accountId }
+        // Партнёрская нога ищется в общем журнале независимо от скоупа: карточка
+        // перевода всегда показывает обе стороны, даже если вторая нога в другом
+        // балансе или ещё не доехала по синку.
+        val legsByLinkedId = data.transactions
+            .filter { !it.deleted && it.linkedId.isNotEmpty() }
+            .groupBy { it.linkedId }
         val items = scopedTransactions
             .let(Transfers::collapse)
             .map { tx ->
@@ -199,12 +228,13 @@ class HistoryViewModel @Inject constructor(
                     transaction = tx,
                     categoryName = category?.name ?: "",
                     categoryIconKey = category?.iconKey ?: "",
-                    categoryColorKey = category?.colorKey ?: "default",
+                    categoryColorKey = category?.colorKey ?: CategoryPalette.DEFAULT_KEY,
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
                     isTransfer = TxType.fromWire(tx.type).isTransfer,
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
                     isTransferPair = Transfers.isCollapsedPair(tx, scopedTransactions),
+                    transferCard = buildTransferCard(tx, legsByLinkedId, accountById, symbols),
                 )
             }
 
@@ -231,6 +261,7 @@ class HistoryViewModel @Inject constructor(
             categoryTotals = Aggregates.byCategory(entries),
             accountTotals = Aggregates.byAccount(entries),
             isIncomeOnly = f.types == setOf(TxType.INCOME),
+            isTransferOnly = f.types == setOf(TxType.TRANSFER_OUT, TxType.TRANSFER_IN),
             totalExpenseMinor = entries.filter { it.type == TxType.EXPENSE }.sumOf { it.amountMinor },
             totalIncomeMinor = entries.filter { it.type == TxType.INCOME }.sumOf { it.amountMinor },
             currencySymbol = symbol,
@@ -271,10 +302,80 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun openDetail(categoryId: String, accountId: String? = null) {
+        // Псевдо-категория комиссий не открывается: за ней нет записи в БД.
+        if (categoryId == TransferFees.CATEGORY_ID) return
         _detail.value = HistoryDetail(categoryId, accountId)
     }
 
     fun closeDetail() {
         _detail.value = null
     }
+}
+
+/**
+ * Развёрнутые данные перевода для карточки истории. Обе ноги ищутся в общем
+ * журнале по связке; без ноги-партнёра счёт на той стороне берётся из
+ * [TransactionEntity.counterpartyAccountId]. Суммы ног — в валюте каждого счёта:
+ * у ноги списания это отправленное без комиссии ([TransactionEntity.amountMinor]
+ * хранит «всего списано» с комиссией), у ноги зачисления — полученное.
+ * null у доходов и расходов.
+ */
+private fun buildTransferCard(
+    leg: TransactionEntity,
+    legsByLinkedId: Map<String, List<TransactionEntity>>,
+    accountById: Map<String, AccountEntity>,
+    symbols: Map<String, String>,
+): TransferCard? {
+    val legType = TxType.fromWire(leg.type)
+    if (!legType.isTransfer) return null
+    val legs = legsByLinkedId[leg.linkedId].orEmpty()
+    val outLeg = if (legType == TxType.TRANSFER_OUT) {
+        leg
+    } else {
+        legs.firstOrNull { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+    }
+    val inLeg = if (legType == TxType.TRANSFER_IN) {
+        leg
+    } else {
+        legs.firstOrNull { TxType.fromWire(it.type) == TxType.TRANSFER_IN }
+    }
+    val sourceId = outLeg?.accountId ?: leg.counterpartyAccountId
+    val destinationId = inLeg?.accountId ?: leg.counterpartyAccountId
+    val source = accountById[sourceId]
+    val destination = accountById[destinationId]
+
+    fun cardAccount(account: AccountEntity?, id: String) = TransferAccount(
+        id = id,
+        name = account?.name ?: "",
+        iconKey = account?.iconKey ?: "",
+        colorKey = account?.colorKey ?: CategoryPalette.DEFAULT_KEY,
+    )
+
+    fun symbolOf(account: AccountEntity?): String = account
+        ?.let { symbols[it.currencyCode] ?: it.currencyCode }
+        .orEmpty()
+
+    // Ключ серии одинаковых переводов подряд: счета-участники и валюты ног.
+    // Собрать его можно только когда известны обе ноги и оба счёта.
+    val groupKey = if (outLeg != null && inLeg != null && source != null && destination != null) {
+        "$sourceId|$destinationId|${source.currencyCode}|${destination.currencyCode}"
+    } else {
+        ""
+    }
+    return TransferCard(
+        source = cardAccount(source, sourceId),
+        destination = cardAccount(destination, destinationId),
+        sentMinor = outLeg?.let { it.amountMinor - it.feeMinor },
+        sourceCurrencySymbol = symbolOf(source),
+        sourceCurrencyCode = source?.currencyCode ?: "",
+        // Комиссия хранится на ноге списания; у ноги зачисления она берётся у партнёра.
+        feeMinor = outLeg?.feeMinor ?: 0L,
+        receivedMinor = inLeg?.amountMinor,
+        receivedCurrencySymbol = symbolOf(destination),
+        receivedCurrencyCode = destination?.currencyCode ?: "",
+        ownSide = if (legType == TxType.TRANSFER_OUT) TransferSide.SOURCE else TransferSide.DESTINATION,
+        date = leg.date,
+        note = leg.note,
+        groupKey = groupKey,
+    )
 }

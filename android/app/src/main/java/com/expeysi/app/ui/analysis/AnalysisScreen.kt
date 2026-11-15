@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.TxType
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -46,18 +47,22 @@ fun AnalysisScreen(
             onRangeSelected = viewModel::selectRange,
             onPeriodPickerDismiss = viewModel::closePeriodPicker,
             onCategoryClick = { category ->
-                val (startMillis, endMillisExclusive) = state.period.bounds(ZonedDateTime.now(zone), zone)
-                onOpenCategory(
-                    OpenCategoryRequest(
-                        balanceId = state.balanceId,
-                        categoryId = category.categoryId,
-                        type = state.type,
-                        startMillis = startMillis,
-                        endMillisExclusive = endMillisExclusive,
-                        periodLabel = periodLabel,
-                        accountIds = state.selectedAccountIds,
-                    ),
-                )
+                // Псевдо-категория комиссий не открывается: за ней нет
+                // записи в БД (сектор доната и строка списка не ведут никуда).
+                if (category.categoryId != TransferFees.CATEGORY_ID) {
+                    val (startMillis, endMillisExclusive) = state.period.bounds(ZonedDateTime.now(zone), zone)
+                    onOpenCategory(
+                        OpenCategoryRequest(
+                            balanceId = state.balanceId,
+                            categoryId = category.categoryId,
+                            type = state.type,
+                            startMillis = startMillis,
+                            endMillisExclusive = endMillisExclusive,
+                            periodLabel = periodLabel,
+                            accountIds = state.selectedAccountIds,
+                        ),
+                    )
+                }
             },
             onExpandToggle = viewModel::toggleExpanded,
             onDraftAccountToggle = viewModel::toggleDraftAccount,

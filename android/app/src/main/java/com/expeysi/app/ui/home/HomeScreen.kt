@@ -91,6 +91,7 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.categoriesLabel
+import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.common.operationsLabel
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
@@ -379,13 +380,16 @@ fun HomeContent(
                 state.transactions.groupBy { item ->
                     Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
                 }.forEach { (date, transactions) ->
-                    // Переводы нейтральны: из сумм шапки дня исключены.
+                    // Переводы нейтральны: перемещение денег внутри семьи не
+                    // доход и не расход. Но комиссия перевода — реальная
+                    // потеря денег: входит в расходы дня.
                     val incomeMinor = transactions
                         .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
                         .sumOf { it.transaction.amountMinor }
                     val expenseMinor = transactions
                         .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
-                        .sumOf { it.transaction.amountMinor }
+                        .sumOf { it.transaction.amountMinor } +
+                        Transfers.feesMinor(transactions.map { it.transaction })
                     stickyHeader(key = "date-$date") {
                         DayGroupHeader(
                             dateLabel = when (date) {
@@ -1007,7 +1011,7 @@ private fun TopCategoryRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                text = category.name.ifBlank { stringResource(R.string.report_uncategorized) },
+                text = categoryDisplayName(category.categoryId, category.name),
                 style = MaterialTheme.typography.bodyLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

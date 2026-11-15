@@ -5,6 +5,7 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
+import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.TxType
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,12 +50,41 @@ class RoomAnalysisRepository @Inject constructor(
                     amountMinor = rows.sumOf { it.amountMinor },
                     operationCount = rows.size,
                 )
-            }
-            .sortedByDescending { it.amountMinor }
+            } +
+            // Комиссия перевода — расход без категории: отдельным
+            // псевдо-сектором (см. TransferFees), чтобы итог и донат
+            // оставались равны сумме категорий. totalMinor по-прежнему
+            // считается суммой категорий.
+            feeStats(type, startMillis, endMillisExclusive, resolvedIds)
+        val sorted = stats.sortedByDescending { it.amountMinor }
         return CategorySummary(
-            totalMinor = stats.sumOf { it.amountMinor },
+            totalMinor = sorted.sumOf { it.amountMinor },
             currencySymbol = symbol,
-            categories = stats,
+            categories = sorted,
+        )
+    }
+
+    /** Псевдо-категория комиссий переводов; пусто у доходов и при комиссиях нет. */
+    private suspend fun feeStats(
+        type: TxType,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
+        accountIds: List<String>,
+    ): List<CategoryStat> {
+        if (type != TxType.EXPENSE) return emptyList()
+        val feeLegs = transactionDao
+            .byTypeAndPeriod(TxType.TRANSFER_OUT.wire, startMillis, endMillisExclusive, accountIds)
+            .filter { it.feeMinor > 0 }
+        if (feeLegs.isEmpty()) return emptyList()
+        return listOf(
+            CategoryStat(
+                categoryId = TransferFees.CATEGORY_ID,
+                name = "",
+                iconKey = TransferFees.ICON_KEY,
+                colorKey = TransferFees.COLOR_KEY,
+                amountMinor = feeLegs.sumOf { it.feeMinor },
+                operationCount = feeLegs.size,
+            ),
         )
     }
 

@@ -73,6 +73,51 @@ data class TransactionItem(
      * без знака. Одиночная нога показывает движение денег счёта: плюс или минус.
      */
     val isTransferPair: Boolean = false,
+    /** Развёрнутые данные перевода для карточек истории; null у доходов и расходов. */
+    val transferCard: TransferCard? = null,
+)
+
+/** Счёт на стороне развёрнутой карточки перевода: имя, иконка и цвет аватара. */
+data class TransferAccount(
+    val id: String,
+    val name: String,
+    val iconKey: String,
+    val colorKey: String,
+)
+
+/** Какая нога перевода принадлежит скоупу текущего списка. */
+enum class TransferSide { SOURCE, DESTINATION }
+
+/**
+ * Развёрнутые данные перевода для карточки в списке истории: оба счёта с
+ * аватарами-иконками, суммы ног в валюте каждого счёта, комиссия отдельным
+ * полем, одна дата и заметка на карточку. Партнёрская нога ищется по всему
+ * хранилищу, независимо от скоупа списка.
+ */
+data class TransferCard(
+    val source: TransferAccount,
+    val destination: TransferAccount,
+    /** Сколько списано со счёта-источника без комиссии; null — нога не доехала по синку. */
+    val sentMinor: Long?,
+    val sourceCurrencySymbol: String,
+    /** ISO-код валюты источника: дробность суммы и сторона курса считаются по нему. */
+    val sourceCurrencyCode: String,
+    /** Комиссия сверх списания в валюте источника; 0 — нет. */
+    val feeMinor: Long,
+    /** Сколько зачислено на счёт-получатель; null — нога не доехала по синку. */
+    val receivedMinor: Long?,
+    val receivedCurrencySymbol: String,
+    val receivedCurrencyCode: String,
+    /** Чья нога в скоупе списка; для знаков и цвета относительно счёта. */
+    val ownSide: TransferSide,
+    /** Дата перевода; у пары ног общая. */
+    val date: Long,
+    val note: String,
+    /**
+     * Идентичность серии для группировки: счета-участники и валюты ног.
+     * Пустой — обе ноги не найдены, серию собрать нельзя.
+     */
+    val groupKey: String,
 )
 
 data class ImportUiState(
@@ -216,13 +261,24 @@ class HomeViewModel @Inject constructor(
         }
 
         val todayStart = Periods.day(LocalDate.now(zone), zone).startMillis
+        fun txDayAmount(tx: TransactionEntity, amountMinor: Long) = TxDayAmount(
+            amountMinor,
+            Periods.day(Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate(), zone).startMillis,
+        )
         fun windowSums(type: TxType) = Windows.sums(
             balanceTxs
                 .filter { TxType.fromWire(it.type) == type }
-                .map {
-                    val txDay = Instant.ofEpochMilli(it.date).atZone(zone).toLocalDate()
-                    TxDayAmount(it.amountMinor, Periods.day(txDay, zone).startMillis)
-                },
+                .map { txDayAmount(it, it.amountMinor) } +
+                // Комиссия перевода — реальный расход дня: с ног-списаний
+                // комиссия входит в окно расходов сверх обычных расходов;
+                // у ноги зачисления комиссии нет.
+                (if (type == TxType.EXPENSE) {
+                    balanceTxs
+                        .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+                        .map { txDayAmount(it, it.feeMinor) }
+                } else {
+                    emptyList()
+                }),
             todayStart,
         )
 

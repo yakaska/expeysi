@@ -47,6 +47,7 @@
     <string name="history_back_groups_cd">Back to groups</string>
     <string name="history_expand_cd">Expand</string>
     <string name="history_edit_account">Edit account</string>
+    <string name="history_transfer_fee_chip">+ fee %1$s</string>
     <string name="home_top_categories">Expenses by category</string>
     <string name="home_total">Total</string>
     <string name="home_empty_title">Nothing here yet</string>
@@ -56,9 +57,10 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_copy">Copy</string>
     <string name="common_back">Back</string>
-    <string name="drawer_transaction_comparison">Comparison</string>
+    <string name="drawer_category_comparison">Category comparison</string>
     <string name="drawer_expenses_report">Expenses</string>
     <string name="drawer_incomes_report">Income</string>
+    <string name="drawer_transfers_report">Transfers</string>
     <string name="drawer_data_export">Export</string>
     <string name="drawer_data_import">Import</string>
     <string name="report_total_income">Total received</string>
@@ -129,6 +131,7 @@
     <string name="common_retry">Retry</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Reports</string>
+    <string name="drawer_section_analytics">Analytics</string>
     <string name="drawer_section_data">Data</string>
     <string name="drawer_section_misc">Miscellaneous</string>
     <string name="drawer_home">Home</string>
@@ -218,6 +221,8 @@
     <!-- %1$s — код валюты, %2$s — остаток счёта; запись чисел и разделитель не переводятся. -->
     <string name="add_transfer_account_subtitle" translatable="false">%1$s · %2$s</string>
     <string name="transfer_title">Transfer</string>
+    <!-- Псевдо-категория комиссий переводов в разрезках (донаты, итоги). -->
+    <string name="transfer_fees_category">Transfer fees</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Opening balance: %1$s %2$s</string>
     <string name="account_delete_title">Delete account?</string>
@@ -258,5 +263,9 @@
     <plurals name="common_rubles">
         <item quantity="one">%1$d ruble</item>
         <item quantity="other">%1$d rubles</item>
+    </plurals>
+    <plurals name="history_transfer_group_count">
+        <item quantity="one">%1$d transfer</item>
+        <item quantity="other">%1$d transfers</item>
     </plurals>
 </resources>
