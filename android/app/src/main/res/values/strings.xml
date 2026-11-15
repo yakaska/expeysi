@@ -198,10 +198,8 @@
     <string name="add_mode_transfer">Transfer</string>
     <string name="add_transfer_from">From account</string>
     <string name="add_transfer_to">To account</string>
-    <!-- %1$s — символ валюты. -->
-    <string name="add_transfer_amount_from">You send, %1$s</string>
-    <!-- %1$s — символ валюты. -->
-    <string name="add_transfer_amount_to">You receive, %1$s</string>
+    <string name="add_transfer_send">Send</string>
+    <string name="add_transfer_receive">Receive</string>
     <!-- %1$s и %2$s — коды валют пары перевода. -->
     <string name="add_transfer_rate_label">Rate, 1 %1$s = ? %2$s</string>
     <string name="add_transfer_rate_label_known">Rate, 1 %1$s = %3$s %2$s</string>
@@ -210,7 +208,7 @@
     <!-- %1$s и %2$s — коды валют пары перевода. -->
     <string name="add_transfer_rate_caption_unknown">1 %1$s = ? %2$s</string>
     <string name="add_transfer_rate_direction_cd">Change rate direction</string>
-    <!-- %1$s — символ валюты списания. -->
+    <!-- %1$s — код валюты списания. -->
     <string name="add_transfer_fee">Fee, %1$s</string>
     <string name="add_transfer_add_fee">Add fee</string>
     <string name="add_transfer_swap_cd">Swap accounts</string>

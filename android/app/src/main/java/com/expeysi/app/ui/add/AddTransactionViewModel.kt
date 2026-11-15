@@ -175,6 +175,15 @@ class AddTransactionViewModel @Inject constructor(
     /** Направление развёрнуто вручную — до смены пары автоправило не трогает его. */
     private var rateDirectionManual = false
 
+    /**
+     * Подсказка или настоящий курс: true — курс подставлен последним
+     * использованным для пары, пользователь его не правил, суммы его пока
+     * не вывели. Окрашивает подпись курса серым; сбрасывается при правке
+     * курса, при выводе курса из сумм и при развороте перевода.
+     */
+    private val _rateIsSuggested = MutableStateFlow(false)
+    val rateIsSuggested: StateFlow<Boolean> = _rateIsSuggested.asStateFlow()
+
     /** Курс и комиссия правились вручную — inline-ошибки показываются только после этого. */
     private val _rateTouched = MutableStateFlow(false)
     private val _feeTouched = MutableStateFlow(false)
@@ -294,12 +303,22 @@ class AddTransactionViewModel @Inject constructor(
             val send = Money.parseToMinor(_fromAmountText.value)
             val receive = Money.parseToMinor(_toAmountText.value)
             val derived = if (send != null && receive != null) TransferCalc.exactRate(send, receive) else null
-            setDerivedRate(derived ?: rateStore.rate(codes.first, codes.second)?.let(TransferCalc::parse))
-            if (rateExact == null) _rateText.value = ""
+            // Курс из сумм ног — настоящий; пока ног нет — последний использованный
+            // курс пары из локального хранилища, показывается как подсказка.
+            if (derived != null) {
+                setDerivedRate(derived, suggested = false)
+            } else {
+                setDerivedRate(rateStore.rate(codes.first, codes.second)?.let(TransferCalc::parse), suggested = true)
+            }
+            if (rateExact == null) {
+                _rateText.value = ""
+                _rateIsSuggested.value = false
+            }
         } else {
             rateExact = null
             _rateInverted.value = false
             _rateText.value = ""
+            _rateIsSuggested.value = false
         }
     }
 
@@ -307,10 +326,13 @@ class AddTransactionViewModel @Inject constructor(
      * Курс выведен из сумм (правка зачисления, загрузка правки, смена пары):
      * хранится точным числом, направление показа выбирается автоправилом
      * «крупная валюта слева», поле показывает до шести значащих цифр.
+     * Подставленный из хранилища курс помечается подсказкой ([suggested]),
+     * выведенный из сумм — настоящим курсом.
      */
-    private fun setDerivedRate(rate: BigDecimal?) {
+    private fun setDerivedRate(rate: BigDecimal?, suggested: Boolean = false) {
         if (rate == null) return
         rateExact = rate
+        _rateIsSuggested.value = suggested
         if (!rateDirectionManual) {
             _rateInverted.value = rate.compareTo(BigDecimal.ONE) < 0
         }
@@ -523,6 +545,8 @@ class AddTransactionViewModel @Inject constructor(
         val text = Money.formatInput(value)
         _rateText.value = text
         _rateTouched.value = true
+        // Пользовательский ввод не подсказка, даже если совпал с нею.
+        _rateIsSuggested.value = false
         // Точный курс хранится как введён; в перевёрнутом направлении поле
         // редактирует обратный курс, и он пересчитывается в прямой.
         val typed = TransferCalc.parse(text)
@@ -550,9 +574,17 @@ class AddTransactionViewModel @Inject constructor(
         _feeTouched.value = true
     }
 
-    /** Пользователь раскрыл поле комиссии. */
+    /** Пользователь раскрыл поле комиссии: «Добавить комиссию» или IME-переход. */
     fun showFee() {
         _feeVisible.value = true
+    }
+
+    /**
+     * Пользователь ушёл из пустого поля комиссии: сворачиваем обратно в
+     * «Добавить комиссию». Введённая комиссия поле не сворачивает.
+     */
+    fun hideFee() {
+        _feeVisible.value = false
     }
 
     /** Зачисление = списание × точный курс; негодный вход поле зачисления не трогает. */
@@ -602,13 +634,17 @@ class AddTransactionViewModel @Inject constructor(
             rateExact = null
             _rateInverted.value = false
             _rateText.value = ""
+            _rateIsSuggested.value = false
             if (!_toAmountTouched.value) _toAmountText.value = _fromAmountText.value
         } else {
             rateDirectionManual = false
             rateExact = null
             _rateTouched.value = false
-            setDerivedRate(rateStore.rate(pair.first, pair.second)?.let(TransferCalc::parse))
-            if (rateExact == null) _rateText.value = ""
+            setDerivedRate(rateStore.rate(pair.first, pair.second)?.let(TransferCalc::parse), suggested = true)
+            if (rateExact == null) {
+                _rateText.value = ""
+                _rateIsSuggested.value = false
+            }
             recomputeReceive()
         }
     }
@@ -630,8 +666,12 @@ class AddTransactionViewModel @Inject constructor(
         _rateTouched.value = false
         rateDirectionManual = false
         rateExact = rateExact?.let { TransferCalc.invertRate(it) }
-        setDerivedRate(rateExact)
-        if (rateExact == null) _rateText.value = ""
+        // Инвертированный курс вычислен автоматически — не подсказка.
+        setDerivedRate(rateExact, suggested = false)
+        if (rateExact == null) {
+            _rateText.value = ""
+            _rateIsSuggested.value = false
+        }
         transferPair = currencyPairCodes()
     }
 
