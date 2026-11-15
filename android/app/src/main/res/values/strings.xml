@@ -134,7 +134,17 @@
     <string name="drawer_section_analytics">Analytics</string>
     <string name="drawer_section_data">Data</string>
     <string name="drawer_section_misc">Miscellaneous</string>
+    <string name="drawer_section_interface">Interface settings</string>
     <string name="drawer_home">Home</string>
+    <string name="drawer_language">Language</string>
+    <!-- Названия языков не переводятся: каждый показывается на своём языке. -->
+    <string name="language_system">System default</string>
+    <string name="language_english" translatable="false">English</string>
+    <string name="language_russian" translatable="false">Русский</string>
+    <string name="drawer_theme">Theme</string>
+    <string name="theme_system">System default</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
     <string name="history_detail_title_parts">%1$s · %2$s</string>
     <!-- %1$s — количество импортированных операций. -->
     <string name="import_done">Imported transactions: %1$d</string>

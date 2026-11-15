@@ -1,6 +1,7 @@
 package com.expeysi.app.ui.home
 
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CompareArrows
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
@@ -24,6 +26,7 @@ import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
@@ -33,6 +36,7 @@ import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,8 +55,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.os.LocaleListCompat
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.data.ThemeMode
 import com.expeysi.app.ui.common.rememberClipboardCopy
+import com.expeysi.app.ui.theme.ThemeViewModel
 
 /** Дисплейный шрифт со стилизацией «под иврит» для имени приложения в шапке drawer. */
 private val SholomFontFamily = FontFamily(Font(R.font.sholom))
@@ -77,10 +86,14 @@ fun HomeNavigationDrawer(
     content: @Composable () -> Unit,
 ) {
     var showLeaveConfirmation by remember { mutableStateOf(false) }
+    var showLanguagePicker by remember { mutableStateOf(false) }
+    var showThemePicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.home_family_code_copied)
     val copyLabel = stringResource(R.string.common_copy)
     val copyToClipboard = rememberClipboardCopy()
+    val themeViewModel: ThemeViewModel = hiltViewModel()
+    val themeMode by themeViewModel.mode.collectAsStateWithLifecycle()
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -189,6 +202,21 @@ fun HomeNavigationDrawer(
                         onClick = { if (!importing) onImportClick() },
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
+                    DrawerSection(stringResource(R.string.drawer_section_interface))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_language)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.Translate, contentDescription = null) },
+                        onClick = { showLanguagePicker = true },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_theme)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
+                        onClick = { showThemePicker = true },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
                     DrawerSection(stringResource(R.string.drawer_section_misc))
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.history_mode_categories)) },
@@ -251,6 +279,120 @@ fun HomeNavigationDrawer(
                 }
             },
         )
+    }
+    if (showLanguagePicker) {
+        LanguagePickerDialog(onDismiss = { showLanguagePicker = false })
+    }
+    if (showThemePicker) {
+        ThemePickerDialog(
+            selectedMode = themeMode,
+            onDismiss = { showThemePicker = false },
+            onSelect = { selected ->
+                showThemePicker = false
+                themeViewModel.setMode(selected)
+            },
+        )
+    }
+}
+
+/** Диалог переключения языка: выбор применяется сразу, активити пересоздаётся. */
+@Composable
+private fun LanguagePickerDialog(onDismiss: () -> Unit) {
+    // Пустой список локалей — «язык системы», иначе используем код языка.
+    val activeLanguageTag = AppCompatDelegate.getApplicationLocales()
+        .takeIf { !it.isEmpty }
+        ?.get(0)
+        ?.language
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_language)) },
+        text = {
+            Column {
+                RadioOption(
+                    label = stringResource(R.string.language_system),
+                    selected = activeLanguageTag == null,
+                    onClick = {
+                        onDismiss()
+                        applyLanguage(null)
+                    },
+                )
+                RadioOption(
+                    label = stringResource(R.string.language_english),
+                    selected = activeLanguageTag == "en",
+                    onClick = {
+                        onDismiss()
+                        applyLanguage("en")
+                    },
+                )
+                RadioOption(
+                    label = stringResource(R.string.language_russian),
+                    selected = activeLanguageTag == "ru",
+                    onClick = {
+                        onDismiss()
+                        applyLanguage("ru")
+                    },
+                )
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+private fun applyLanguage(tag: String?) {
+    AppCompatDelegate.setApplicationLocales(
+        tag?.let(LocaleListCompat::forLanguageTags) ?: LocaleListCompat.getEmptyLocaleList(),
+    )
+}
+
+/** Диалог выбора темы: «как в системе», светлая, тёмная; применяется сразу. */
+@Composable
+private fun ThemePickerDialog(
+    selectedMode: ThemeMode,
+    onDismiss: () -> Unit,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_theme)) },
+        text = {
+            Column {
+                RadioOption(
+                    label = stringResource(R.string.theme_system),
+                    selected = selectedMode == ThemeMode.SYSTEM,
+                    onClick = { onSelect(ThemeMode.SYSTEM) },
+                )
+                RadioOption(
+                    label = stringResource(R.string.theme_light),
+                    selected = selectedMode == ThemeMode.LIGHT,
+                    onClick = { onSelect(ThemeMode.LIGHT) },
+                )
+                RadioOption(
+                    label = stringResource(R.string.theme_dark),
+                    selected = selectedMode == ThemeMode.DARK,
+                    onClick = { onSelect(ThemeMode.DARK) },
+                )
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun RadioOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Spacer(Modifier.size(12.dp))
+        Text(label, style = MaterialTheme.typography.bodyLarge)
     }
 }
 
