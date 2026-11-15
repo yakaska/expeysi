@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.AlertDialog
@@ -163,6 +165,7 @@ fun AddTransactionScreen(
     val rateInverted by viewModel.rateInverted.collectAsStateWithLifecycle()
     val rateErrorVisible by viewModel.rateErrorVisible.collectAsStateWithLifecycle()
     val feeErrorVisible by viewModel.feeErrorVisible.collectAsStateWithLifecycle()
+    val rateIsSuggested by viewModel.rateIsSuggested.collectAsStateWithLifecycle()
     val noteBringIntoViewRequester = remember { BringIntoViewRequester() }
     val coroutineScope = rememberCoroutineScope()
 
@@ -193,6 +196,11 @@ fun AddTransactionScreen(
     var showCalculator by rememberSaveable { mutableStateOf(false) }
     // Поле курса свернуто в подпись, пока пользователь её не раскроет.
     var rateFieldVisible by rememberSaveable { mutableStateOf(false) }
+    // Иконка калькулятора в поле суммы видна только в фокусе; без фокуса — код валюты.
+    var sendAmountFocused by remember { mutableStateOf(false) }
+    var receiveAmountFocused by remember { mutableStateOf(false) }
+    // Поле комиссии раскрывается кнопкой «Добавить комиссию»: после появления фокус берёт оно.
+    var feeAwaitFocus by rememberSaveable { mutableStateOf(false) }
 
     val isTransfer = mode == AddMode.TRANSFER
 
@@ -412,8 +420,6 @@ fun AddTransactionScreen(
     val selectedCategory = categories.firstOrNull { it.id == selectedCategoryId }
 
     val amountSymbol = currencySymbolOf(selectedAccount)
-    val fromSymbol = currencySymbolOf(fromAccount)
-    val toSymbol = currencySymbolOf(toAccount)
     // Коды валют из балансов счетов; курс перевода показывается по кодам пары.
     val fromCode = fromAccount?.let { balances[it.balanceId]?.currencyCode }
     val toCode = toAccount?.let { balances[it.balanceId]?.currencyCode }
@@ -633,17 +639,21 @@ fun AddTransactionScreen(
                         AmountField(
                             value = fromAmountText,
                             onValueChange = viewModel::onFromAmountChange,
-                            // %1$s — символ валюты.
-                            label = stringResource(R.string.add_transfer_amount_from, fromSymbol),
+                            label = stringResource(R.string.add_transfer_send),
                             onCalculate = {
                                 calculatorTarget = CALCULATOR_FROM
                                 showCalculator = true
                             },
-                            modifier = Modifier.bringIntoViewOnFocus(amountBringIntoView, coroutineScope),
+                            modifier = Modifier
+                                .bringIntoViewOnFocus(amountBringIntoView, coroutineScope)
+                                .onFocusChanged { sendAmountFocused = it.isFocused },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                             keyboardActions = KeyboardActions(
                                 onNext = { if (feeVisible) feeFocus.requestFocus() else noteFocus.requestFocus() },
                             ),
+                            // Валюта внутри поля — код ISO, не символ: одинаковый рендер.
+                            suffix = fromCode ?: Currency.DEFAULT,
+                            showCalculator = sendAmountFocused,
                         )
                     } else {
                         // Подпись раскрывается в поле с фокусом, чтобы сразу править курс.
@@ -666,21 +676,24 @@ fun AddTransactionScreen(
                             AmountField(
                                 value = fromAmountText,
                                 onValueChange = viewModel::onFromAmountChange,
-                                // %1$s — символ валюты.
-                                label = stringResource(R.string.add_transfer_amount_from, fromSymbol),
+                                label = stringResource(R.string.add_transfer_send),
                                 onCalculate = {
                                     calculatorTarget = CALCULATOR_FROM
                                     showCalculator = true
                                 },
                                 modifier = Modifier
                                     .weight(1f)
-                                    .bringIntoViewOnFocus(amountBringIntoView, coroutineScope),
+                                    .bringIntoViewOnFocus(amountBringIntoView, coroutineScope)
+                                    .onFocusChanged { sendAmountFocused = it.isFocused },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                                 keyboardActions = KeyboardActions(
                                     onNext = {
                                         if (rateFieldVisible) rateFocus.requestFocus() else receiveFocus.requestFocus()
                                     },
                                 ),
+                                // Валюта внутри поля — код ISO, не символ: одинаковый рендер.
+                                suffix = fromCode ?: Currency.DEFAULT,
+                                showCalculator = sendAmountFocused,
                             )
                             Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
                             // Нога, ещё не дошедшая по синку, правится только по своей стороне
@@ -688,8 +701,7 @@ fun AddTransactionScreen(
                             AmountField(
                                 value = toAmountText,
                                 onValueChange = viewModel::onToAmountChange,
-                                // %1$s — символ валюты.
-                                label = stringResource(R.string.add_transfer_amount_to, toSymbol),
+                                label = stringResource(R.string.add_transfer_receive),
                                 onCalculate = {
                                     calculatorTarget = CALCULATOR_TO
                                     showCalculator = true
@@ -698,14 +710,22 @@ fun AddTransactionScreen(
                                 modifier = Modifier
                                     .weight(1f)
                                     .focusRequester(receiveFocus)
-                                    .bringIntoViewOnFocus(receiveBringIntoView, coroutineScope),
+                                    .bringIntoViewOnFocus(receiveBringIntoView, coroutineScope)
+                                    .onFocusChanged { receiveAmountFocused = it.isFocused },
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                                 keyboardActions = KeyboardActions(
                                     onNext = { if (feeVisible) feeFocus.requestFocus() else noteFocus.requestFocus() },
                                 ),
+                                suffix = toCode ?: Currency.DEFAULT,
+                                showCalculator = receiveAmountFocused,
                             )
                         }
                         if (rateFieldVisible) {
+                            // Фокус уже заходил в поле: только после реальной потери
+                            // фокуса валидный курс сворачивается в подпись. Присоединение
+                            // узла тоже выдаёт событие «не в фокусе» — без этого поля
+                            // сворачивалось бы сразу, не получив фокуса.
+                            var rateHadFocus by remember { mutableStateOf(false) }
                             Row(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -716,7 +736,16 @@ fun AddTransactionScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .focusRequester(rateFocus)
-                                        .bringIntoViewOnFocus(rateBringIntoView, coroutineScope),
+                                        .bringIntoViewOnFocus(rateBringIntoView, coroutineScope)
+                                        .onFocusChanged { state ->
+                                            if (state.isFocused) {
+                                                rateHadFocus = true
+                                            } else if (rateHadFocus && parsedRate != null && parsedRate.signum() > 0) {
+                                                // Уход из валидного поля сворачивает его в подпись;
+                                                // пустую или испорченную правку оставляю на экране.
+                                                rateFieldVisible = false
+                                            }
+                                        },
                                     colors = fieldColors(),
                                     isError = rateErrorVisible,
                                     supportingText = if (rateErrorVisible) {
@@ -753,16 +782,23 @@ fun AddTransactionScreen(
                                 )
                             }
                         } else {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth(),
+                            // Подпись курса: вся строка нажимается (ripple), карандаш
+                            // подсказывает правку; текст центрирован по всей строке,
+                            // кнопка разворота прижата вправо (48dp).
+                            val captionColor = if (parsedRate != null && !rateIsSuggested) {
+                                MaterialTheme.colorScheme.onSurface
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { rateFieldVisible = true },
                             ) {
-                                // Паддинг 16dp: начало подписи совпадает с отступом
-                                // текста полей выше (по умолчанию у кнопки-текста 12dp).
-                                TextButton(
-                                    onClick = { rateFieldVisible = true },
-                                    contentPadding = PaddingValues(horizontal = 16.dp),
-                                    modifier = Modifier.weight(1f),
+                                Row(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                                 ) {
                                     Text(
                                         if (parsedRate != null) {
@@ -780,26 +816,54 @@ fun AddTransactionScreen(
                                             )
                                         },
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = captionColor,
+                                    )
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
                                 RateDirectionToggle(
                                     enabled = rateToggleEnabled,
                                     onClick = viewModel::toggleRateDirection,
+                                    modifier = Modifier.align(Alignment.CenterEnd),
                                 )
                             }
                         }
                     }
+                    // Поле комиссии раскрывается кнопкой «Добавить комиссию»:
+                    // после появления фокус и клавиатура берёт оно.
+                    LaunchedEffect(feeVisible) {
+                        if (feeVisible && feeAwaitFocus) {
+                            feeFocus.requestFocus()
+                            feeAwaitFocus = false
+                        }
+                    }
                     if (feeVisible) {
+                        // Фокус уже заходил в поле: присоединение узла тоже выдаёт
+                        // «не в фокусе» — без этого поле из «Добавить комиссию» сразу
+                        // сворачивалось бы обратно, не получив фокуса.
+                        var feeHadFocus by remember { mutableStateOf(false) }
                         MoneyTextField(
                             value = feeText,
                             onValueChange = viewModel::onFeeChange,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(feeFocus)
-                                .bringIntoViewOnFocus(feeBringIntoView, coroutineScope),
-                            // %1$s — символ валюты списания.
-                            label = { Text(stringResource(R.string.add_transfer_fee, fromSymbol)) },
+                                .bringIntoViewOnFocus(feeBringIntoView, coroutineScope)
+                                .onFocusChanged { state ->
+                                    if (state.isFocused) {
+                                        feeHadFocus = true
+                                    } else if (feeHadFocus && feeText.isEmpty()) {
+                                        // Пустая комиссия при уходе сворачивается обратно
+                                        // в «Добавить комиссию»; введённая остаётся раскрытой.
+                                        viewModel.hideFee()
+                                    }
+                                },
+                            // %1$s — код валюты списания.
+                            label = { Text(stringResource(R.string.add_transfer_fee, fromCode ?: Currency.DEFAULT)) },
                             colors = fieldColors(),
                             isError = feeErrorVisible,
                             supportingText = if (feeErrorVisible) {
@@ -811,12 +875,10 @@ fun AddTransactionScreen(
                             keyboardActions = KeyboardActions(onNext = { noteFocus.requestFocus() }),
                         )
                     } else {
-                        // Паддинг 16dp: начало подписи совпадает с отступом
-                        // текста полей выше (по умолчанию у кнопки-текста 12dp).
-                        TextButton(
-                            onClick = viewModel::showFee,
-                            contentPadding = PaddingValues(horizontal = 16.dp),
-                        ) {
+                        TextButton(onClick = {
+                            feeAwaitFocus = true
+                            viewModel.showFee()
+                        }) {
                             Text(stringResource(R.string.add_transfer_add_fee))
                         }
                     }
@@ -1012,6 +1074,9 @@ private fun SelectorRow(
 /**
  * Поле суммы с калькулятором: одинаковая высота и оформление на всех трёх
  * вкладках. Параметры клавиатуры пробрасываются для IME-цепочки полей.
+ * У перевода [suffix] занимает правый край кодом валюты, а калькулятор
+ * показывается только в фокусном поле ([showCalculator]); слот правого
+ * края фиксированной ширины, поэтому текст поля не сдвигается при смене.
  */
 @Composable
 private fun AmountField(
@@ -1023,31 +1088,55 @@ private fun AmountField(
     modifier: Modifier = Modifier,
     keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
     keyboardActions: KeyboardActions = KeyboardActions.Default,
+    suffix: String? = null,
+    showCalculator: Boolean = true,
 ) {
     MoneyTextField(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         enabled = enabled,
-        label = { Text(label) },
+        label = { Text(label, maxLines = 1) },
         colors = fieldColors(),
         keyboardOptions = keyboardOptions,
         keyboardActions = keyboardActions,
-        trailingIcon = {
-            IconButton(onClick = onCalculate) {
-                Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+        trailingIcon = if (suffix == null) {
+            {
+                IconButton(onClick = onCalculate) {
+                    Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+                }
+            }
+        } else {
+            {
+                Box(
+                    modifier = Modifier.widthIn(min = 48.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (showCalculator) {
+                        IconButton(onClick = onCalculate) {
+                            Icon(Icons.Filled.Calculate, contentDescription = stringResource(R.string.calc_title))
+                        }
+                    } else {
+                        Text(
+                            suffix,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
         },
     )
 }
 
-/** Кнопка разворота направления показа курса: «1 USD = 25 000 VND» ↔ «1 VND = …». */
+/** Кнопка разворота направления показа курса: 48dp, «1 USD = 25 000 VND» ↔ «1 VND = …». */
 @Composable
 private fun RateDirectionToggle(
     enabled: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    IconButton(onClick = onClick, enabled = enabled) {
+    IconButton(onClick = onClick, enabled = enabled, modifier = modifier) {
         Icon(
             Icons.Filled.SwapHoriz,
             contentDescription = stringResource(R.string.add_transfer_rate_direction_cd),
