@@ -114,7 +114,7 @@ private fun AppNavigation() {
                 navController.navigate("analysis")
             }
         },
-        onTransactionComparisonClick = {
+        onCategoryComparisonClick = {
             scope.launch {
                 drawerState.close()
                 navController.navigate("category-report")

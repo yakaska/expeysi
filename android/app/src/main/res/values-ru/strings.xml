@@ -54,7 +54,7 @@
     <string name="common_cancel">Отмена</string>
     <string name="common_copy">Копировать</string>
     <string name="common_back">Назад</string>
-    <string name="drawer_transaction_comparison">Сравнение</string>
+    <string name="drawer_category_comparison">Сравнение категорий</string>
     <string name="drawer_expenses_report">Расходы</string>
     <string name="drawer_incomes_report">Доходы</string>
     <string name="drawer_data_export">Экспорт</string>
@@ -127,6 +127,7 @@
     <string name="common_retry">Повторить</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Отчёты</string>
+    <string name="drawer_section_analytics">Аналитика</string>
     <string name="drawer_section_data">Данные</string>
     <string name="drawer_section_misc">Разное</string>
     <string name="drawer_home">Главная</string>

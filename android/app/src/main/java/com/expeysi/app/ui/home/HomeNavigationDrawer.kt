@@ -63,7 +63,7 @@ fun HomeNavigationDrawer(
     leavingFamily: Boolean,
     onHomeClick: () -> Unit,
     onAnalysisClick: () -> Unit,
-    onTransactionComparisonClick: () -> Unit,
+    onCategoryComparisonClick: () -> Unit,
     onExpensesReportClick: () -> Unit,
     onIncomesReportClick: () -> Unit,
     onImportClick: () -> Unit,
@@ -131,20 +131,6 @@ fun HomeNavigationDrawer(
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.analysis_title)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.PieChart, contentDescription = null) },
-                        onClick = onAnalysisClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_transaction_comparison)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.CompareArrows, contentDescription = null) },
-                        onClick = onTransactionComparisonClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
                         label = { Text(stringResource(R.string.drawer_expenses_report)) },
                         selected = false,
                         icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
@@ -156,6 +142,21 @@ fun HomeNavigationDrawer(
                         selected = false,
                         icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
                         onClick = onIncomesReportClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    DrawerSection(stringResource(R.string.drawer_section_analytics))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.analysis_title)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.PieChart, contentDescription = null) },
+                        onClick = onAnalysisClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_category_comparison)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.CompareArrows, contentDescription = null) },
+                        onClick = onCategoryComparisonClick,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     DrawerSection(stringResource(R.string.drawer_section_data))

@@ -56,7 +56,7 @@
     <string name="common_cancel">Cancel</string>
     <string name="common_copy">Copy</string>
     <string name="common_back">Back</string>
-    <string name="drawer_transaction_comparison">Comparison</string>
+    <string name="drawer_category_comparison">Category comparison</string>
     <string name="drawer_expenses_report">Expenses</string>
     <string name="drawer_incomes_report">Income</string>
     <string name="drawer_data_export">Export</string>
@@ -129,6 +129,7 @@
     <string name="common_retry">Retry</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Reports</string>
+    <string name="drawer_section_analytics">Analytics</string>
     <string name="drawer_section_data">Data</string>
     <string name="drawer_section_misc">Miscellaneous</string>
     <string name="drawer_home">Home</string>
