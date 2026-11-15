@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.South
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -73,8 +75,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.domain.Currency
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.MoneyTextField
+import com.expeysi.app.ui.common.AmountFormat
+import com.expeysi.app.ui.icons.BalanceIcon
 import com.expeysi.app.ui.icons.CategoryIcon
 import kotlinx.coroutines.launch
 import java.time.format.DateTimeFormatter
@@ -240,24 +245,50 @@ fun AddTransactionScreen(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
             )
             LazyColumn {
-                items(accounts, key = { it.id }) { account ->
-                    ListItem(
-                        leadingContent = {
-                            CategoryIcon(account.iconKey, account.colorKey)
-                        },
-                        headlineContent = { Text(account.name) },
-                        supportingContent = {
-                            balances[account.balanceId]?.let { Text(it.name) }
-                        },
-                        modifier = Modifier.clickable {
-                            when {
-                                isTransfer && accountSheetForTo -> viewModel.onToAccountSelect(account.id)
-                                isTransfer -> viewModel.onFromAccountSelect(account.id)
-                                else -> viewModel.onAccountSelect(account.id)
+                // Счета сгруппированы по балансам: заголовок баланса, под ним
+                // с отступом его счета; баланс по имени в строке уже не нужен.
+                accountSheetGroups(accounts, balances).forEach { group ->
+                    if (group.balanceName.isNotBlank()) {
+                        item(key = "group-${group.balanceId}") {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 8.dp, top = 12.dp),
+                            ) {
+                                BalanceIcon(
+                                    name = group.balanceName,
+                                    iconKey = group.iconKey,
+                                    colorKey = group.colorKey,
+                                    size = 24.dp,
+                                )
+                                Text(
+                                    text = group.balanceName,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(start = 8.dp),
+                                )
                             }
-                            showAccountSheet = false
-                        },
-                    )
+                        }
+                    }
+                    items(group.accounts, key = { it.id }) { account ->
+                        ListItem(
+                            leadingContent = {
+                                CategoryIcon(account.iconKey, account.colorKey)
+                            },
+                            headlineContent = { Text(account.name) },
+                            modifier = Modifier
+                                .padding(start = 20.dp)
+                                .clickable {
+                                    when {
+                                        isTransfer && accountSheetForTo -> viewModel.onToAccountSelect(account.id)
+                                        isTransfer -> viewModel.onFromAccountSelect(account.id)
+                                        else -> viewModel.onAccountSelect(account.id)
+                                    }
+                                    showAccountSheet = false
+                                },
+                        )
+                    }
                 }
             }
         }
@@ -434,37 +465,32 @@ fun AddTransactionScreen(
                     }
 
                     if (isTransfer) {
-                        ListItem(
-                            headlineContent = { Text(stringResource(R.string.add_transfer_from)) },
-                            supportingContent = {
-                                Text(fromAccount?.name ?: stringResource(R.string.common_select))
-                            },
-                            leadingContent = {
-                                fromAccount?.let { CategoryIcon(it.iconKey, it.colorKey) }
-                            },
-                            trailingContent = {
-                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
+                        TransferLegCard(
+                            headline = stringResource(R.string.add_transfer_from),
+                            account = fromAccount,
+                            onClick = {
                                 accountSheetForTo = false
                                 showAccountSheet = true
                             },
+                            modifier = Modifier.padding(top = 8.dp),
                         )
-                        ListItem(
-                            headlineContent = { Text(stringResource(R.string.add_transfer_to)) },
-                            supportingContent = {
-                                Text(toAccount?.name ?: stringResource(R.string.common_select))
-                            },
-                            leadingContent = {
-                                toAccount?.let { CategoryIcon(it.iconKey, it.colorKey) }
-                            },
-                            trailingContent = {
-                                Icon(Icons.Filled.ChevronRight, contentDescription = null)
-                            },
-                            modifier = Modifier.clickable {
+                        TransferRateRow(
+                            fromCode = fromAccount?.let { balances[it.balanceId]?.currencyCode },
+                            toCode = toAccount?.let { balances[it.balanceId]?.currencyCode },
+                            fromSymbol = fromSymbol,
+                            toSymbol = toSymbol,
+                            fromAmountText = fromAmountText,
+                            toAmountText = toAmountText,
+                            modifier = Modifier.padding(vertical = 6.dp),
+                        )
+                        TransferLegCard(
+                            headline = stringResource(R.string.add_transfer_to),
+                            account = toAccount,
+                            onClick = {
                                 accountSheetForTo = true
                                 showAccountSheet = true
                             },
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     } else {
                         ListItem(
@@ -599,6 +625,95 @@ fun AddTransactionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+/** Карточка выбора счёта в переводе: подпись («Со счёта»/«На счёт»), иконка и имя счёта. */
+@Composable
+private fun TransferLegCard(
+    headline: String,
+    account: AccountEntity?,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        border = BorderStroke(1.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        ) {
+            CategoryIcon(account?.iconKey ?: "", account?.colorKey ?: "default")
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
+            ) {
+                Text(
+                    text = headline,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = account?.name ?: stringResource(R.string.common_select),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+            }
+            Icon(Icons.Filled.ChevronRight, contentDescription = null)
+        }
+    }
+}
+
+/**
+ * Стрелка от счёта списания к счёту получения с курсом перевода рядом.
+ * Курс не хранится и следует из введённых сумм ног; пока сумма не введена,
+ * на её месте многоточие. Бесчисленный курс обеих ног в одной валюте — 1 : 1.
+ */
+@Composable
+private fun TransferRateRow(
+    fromCode: String?,
+    toCode: String?,
+    fromSymbol: String,
+    toSymbol: String,
+    fromAmountText: String,
+    toAmountText: String,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier.fillMaxWidth(),
+    ) {
+        Icon(
+            Icons.Filled.South,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
+        )
+        if (fromCode != null && toCode != null) {
+            val rate = when {
+                fromCode == toCode -> stringResource(R.string.add_transfer_rate_same)
+                else -> {
+                    val fromMinor = Money.parseToMinor(fromAmountText)
+                    val toMinor = Money.parseToMinor(toAmountText)
+                    val rateText = if (fromMinor != null && fromMinor > 0 && toMinor != null && toMinor > 0) {
+                        AmountFormat.rate(toMinor, fromMinor)
+                    } else {
+                        "…"
+                    }
+                    stringResource(R.string.add_transfer_rate_fmt, fromSymbol, rateText, toSymbol)
+                }
+            }
+            Text(
+                text = rate,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 8.dp),
+            )
         }
     }
 }
