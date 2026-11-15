@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.SportsEsports
+import com.expeysi.app.domain.TransferFees
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Wallet
@@ -31,8 +32,12 @@ object IconCatalog {
 
     const val DEFAULT_KEY = "category"
 
-    /** Ключ иконки строки перевода в списках операций. */
-    const val TRANSFER_KEY = "swap_horiz"
+    /**
+     * Ключ иконки строки перевода в списках операций. Literal живёт в
+     * домене (TransferFees.ICON_KEY): псевдо-категория комиссий в
+     * разрезках рисуется той же иконкой, а данные слои не зависят от UI.
+     */
+    const val TRANSFER_KEY = TransferFees.ICON_KEY
 
     private val icons: Map<String, ImageVector> = mapOf(
         "wallet" to Icons.Filled.Wallet,

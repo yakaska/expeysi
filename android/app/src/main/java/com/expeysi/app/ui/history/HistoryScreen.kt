@@ -65,9 +65,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.domain.Money
+import com.expeysi.app.domain.TransferFees
+import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
+import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -396,6 +399,9 @@ private fun TransactionList(
                     else -> date.format(dayHeaderFormatter)
                 }
                 if (!transferOnly) {
+                    // Переводы нейтральны, но их комиссия — реальная потеря
+                    // денег: входит в расходы дня.
+                    val feeMinor = Transfers.feesMinor(dayItems.map { it.transaction })
                     DayGroupHeader(
                         dateLabel = dateLabel,
                         incomeMinor = dayItems
@@ -403,7 +409,7 @@ private fun TransactionList(
                             .sumOf { it.transaction.amountMinor },
                         expenseMinor = dayItems
                             .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
-                            .sumOf { it.transaction.amountMinor },
+                            .sumOf { it.transaction.amountMinor } + feeMinor,
                         currencySymbol = dayItems.first().currencySymbol,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -591,13 +597,28 @@ private fun CategoriesView(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 64.dp)
-                    .clickable { onCategoryClick(total.categoryId) }
+                    .clickable(
+                        // Псевдо-категория комиссий никуда не ведёт: за ней
+                        // нет записи в БД.
+                        enabled = total.categoryId != TransferFees.CATEGORY_ID,
+                    ) { onCategoryClick(total.categoryId) }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CategoryIcon(category?.iconKey ?: "", category?.colorKey ?: "default")
+                CategoryIcon(
+                    if (total.categoryId == TransferFees.CATEGORY_ID) {
+                        TransferFees.ICON_KEY
+                    } else {
+                        category?.iconKey ?: ""
+                    },
+                    if (total.categoryId == TransferFees.CATEGORY_ID) {
+                        TransferFees.COLOR_KEY
+                    } else {
+                        category?.colorKey ?: "default"
+                    },
+                )
                 Text(
-                    text = category?.name ?: stringResource(R.string.report_uncategorized),
+                    text = categoryDisplayName(total.categoryId, category?.name ?: ""),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier
                         .weight(1f)
@@ -670,19 +691,25 @@ private fun AccountsView(
                 if (expanded) {
                     total.categories.forEach { categoryTotal ->
                         val category = categoryById[categoryTotal.categoryId]
+                        val isFee = categoryTotal.categoryId == TransferFees.CATEGORY_ID
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = 56.dp)
-                                .clickable {
+                                // Псевдо-категория комиссий никуда не ведёт:
+                                // за ней нет записи в БД.
+                                .clickable(enabled = !isFee) {
                                     onCategoryClick(categoryTotal.categoryId, total.accountId)
                                 }
                                 .padding(vertical = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            CategoryIcon(category?.iconKey ?: "", category?.colorKey ?: "default")
+                            CategoryIcon(
+                                if (isFee) TransferFees.ICON_KEY else category?.iconKey ?: "",
+                                if (isFee) TransferFees.COLOR_KEY else category?.colorKey ?: "default",
+                            )
                             Text(
-                                text = category?.name ?: stringResource(R.string.report_uncategorized),
+                                text = categoryDisplayName(categoryTotal.categoryId, category?.name ?: ""),
                                 style = MaterialTheme.typography.bodyLarge,
                             )
                             Text(

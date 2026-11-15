@@ -261,13 +261,24 @@ class HomeViewModel @Inject constructor(
         }
 
         val todayStart = Periods.day(LocalDate.now(zone), zone).startMillis
+        fun txDayAmount(tx: TransactionEntity, amountMinor: Long) = TxDayAmount(
+            amountMinor,
+            Periods.day(Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate(), zone).startMillis,
+        )
         fun windowSums(type: TxType) = Windows.sums(
             balanceTxs
                 .filter { TxType.fromWire(it.type) == type }
-                .map {
-                    val txDay = Instant.ofEpochMilli(it.date).atZone(zone).toLocalDate()
-                    TxDayAmount(it.amountMinor, Periods.day(txDay, zone).startMillis)
-                },
+                .map { txDayAmount(it, it.amountMinor) } +
+                // Комиссия перевода — реальный расход дня: с ног-списаний
+                // комиссия входит в окно расходов сверх обычных расходов;
+                // у ноги зачисления комиссии нет.
+                (if (type == TxType.EXPENSE) {
+                    balanceTxs
+                        .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+                        .map { txDayAmount(it, it.feeMinor) }
+                } else {
+                    emptyList()
+                }),
             todayStart,
         )
 

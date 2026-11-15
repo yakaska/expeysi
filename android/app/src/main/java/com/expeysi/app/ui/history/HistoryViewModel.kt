@@ -19,6 +19,7 @@ import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
+import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.UiText
@@ -195,11 +196,20 @@ class HistoryViewModel @Inject constructor(
 
         // Разбивки по категориям и счетам — только потоки денег; ноги переводов
         // в донышках анализов и в итогах доходов/расходов не участвуют.
+        // Исключение — комиссия перевода: реальная потеря денег, входит в
+        // расходы как псевдо-категория TransferFees.CATEGORY_ID на счёте-источнике.
+        val feeEntries = if (TxType.EXPENSE in f.types && f.categoryIds == null) {
+            filtered
+                .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT && it.feeMinor > 0 }
+                .map { AggEntry(TransferFees.CATEGORY_ID, it.accountId, TxType.EXPENSE, it.feeMinor) }
+        } else {
+            emptyList()
+        }
         val entries = filtered
             .filterNot { TxType.fromWire(it.type).isTransfer }
             .map {
                 AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
-            }
+            } + feeEntries
 
         val scopedTransactions = filtered
             .filter { detail == null || it.categoryId == detail.categoryId }
@@ -292,6 +302,8 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun openDetail(categoryId: String, accountId: String? = null) {
+        // Псевдо-категория комиссий не открывается: за ней нет записи в БД.
+        if (categoryId == TransferFees.CATEGORY_ID) return
         _detail.value = HistoryDetail(categoryId, accountId)
     }
 

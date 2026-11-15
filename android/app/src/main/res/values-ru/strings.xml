@@ -217,6 +217,8 @@
     <string name="add_transfer_error_rate">Курс должен быть больше нуля</string>
     <string name="add_transfer_error_fee">Комиссия не может быть отрицательной</string>
     <string name="transfer_title">Перевод</string>
+    <!-- Псевдо-категория комиссий переводов в разрезках (донаты, итоги). -->
+    <string name="transfer_fees_category">Комиссии переводов</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Начальный остаток: %1$s %2$s</string>
     <string name="account_delete_title">Удалить счёт?</string>

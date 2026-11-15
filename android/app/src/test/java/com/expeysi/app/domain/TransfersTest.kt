@@ -186,4 +186,49 @@ class TransfersTest {
 
         assertEquals(listOf("out"), page.map { it.id })
     }
+
+    @Test
+    fun `комиссии берутся только с ног списания`() {
+        val legs = listOf(
+            leg("out", TxType.TRANSFER_OUT, linkedId = "L1").copy(feeMinor = 50),
+            leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a2", counterAccountId = "a1").copy(feeMinor = 0),
+        )
+        assertEquals(50L, Transfers.feesMinor(legs))
+    }
+
+    @Test
+    fun `комиссии нескольких переводов суммируются`() {
+        val legs = listOf(
+            leg("out1", TxType.TRANSFER_OUT, linkedId = "L1").copy(feeMinor = 50),
+            leg("out2", TxType.TRANSFER_OUT, linkedId = "L2").copy(feeMinor = 30),
+        )
+        assertEquals(80L, Transfers.feesMinor(legs))
+    }
+
+    @Test
+    fun `нога списания без комиссии и обычные операции дают ноль`() {
+        val legs = listOf(
+            leg("out", TxType.TRANSFER_OUT, linkedId = "L1"),
+            leg("expense", TxType.EXPENSE),
+            leg("income", TxType.INCOME, accountId = "a1", counterAccountId = ""),
+        )
+        assertEquals(0L, Transfers.feesMinor(legs))
+    }
+
+    @Test
+    fun `свернутая пара учитывает комиссию один раз`() {
+        val pair = listOf(
+            leg("out", TxType.TRANSFER_OUT, linkedId = "L1").copy(feeMinor = 50, amountMinor = 100_50),
+            leg("in", TxType.TRANSFER_IN, linkedId = "L1", accountId = "a2", counterAccountId = "a1"),
+        )
+        val collapsed = Transfers.collapse(pair)
+        // Видна только нога списания, комиссия считается по ней один раз.
+        assertEquals(50L, Transfers.feesMinor(Transfers.collapse(pair)))
+        assertEquals(listOf("out"), collapsed.map { it.id })
+    }
+
+    @Test
+    fun `пустой список комиссий даёт ноль`() {
+        assertEquals(0L, Transfers.feesMinor(emptyList()))
+    }
 }

@@ -221,6 +221,8 @@
     <!-- %1$s — код валюты, %2$s — остаток счёта; запись чисел и разделитель не переводятся. -->
     <string name="add_transfer_account_subtitle" translatable="false">%1$s · %2$s</string>
     <string name="transfer_title">Transfer</string>
+    <!-- Псевдо-категория комиссий переводов в разрезках (донаты, итоги). -->
+    <string name="transfer_fees_category">Transfer fees</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Opening balance: %1$s %2$s</string>
     <string name="account_delete_title">Delete account?</string>
