@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.expeysi.app.data.AuthRepository
 import com.expeysi.app.data.LastTransactionSelectionStore
+import com.expeysi.app.data.TransferRateStore
 import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
@@ -15,7 +16,10 @@ import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.data.sync.SyncEngine
+import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.Money
+import com.expeysi.app.domain.TransferCalc
+import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -29,6 +33,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -48,12 +53,17 @@ class AddTransactionViewModel @Inject constructor(
     balanceDao: BalanceDao,
     authRepository: AuthRepository,
     private val selectionStore: LastTransactionSelectionStore,
+    private val rateStore: TransferRateStore,
     private val syncEngine: SyncEngine,
 ) : ViewModel() {
 
     private val editId: String? = savedStateHandle["transactionId"]
     private val userId: String = authRepository.userId ?: "local"
     private var original: TransactionEntity? = null
+
+    /** Дата и время записи на момент открытия правки: эталон для dirty-сравнения. */
+    private var originalDate: LocalDate? = null
+    private var originalTime: LocalTime? = null
 
     /** Открытая нога перевода при редактировании пары; null — доход, расход или создание. */
     private var editLinkedId: String? = null
@@ -84,6 +94,19 @@ class AddTransactionViewModel @Inject constructor(
     val balances: StateFlow<Map<String, BalanceEntity>> = balanceDao.observeAll()
         .map { balances -> balances.associateBy { it.id } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** Текущие остатки счетов для подписей в карточке перевода. */
+    val accountBalances: StateFlow<Map<String, Long>> = combine(
+        accountDao.observeActive(),
+        transactionDao.observeActive(),
+    ) { accounts, transactions ->
+        accounts.associate { account ->
+            val sums = transactions
+                .filter { it.accountId == account.id }
+                .map { TxSum(TxType.fromWire(it.type), it.amountMinor) }
+            account.id to BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums)
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     val categories: StateFlow<List<CategoryEntity>> = combine(
         _mode.flatMapLatest { mode ->
@@ -126,6 +149,46 @@ class AddTransactionViewModel @Inject constructor(
      * чтобы не затереть комиссию или собственный ввод.
      */
     private val _toAmountTouched = MutableStateFlow(false)
+
+    /**
+     * Курс перевода для разных валют: вводится вручную и сети не загружается.
+     * Хранится точным числом [rateExact] (пересчёт туда-обратно сумму не меняет),
+     * поле показывает его округлённо — до шести значащих цифр. При смене пары
+     * валют подставляется последний использованный курс пары; при правке
+     * зачисления курс выводится из сумм.
+     */
+    private val _rateText = MutableStateFlow("")
+    val rateText: StateFlow<String> = _rateText.asStateFlow()
+
+    /** Точный курс «куда/откуда»; null — поле пустое или битое, пересчёт замирает. */
+    private var rateExact: BigDecimal? = null
+
+    /**
+     * Направление показа курса: false — «1 отправление = N зачисление», true —
+     * наоборот. По умолчанию выбирается автоправилом «крупная валюта слева»
+     * (курс меньше единицы — показ наоборот); ручной разворот сохраняется,
+     * пока пара не сменится.
+     */
+    private val _rateInverted = MutableStateFlow(false)
+    val rateInverted: StateFlow<Boolean> = _rateInverted.asStateFlow()
+
+    /** Направление развёрнуто вручную — до смены пары автоправило не трогает его. */
+    private var rateDirectionManual = false
+
+    /** Курс и комиссия правились вручную — inline-ошибки показываются только после этого. */
+    private val _rateTouched = MutableStateFlow(false)
+    private val _feeTouched = MutableStateFlow(false)
+
+    /** Комиссия в валюте списания; пустая строка — перевода без комиссии. */
+    private val _feeText = MutableStateFlow("")
+    val feeText: StateFlow<String> = _feeText.asStateFlow()
+
+    /** Поле комиссии видно, когда пользователь его раскрыл или комиссия загружена из записи. */
+    private val _feeVisible = MutableStateFlow(false)
+    val feeVisible: StateFlow<Boolean> = _feeVisible.asStateFlow()
+
+    /** Пара валют при последнем пересчёте курса; её смена перезаполняет курс. */
+    private var transferPair: Pair<String, String>? = null
 
     private val _date = MutableStateFlow(LocalDate.now(zone))
     val date: StateFlow<LocalDate> = _date.asStateFlow()
@@ -181,6 +244,9 @@ class AddTransactionViewModel @Inject constructor(
                             _selectedCategoryId.value = tx.categoryId
                         }
                     }
+                    // Дата/время baseline для dirty-сравнения фиксируются после нормализации.
+                    originalDate = _date.value
+                    originalTime = _time.value
                 }
             } else {
                 _selectedAccountId.value = selectionStore.accountId(userId)
@@ -205,20 +271,74 @@ class AddTransactionViewModel @Inject constructor(
         editInLeg = inLeg
         _fromAccountId.value = out?.accountId ?: tx.counterpartyAccountId.ifEmpty { null }
         _toAccountId.value = inLeg?.accountId ?: tx.counterpartyAccountId.ifEmpty { null }
-        _fromAmountText.value = out?.let { Money.formatInput(Money.formatAuto(it.amountMinor)) } ?: ""
+        // «Отправляете» — сумма без комиссии: она хранится у ноги отдельным полем.
+        val feeMinor = out?.feeMinor ?: 0L
+        _fromAmountText.value = out?.let { Money.formatInput(Money.formatAuto(it.amountMinor - feeMinor)) } ?: ""
         _toAmountText.value = inLeg?.let { Money.formatInput(Money.formatAuto(it.amountMinor)) } ?: ""
+        // Сохранённая комиссия показывается раскрытой.
+        if (feeMinor > 0L) {
+            _feeText.value = Money.formatInput(Money.formatAuto(feeMinor))
+            _feeVisible.value = true
+        }
         // Загруженная сумма зачисления — уже «пользовательские данные»:
         // зеркало при правке списания её не трогает.
         _toAmountTouched.value = inLeg != null
+        transferPair = currencyPairCodes()
+        _rateTouched.value = false
+        val codes = transferPair
+        if (codes != null && codes.first != codes.second) {
+            // Курс выводится из сумм ног в полной точности: пересохранение
+            // без правок не меняет суммы. Пока сумм нет — последний
+            // использованный курс пары из локального хранилища.
+            rateDirectionManual = false
+            val send = Money.parseToMinor(_fromAmountText.value)
+            val receive = Money.parseToMinor(_toAmountText.value)
+            val derived = if (send != null && receive != null) TransferCalc.exactRate(send, receive) else null
+            setDerivedRate(derived ?: rateStore.rate(codes.first, codes.second)?.let(TransferCalc::parse))
+            if (rateExact == null) _rateText.value = ""
+        } else {
+            rateExact = null
+            _rateInverted.value = false
+            _rateText.value = ""
+        }
+    }
+
+    /**
+     * Курс выведен из сумм (правка зачисления, загрузка правки, смена пары):
+     * хранится точным числом, направление показа выбирается автоправилом
+     * «крупная валюта слева», поле показывает до шести значащих цифр.
+     */
+    private fun setDerivedRate(rate: BigDecimal?) {
+        if (rate == null) return
+        rateExact = rate
+        if (!rateDirectionManual) {
+            _rateInverted.value = rate.compareTo(BigDecimal.ONE) < 0
+        }
+        _rateText.value = displayRateText()
+    }
+
+    /** Поле и подпись курса: показ точного курса в текущем направлении. */
+    private fun displayRateText(): String {
+        val rate = rateExact ?: return ""
+        val shown = if (_rateInverted.value) {
+            TransferCalc.invertRate(rate) ?: return ""
+        } else {
+            rate
+        }
+        return TransferCalc.formatRateDisplay(shown)
+    }
+
+    /** Коды валют пары счетов перевода; null, пока какой-то из счетов не выбран. */
+    private fun currencyPairCodes(): Pair<String, String>? {
+        val balancesNow = balances.value
+        val accountsById = accounts.value.associateBy { it.id }
+        val fromCode = currencyCodeOf(accountsById[_fromAccountId.value], balancesNow) ?: return null
+        val toCode = currencyCodeOf(accountsById[_toAccountId.value], balancesNow) ?: return null
+        return fromCode to toCode
     }
 
     /** Разные валюты у счетов перевода? Сумма зачисления вводится независимо. */
-    private fun sameCurrencyNow(): Boolean {
-        val balancesNow = balances.value
-        val fromCode = _fromAccountId.value?.let { balancesNow[it]?.currencyCode } ?: return false
-        val toCode = _toAccountId.value?.let { balancesNow[it]?.currencyCode } ?: return false
-        return fromCode == toCode
-    }
+    private fun sameCurrencyNow(): Boolean = currencyPairCodes()?.let { it.first == it.second } == true
 
     private val regularCanSave: StateFlow<Boolean> = combine(
         _amountText,
@@ -230,28 +350,126 @@ class AddTransactionViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     private val transferCanSave: StateFlow<Boolean> = combine(
+        combine(_fromAccountId, _toAccountId, _fromAmountText) { from, to, send -> Triple(from, to, send) },
+        combine(_toAmountText, _rateText, _feeText) { receive, rate, fee -> Triple(receive, rate, fee) },
+        accounts,
+        balances,
+    ) { inputs, texts, accountsNow, balancesNow ->
+        val accountsById = accountsNow.associateBy { it.id }
+        val fromCode = currencyCodeOf(accountsById[inputs.first], balancesNow)
+        val toCode = currencyCodeOf(accountsById[inputs.second], balancesNow)
+        val sameCurrency = fromCode != null && toCode != null && fromCode == toCode
+        TransferCalc.canSave(
+            fromId = inputs.first,
+            toId = inputs.second,
+            sameCurrency = sameCurrency,
+            sendText = inputs.third,
+            receiveText = texts.first,
+            rateText = texts.second,
+            feeText = texts.third,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /**
+     * Сломанные поля перевода: курс пустой или неположительный (только для
+     * пары разных валют) и отрицательная комиссия. Показывается на поле
+     * после касания — см. rateErrorVisible/feeErrorVisible.
+     */
+    private val transferErrors = combine(
+        combine(_rateText, _feeText) { rate, fee -> rate to fee },
+        accounts,
+        balances,
         _fromAccountId,
         _toAccountId,
-        _fromAmountText,
-        _toAmountText,
-    ) { from, to, fromAmount, toAmount ->
-        val out = Money.parseToMinor(fromAmount)
-        val inMinor = Money.parseToMinor(toAmount)
-        from != null &&
-            to != null &&
-            from != to &&
-            out != null &&
-            out > 0 &&
-            inMinor != null &&
-            inMinor > 0
+    ) { texts, accountsNow, balancesNow, fromId, toId ->
+        val accountsById = accountsNow.associateBy { it.id }
+        val fromCode = currencyCodeOf(accountsById[fromId], balancesNow)
+        val toCode = currencyCodeOf(accountsById[toId], balancesNow)
+        val cross = fromCode != null && toCode != null && fromCode != toCode
+        val rate = TransferCalc.parse(texts.first)
+        val feeMinor = if (texts.second.isEmpty()) 0L else Money.parseToMinor(texts.second)
+        Pair(
+            // Курс имеет смысл только у пары разных валют.
+            cross && (rate == null || rate.signum() <= 0),
+            feeMinor != null && feeMinor < 0,
+        )
+    }
+    val rateErrorVisible: StateFlow<Boolean> = combine(transferErrors, _rateTouched) { errors, touched ->
+        errors.first && touched
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    val feeErrorVisible: StateFlow<Boolean> = combine(transferErrors, _feeTouched) { errors, touched ->
+        errors.second && touched
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Правка изменена? Доход/расход: всё сохраняемое против записи на открытии. */
+    private val regularDirty: StateFlow<Boolean> = combine(
+        combine(_amountText, _selectedAccountId, _selectedCategoryId) { amount, account, category ->
+            Triple(amount, account, category)
+        },
+        combine(_date, _time, _note) { date, time, note -> Triple(date, time, note) },
+    ) { fields, stamp ->
+        val baseline = original
+        val baselineDate = originalDate
+        val baselineTime = originalTime
+        if (!isEdit || baseline == null || baselineDate == null || baselineTime == null || _mode.value == AddMode.TRANSFER) {
+            false
+        } else {
+            regularDirty(
+                RegularDirtyInput(fields.second, fields.third, fields.first, stamp.first, stamp.second, stamp.third),
+                baseline,
+                baselineDate,
+                baselineTime,
+            )
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
+
+    /** Правка изменена? Перевод: счета, суммы, комиссия, дата/время, заметка против ног. */
+    private val transferDirty: StateFlow<Boolean> = combine(
+        combine(_fromAccountId, _toAccountId, _fromAmountText, _feeText) { from, to, send, fee ->
+            TransferFields(from, to, send, fee)
+        },
+        combine(_toAmountText, _date, _time, _note) { receive, date, time, note ->
+            TransferStamp(receive, date, time, note)
+        },
+    ) { fields, stamp ->
+        val baseline = original
+        val baselineDate = originalDate
+        val baselineTime = originalTime
+        if (!isEdit || baseline == null || baselineDate == null || baselineTime == null || _mode.value != AddMode.TRANSFER) {
+            false
+        } else {
+            transferDirty(
+                TransferDirtyInput(
+                    fromAccountId = fields.from,
+                    toAccountId = fields.to,
+                    sendText = fields.send,
+                    feeText = fields.fee,
+                    receiveText = stamp.receive,
+                    date = stamp.date,
+                    time = stamp.time,
+                    note = stamp.note,
+                ),
+                editOutLeg,
+                editInLeg,
+                baseline,
+                baselineDate,
+                baselineTime,
+            )
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     val canSave: StateFlow<Boolean> = combine(
         _mode,
         regularCanSave,
         transferCanSave,
-    ) { mode, regular, transfer ->
-        if (mode == AddMode.TRANSFER) transfer else regular
+        regularDirty,
+        transferDirty,
+    ) { mode, regularValid, transferValid, regularChanged, transferChanged ->
+        val valid = if (mode == AddMode.TRANSFER) transferValid else regularValid
+        val changed = if (mode == AddMode.TRANSFER) transferChanged else regularChanged
+        // Создание — готово, когда валидно; правка — когда валидно и есть правка.
+        valid && (!isEdit || changed)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun onModeChange(value: AddMode) {
@@ -260,13 +478,14 @@ class AddTransactionViewModel @Inject constructor(
         when {
             value == AddMode.TRANSFER -> {
                 _selectedCategoryId.value = null
-                // Со счёта — последний использованный счёт привычного потока.
-                if (_fromAccountId.value == null) {
-                    viewModelScope.launch {
+                viewModelScope.launch {
+                    // Со счёта — последний использованный счёт привычного потока.
+                    if (_fromAccountId.value == null) {
                         _fromAccountId.value = selectionStore.accountId(userId)
                             ?.let { accountDao.byId(it) }
                             ?.selectableId()
                     }
+                    refreshTransferPair()
                 }
             }
             else -> {
@@ -283,14 +502,74 @@ class AddTransactionViewModel @Inject constructor(
     fun onFromAmountChange(value: String) {
         val formatted = Money.formatInput(value)
         _fromAmountText.value = formatted
-        if (sameCurrencyNow() && !_toAmountTouched.value) {
-            _toAmountText.value = formatted
+        if (sameCurrencyNow()) {
+            // Зеркало одинаковых валют; вручную правленное зачисление не затирается.
+            if (!_toAmountTouched.value) _toAmountText.value = formatted
+        } else {
+            // Разные валюты: зачисление = списание × курс.
+            recomputeReceive()
         }
     }
 
     fun onToAmountChange(value: String) {
         _toAmountText.value = Money.formatInput(value)
         _toAmountTouched.value = true
+        // Разные валюты: курс = зачисление / списание.
+        if (!sameCurrencyNow()) recomputeRate()
+    }
+
+    /** Курс правится вручную: зачисление пересчитывается по списанию и курсу. */
+    fun onRateChange(value: String) {
+        val text = Money.formatInput(value)
+        _rateText.value = text
+        _rateTouched.value = true
+        // Точный курс хранится как введён; в перевёрнутом направлении поле
+        // редактирует обратный курс, и он пересчитывается в прямой.
+        val typed = TransferCalc.parse(text)
+        rateExact = if (typed == null) {
+            null
+        } else if (_rateInverted.value) {
+            TransferCalc.invertRate(typed)
+        } else {
+            typed
+        }
+        recomputeReceive()
+    }
+
+    /** Разворот направления показа курса: «1 USD = 25 000 VND» ↔ «1 VND = 0,0000267 USD». */
+    fun toggleRateDirection() {
+        val rate = rateExact ?: return
+        if (rate.signum() <= 0) return
+        _rateInverted.value = !_rateInverted.value
+        rateDirectionManual = true
+        _rateText.value = displayRateText()
+    }
+
+    fun onFeeChange(value: String) {
+        _feeText.value = Money.formatInput(value)
+        _feeTouched.value = true
+    }
+
+    /** Пользователь раскрыл поле комиссии. */
+    fun showFee() {
+        _feeVisible.value = true
+    }
+
+    /** Зачисление = списание × точный курс; негодный вход поле зачисления не трогает. */
+    private fun recomputeReceive() {
+        val rate = rateExact ?: return
+        val send = Money.parseToMinor(_fromAmountText.value) ?: return
+        val receive = TransferCalc.receiveMinor(send, rate) ?: return
+        _toAmountText.value = Money.formatInput(Money.formatAuto(receive))
+    }
+
+    /** Курс = точное отношение зачисления к списанию; списание нулевое или пустое — курс не трогается. */
+    private fun recomputeRate() {
+        val send = Money.parseToMinor(_fromAmountText.value) ?: return
+        if (send <= 0) return
+        val receive = Money.parseToMinor(_toAmountText.value) ?: return
+        if (receive < 0) return
+        setDerivedRate(TransferCalc.exactRate(send, receive))
     }
 
     fun onAccountSelect(id: String) {
@@ -301,16 +580,59 @@ class AddTransactionViewModel @Inject constructor(
     fun onFromAccountSelect(id: String) {
         _fromAccountId.value = id
         selectionStore.selectAccount(userId, id)
-        if (sameCurrencyNow() && !_toAmountTouched.value) {
-            _toAmountText.value = _fromAmountText.value
-        }
+        refreshTransferPair()
     }
 
     fun onToAccountSelect(id: String) {
         _toAccountId.value = id
-        if (sameCurrencyNow() && !_toAmountTouched.value) {
-            _toAmountText.value = _fromAmountText.value
+        refreshTransferPair()
+    }
+
+    /**
+     * Смена пары валют перевода: курс подставляется последним использованным
+     * для этой пары (локальное хранилище), зачисление пересчитывается по
+     * списанию. Пара та же — ничего не делаем: пользовательский курс при смене
+     * счёта той же валюты сохраняется.
+     */
+    private fun refreshTransferPair() {
+        val pair = currencyPairCodes() ?: return
+        if (pair == transferPair) return
+        transferPair = pair
+        if (pair.first == pair.second) {
+            rateExact = null
+            _rateInverted.value = false
+            _rateText.value = ""
+            if (!_toAmountTouched.value) _toAmountText.value = _fromAmountText.value
+        } else {
+            rateDirectionManual = false
+            rateExact = null
+            _rateTouched.value = false
+            setDerivedRate(rateStore.rate(pair.first, pair.second)?.let(TransferCalc::parse))
+            if (rateExact == null) _rateText.value = ""
+            recomputeReceive()
         }
+    }
+
+    /**
+     * Разворот перевода: счета-источник и счёт-получатель меняются местами,
+     * суммы переставляются, точный курс инвертируется без потери точности.
+     * Правка зачисления вручную больше не считается «пользовательскими
+     * данными»: направление изменено, все значения берутся заново.
+     */
+    fun swapTransferAccounts() {
+        val fromId = _fromAccountId.value
+        _fromAccountId.value = _toAccountId.value
+        _toAccountId.value = fromId
+        val swapped = TransferCalc.swap(_fromAmountText.value, _toAmountText.value, _rateText.value)
+        _fromAmountText.value = swapped.sendText
+        _toAmountText.value = swapped.receiveText
+        _toAmountTouched.value = false
+        _rateTouched.value = false
+        rateDirectionManual = false
+        rateExact = rateExact?.let { TransferCalc.invertRate(it) }
+        setDerivedRate(rateExact)
+        if (rateExact == null) _rateText.value = ""
+        transferPair = currencyPairCodes()
     }
 
     fun onCategorySelect(id: String) {
@@ -379,8 +701,22 @@ class AddTransactionViewModel @Inject constructor(
         val fromId = _fromAccountId.value ?: return
         val toId = _toAccountId.value ?: return
         if (fromId == toId) return
-        val outAmount = Money.parseToMinor(_fromAmountText.value) ?: return
-        val inAmount = Money.parseToMinor(_toAmountText.value) ?: return
+        val outSent = Money.parseToMinor(_fromAmountText.value) ?: return
+        // Комиссия списывается со счёта-источника сверх отправляемой суммы.
+        val feeMinor = if (_feeText.value.isEmpty()) 0L else Money.parseToMinor(_feeText.value) ?: return
+        val outAmount = outSent + feeMinor
+        val inAmount = when {
+            // Одинаковые валюты: нога зачисления зеркалит списание (или хранит свою правку).
+            sameCurrencyNow() -> Money.parseToMinor(_toAmountText.value) ?: outSent
+            else -> Money.parseToMinor(_toAmountText.value) ?: return
+        }
+        // Последний курс пары запоминается для следующего перевода: локально,
+        // в записи перевода курс не хранится. Пишется точным числом.
+        currencyPairCodes()
+            ?.takeIf { it.first != it.second }
+            ?.let { pair ->
+                rateExact?.let { rateStore.saveRate(pair.first, pair.second, it.toPlainString()) }
+            }
         val note = _note.value.trim()
         viewModelScope.launch {
             val now = System.currentTimeMillis()
@@ -402,6 +738,8 @@ class AddTransactionViewModel @Inject constructor(
                             note = note,
                             linkedId = linkedId,
                             counterpartyAccountId = toId,
+                            // amountMinor — всего списано со счёта, комиссия рядом отдельным полем.
+                            feeMinor = feeMinor,
                             updatedAt = now,
                         ),
                     )
@@ -464,3 +802,19 @@ class AddTransactionViewModel @Inject constructor(
         deleted.forEach { syncEngine.uploadTransaction(it) }
     }
 }
+
+/** Поля перевода для dirty-сравнения: счета-источник, списание и комиссия. */
+private data class TransferFields(
+    val from: String?,
+    val to: String?,
+    val send: String,
+    val fee: String,
+)
+
+/** Дата/время и суммы правки перевода для dirty-сравнения. */
+private data class TransferStamp(
+    val receive: String,
+    val date: LocalDate,
+    val time: LocalTime,
+    val note: String,
+)

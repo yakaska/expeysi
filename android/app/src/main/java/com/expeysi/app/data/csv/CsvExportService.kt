@@ -164,10 +164,10 @@ private fun serviceRow(
     balance?.name ?: "",
     balance?.iconKey ?: "",
     balance?.colorKey ?: "",
-    // Связка перевода есть только у ног переводов.
+    // Связка перевода есть только у ног переводов, комиссия — только у списаний.
+    "",
     "",
 )
-
 private fun transactionRow(
     tx: TransactionEntity,
     account: AccountEntity,
@@ -201,6 +201,7 @@ private fun transactionRow(
         balance?.iconKey ?: "",
         balance?.colorKey ?: "",
         if (isTransfer) tx.linkedId else "",
+        feeColumn(tx),
     )
 }
 
@@ -208,10 +209,22 @@ private fun transactionRow(
  * Доход пишется положительной суммой, расход — отрицательной, как в формате
  * «Бюджета». Ноги перевода идут в ту же знаковую логику: списание — минус,
  * зачисление — плюс, поэтому остатки счетов после реимпорта совпадают.
+ * Комиссия выписана отдельной колонкой [CsvFormat.FEE_COLUMN]: в «Сумму»
+ * ноги списания идёт чистое отправление, комиссия в неё не запекается.
  */
 private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.type)) {
     TxType.INCOME, TxType.TRANSFER_IN -> tx.amountMinor
-    TxType.EXPENSE, TxType.TRANSFER_OUT -> -tx.amountMinor
+    TxType.EXPENSE, TxType.TRANSFER_OUT -> -(tx.amountMinor - tx.feeMinor)
+}
+
+/** Колонка комиссии: только у ноги списания с ненулевой комиссией, у прочих строк пустая. */
+private fun feeColumn(tx: TransactionEntity): String = if (tx.feeMinor > 0L) {
+    when (TxType.fromWire(tx.type)) {
+        TxType.TRANSFER_OUT -> formatAmount(tx.feeMinor)
+        else -> ""
+    }
+} else {
+    ""
 }
 
 private fun csvRow(delimiter: Char, vararg fields: String): String = fields.joinToString(delimiter.toString()) { escape(it, delimiter) }

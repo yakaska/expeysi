@@ -25,6 +25,13 @@ data class TransactionEntity(
     val note: String = "",
     val linkedId: String = "",
     val counterpartyAccountId: String = "",
+    /**
+     * Комиссия перевода, списанная со счёта-источника сверх отправляемой
+     * суммы (только у transfer_out; у остальных записей 0). [amountMinor]
+     * остаётся «всего списано» — отправлено + комиссия, как это учитывают
+     * балансы и лента.
+     */
+    val feeMinor: Long = 0,
     val deleted: Boolean = false,
     val updatedAt: Long,
     val updatedBy: String = "",

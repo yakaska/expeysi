@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Полный путь 2→9: база собирается из самой старой коммитнутой схемы (2.json)
+ * Полный путь 2→10: база собирается из самой старой коммитнутой схемы (2.json)
  * и открывается через databaseBuilder со всем списком ALL_MIGRATIONS — тем же,
  * что регистрирует DataModule. 1→2 пути не входит: `1.json` не коммитился.
  */
@@ -56,7 +56,7 @@ class MigrationChainTest {
             .build()
 
         runBlocking {
-            // Первый DAO-запрос открывает базу и прогоняет все миграции 2→9.
+            // Первый DAO-запрос открывает базу и прогоняет все миграции 2→10.
             val account = db.accountDao().byId(PresetData.ACCOUNT_CASH_ID)
             assertNotNull(account)
             assertEquals(1500L, account!!.openingBalanceMinor)
@@ -71,6 +71,8 @@ class MigrationChainTest {
             // 8→9 добавил полям перевода пустые дефолты у обычных операций.
             assertEquals("", transaction.linkedId)
             assertEquals("", transaction.counterpartyAccountId)
+            // 9→10 добавил комиссию переводов; у обычных операций ноль.
+            assertEquals(0L, transaction.feeMinor)
 
             val category = db.categoryDao().byId(CC_CATEGORY_ID)
             assertNotNull(category)

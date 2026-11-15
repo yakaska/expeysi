@@ -22,12 +22,13 @@ object CsvFormat {
     const val BALANCE_ICON_COLUMN = "Иконка баланса"
     const val BALANCE_COLOR_COLUMN = "Цвет баланса"
     const val TRANSFER_LINK_COLUMN = "Связка перевода"
+    const val FEE_COLUMN = "Комиссия"
 
-    /** Полный заголовок файла экспорта Expeysi: обязательные колонки плюс оформление и связка. */
+    /** Полный заголовок файла экспорта Expeysi: обязательные колонки плюс оформление, связка и комиссия. */
     const val EXTENDED_HEADER =
         "$HEADER;$CATEGORY_ICON_COLUMN;$CATEGORY_COLOR_COLUMN;$ACCOUNT_ICON_COLUMN;" +
             "$ACCOUNT_COLOR_COLUMN;$BALANCE_NAME_COLUMN;$BALANCE_ICON_COLUMN;$BALANCE_COLOR_COLUMN;" +
-            "$TRANSFER_LINK_COLUMN"
+            "$TRANSFER_LINK_COLUMN;$FEE_COLUMN"
 
     /**
      * Зарезервированное имя категории служебной строки начального остатка.

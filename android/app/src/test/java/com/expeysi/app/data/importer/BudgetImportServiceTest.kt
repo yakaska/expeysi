@@ -128,6 +128,28 @@ class BudgetImportServiceTest {
     }
 
     @Test
+    fun `комиссия файла возвращается ноге списания отдельным полем`() {
+        val legs = transferLegsOf(
+            listOf(
+                // 30 000 отправлено, 1 500 комиссия — как их пишет экспорт.
+                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1", feeMinor = 1_500),
+                item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+            ),
+            accounts,
+            nowMillis = 77,
+        )
+
+        assertEquals(2, legs.size)
+        val out = legs.first()
+        val inLeg = legs.last()
+        // Ноге списания пишется «всего списано» и комиссия рядом — как в базе.
+        assertEquals(31_500L, out.amountMinor)
+        assertEquals(1_500L, out.feeMinor)
+        assertEquals(30_000L, inLeg.amountMinor)
+        assertEquals(0L, inLeg.feeMinor)
+    }
+
+    @Test
     fun `вырожденная связка без зачисления не реконструируется`() {
         val out = listOf(item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"))
         assertTrue(transferLegsOf(out, accounts, nowMillis = 77).isEmpty())
@@ -215,6 +237,7 @@ class BudgetImportServiceTest {
         amountMinor: Long,
         transferLinkId: String? = null,
         note: String = "",
+        feeMinor: Long = 0L,
     ) = BudgetTransaction(
         accountName = accountName,
         categoryName = "Перевод",
@@ -224,6 +247,7 @@ class BudgetImportServiceTest {
         date = 5,
         note = note,
         transferLinkId = transferLinkId,
+        feeMinor = feeMinor,
     )
 
     private fun account(id: String) = AccountEntity(
