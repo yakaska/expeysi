@@ -1,7 +1,11 @@
 package com.expeysi.app.ui
 
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -10,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import com.expeysi.app.domain.Money
@@ -22,6 +27,12 @@ fun MoneyTextField(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     trailingIcon: @Composable (() -> Unit)? = null,
+    textStyle: TextStyle = LocalTextStyle.current,
+    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
+    keyboardOptions: KeyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    isError: Boolean = false,
+    supportingText: @Composable (() -> Unit)? = null,
 ) {
     var fieldValue by remember {
         mutableStateOf(TextFieldValue(value, selection = TextRange(value.length)))
@@ -65,7 +76,12 @@ fun MoneyTextField(
         modifier = modifier,
         enabled = enabled,
         label = label,
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        textStyle = textStyle,
+        colors = colors,
+        keyboardOptions = keyboardOptions,
+        keyboardActions = keyboardActions,
+        isError = isError,
+        supportingText = supportingText,
         singleLine = true,
         trailingIcon = trailingIcon,
     )

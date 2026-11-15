@@ -199,13 +199,26 @@
     <string name="add_transfer_from">From account</string>
     <string name="add_transfer_to">To account</string>
     <!-- %1$s — символ валюты. -->
-    <string name="add_transfer_amount_from">Deducted, %1$s</string>
+    <string name="add_transfer_amount_from">You send, %1$s</string>
     <!-- %1$s — символ валюты. -->
-    <string name="add_transfer_amount_to">Credited, %1$s</string>
-    <!-- %1$s — символ счёта списания, %2$s — курс, %3$s — символ счёта получения; запись чисел не переводится. -->
-    <string name="add_transfer_rate_fmt" translatable="false">1 %1$s ≈ %2$s %3$s</string>
-    <!-- Обе ноги в одной валюте: курс один к одному. -->
-    <string name="add_transfer_rate_same" translatable="false">1 : 1</string>
+    <string name="add_transfer_amount_to">You receive, %1$s</string>
+    <!-- %1$s и %2$s — коды валют пары перевода. -->
+    <string name="add_transfer_rate_label">Rate, 1 %1$s = ? %2$s</string>
+    <string name="add_transfer_rate_label_known">Rate, 1 %1$s = %3$s %2$s</string>
+    <!-- %1$s — код валюты, %2$s — курс, %3$s — код второй валюты; запись чисел не переводится. -->
+    <string name="add_transfer_rate_caption">1 %1$s = %2$s %3$s</string>
+    <!-- %1$s и %2$s — коды валют пары перевода. -->
+    <string name="add_transfer_rate_caption_unknown">1 %1$s = ? %2$s</string>
+    <string name="add_transfer_rate_direction_cd">Change rate direction</string>
+    <!-- %1$s — символ валюты списания. -->
+    <string name="add_transfer_fee">Fee, %1$s</string>
+    <string name="add_transfer_add_fee">Add fee</string>
+    <string name="add_transfer_swap_cd">Swap accounts</string>
+    <string name="add_transfer_error_same_account">Select different accounts for the transfer</string>
+    <string name="add_transfer_error_rate">Rate must be greater than zero</string>
+    <string name="add_transfer_error_fee">Fee can’t be negative</string>
+    <!-- %1$s — код валюты, %2$s — остаток счёта; запись чисел и разделитель не переводятся. -->
+    <string name="add_transfer_account_subtitle" translatable="false">%1$s · %2$s</string>
     <string name="transfer_title">Transfer</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Opening balance: %1$s %2$s</string>

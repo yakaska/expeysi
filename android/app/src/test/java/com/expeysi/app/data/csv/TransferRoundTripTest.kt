@@ -86,6 +86,51 @@ class TransferRoundTripTest {
     }
 
     @Test
+    fun `файл экспорта возвращает ноге списания сумму и комиссию раздельно`() {
+        val accountById = mapOf(
+            "a1" to account("a1", "Карта", opening = 50_000, balanceId = "b1"),
+            "a2" to account("a2", "Кошелёк", opening = 0, balanceId = "b2"),
+        )
+        val file = buildCsv(
+            accounts = accountById.values.toList(),
+            balances = listOf(
+                balance("b1", "Основной", "RUB"),
+                balance("b2", "Донг", "USD"),
+            ),
+            categories = emptyList(),
+            transactions = listOf(
+                // amountMinor — всего списано (30 000 отправлено + 1 500 комиссия).
+                tx("t1", TxType.TRANSFER_OUT, 31_500, "a1", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a2", feeMinor = 1_500),
+                tx("t2", TxType.TRANSFER_IN, 6_30, "a2", "", millis("2026-01-02T03:04:00Z"), linkedId = "L1", counterpartyAccountId = "a1"),
+            ),
+            nowMillis = millis("2026-02-01T00:00:00Z"),
+            zone = UTC,
+            types = setOf(TxType.TRANSFER_OUT, TxType.TRANSFER_IN),
+        )
+
+        val parsed = BudgetCsvParser().parse(ByteArrayInputStream(file.text.toByteArray(Charsets.UTF_8)))
+        val (_, operations) = splitOpeningRows(parsed)
+        val outRow = operations.single { it.accountName == "Карта" }
+        // Файл хранит отправление и комиссию раздельно, не сумму.
+        assertEquals(30_000L, outRow.amountMinor)
+        assertEquals(1_500L, outRow.feeMinor)
+
+        val balanceByKey = resolveBalances(parsed, takenNames = emptySet(), nowMillis = 1)
+        val accountsByName = resolveAccounts(parsed, balanceByKey, openingByKey = emptyMap(), nowMillis = 1)
+        val legs = transferLegsOf(operations, accountsByName, nowMillis = 77)
+
+        val out = legs.first { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+        val inLeg = legs.first { TxType.fromWire(it.type) == TxType.TRANSFER_IN }
+        // Реконструкция возвращает «всего списано» и комиссию отдельным полем —
+        // как их хранит локальная база: балансы сходятся, правка на экране
+        // восстанавливает обе суммы.
+        assertEquals(31_500L, out.amountMinor)
+        assertEquals(1_500L, out.feeMinor)
+        assertEquals(6_30L, inLeg.amountMinor)
+        assertEquals(0L, inLeg.feeMinor)
+    }
+
+    @Test
     fun `одинокая нога без партнёра не реконструируется`() {
         val accountById = mapOf(
             "a1" to account("a1", "Карта", opening = 50_000, balanceId = "b1"),
@@ -159,6 +204,7 @@ class TransferRoundTripTest {
         note: String = "",
         linkedId: String = "",
         counterpartyAccountId: String = "",
+        feeMinor: Long = 0L,
     ) = TransactionEntity(
         id = id,
         type = type.wire,
@@ -169,6 +215,7 @@ class TransferRoundTripTest {
         note = note,
         linkedId = linkedId,
         counterpartyAccountId = counterpartyAccountId,
+        feeMinor = feeMinor,
         updatedAt = 0,
     )
 }

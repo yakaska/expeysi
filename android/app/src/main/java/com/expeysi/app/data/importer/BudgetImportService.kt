@@ -91,7 +91,9 @@ class BudgetImportService @Inject constructor(
             TransactionEntity(
                 id = UUID.randomUUID().toString(),
                 type = item.type.wire,
-                amountMinor = item.amountMinor,
+                // Вырожденная нога списания остаётся расходом и уносит комиссию
+                // в сумме операции — остаток счёта сходится с арифметикой файла.
+                amountMinor = item.amountMinor + if (item.type == TxType.EXPENSE) item.feeMinor else 0L,
                 accountId = accountByKey.getValue(item.accountKey()).id,
                 categoryId = category.id,
                 date = item.date,
@@ -183,13 +185,17 @@ internal fun transferLegsOf(
         TransactionEntity(
             id = UUID.randomUUID().toString(),
             type = TxType.TRANSFER_OUT.wire,
-            amountMinor = out.amountMinor,
+            // Файл хранит отправление и комиссию раздельно: ноге пишется их
+            // сумма (всего списано) и комиссия отдельным полем — так же, как
+            // хранит их локальная база.
+            amountMinor = out.amountMinor + out.feeMinor,
             accountId = outAccount.id,
             categoryId = "",
             date = out.date,
             note = out.note,
             linkedId = linkedId,
             counterpartyAccountId = inAccount.id,
+            feeMinor = out.feeMinor,
             updatedAt = nowMillis,
         ),
         TransactionEntity(

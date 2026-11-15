@@ -85,6 +85,38 @@ class BudgetCsvParserTest {
     }
 
     @Test
+    fun `комиссия читается из колонки файла`() {
+        val transactions = parse(
+            "${HEADER.trimEnd()};Иконка категории;Иконка счета;Название баланса;" +
+                "Иконка баланса;Связка перевода;Комиссия\n" +
+                "2026-01-02;03:04;Карта;Перевод;-300.00;RUB;;swap_horiz;credit_card;Основной;payments;L1;15.00\n" +
+                "2026-01-02;03:04;Кошелёк;Перевод;300.00;RUB;;swap_horiz;payments;Основной;payments;L1;\n",
+        )
+
+        assertEquals(1_500L, transactions.first().feeMinor)
+        // Пустая колонка комиссии — ноль.
+        assertEquals(0L, transactions.last().feeMinor)
+    }
+
+    @Test
+    fun `без колонки комиссии поле остаётся нулём`() {
+        val transactions = parse(HEADER + "2026-01-02;03:04;Наличные;Еда;-100;VND;\n")
+        assertEquals(0L, transactions.single().feeMinor)
+    }
+
+    @Test
+    fun `некорректная комиссия сообщает номер строки`() {
+        val error = assertThrows(BudgetImportException::class.java) {
+            parse(
+                "${HEADER.trimEnd()};Комиссия\n" +
+                    "2026-01-02;03:04;Наличные;Еда;-100;VND;;abc\n",
+            )
+        }
+        assertEquals(BudgetImportError.BAD_AMOUNT, error.reason)
+        assertEquals(2, error.line)
+    }
+
+    @Test
     fun `без колонок оформления атрибуты не заполнены`() {
         val transactions = parse(HEADER + "2026-01-02;03:04;Наличные;Еда;-100;VND;\n")
         val tx = transactions.single()

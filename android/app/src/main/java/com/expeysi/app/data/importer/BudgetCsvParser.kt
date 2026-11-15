@@ -30,6 +30,8 @@ data class BudgetTransaction(
     val balanceColorKey: String? = null,
     // Связка перевода: ноги одного перевода делят одно значение; null — колонки нет.
     val transferLinkId: String? = null,
+    // Комиссия перевода у ноги списания; 0 — колонки нет или она пустая.
+    val feeMinor: Long = 0,
 )
 
 class BudgetCsvParser @Inject constructor() {
@@ -102,6 +104,26 @@ class BudgetCsvParser @Inject constructor() {
             throw BudgetImportException(BudgetImportError.BAD_DATE, line = line)
         }
 
+        // Колонка комиссии: число без знака тем же форматом, что и «Сумма».
+        // Пустая колонка или её отсутствие — ноль; мусор и переполнение —
+        // те же ошибки импорта суммы.
+        val feeMinor = optionalValue(CsvFormat.FEE_COLUMN)
+            ?.let { feeText ->
+                try {
+                    BigDecimal(feeText)
+                } catch (_: NumberFormatException) {
+                    throw BudgetImportException(BudgetImportError.BAD_AMOUNT, line = line)
+                }
+            }
+            ?.let { fee ->
+                try {
+                    fee.abs().movePointRight(2).setScale(0, RoundingMode.UNNECESSARY).longValueExact()
+                } catch (_: ArithmeticException) {
+                    throw BudgetImportException(BudgetImportError.AMOUNT_TOO_LARGE, line = line)
+                }
+            }
+            ?: 0L
+
         return BudgetTransaction(
             accountName = accountName,
             categoryName = categoryName,
@@ -118,6 +140,7 @@ class BudgetCsvParser @Inject constructor() {
             balanceIconKey = optionalValue(CsvFormat.BALANCE_ICON_COLUMN),
             balanceColorKey = optionalValue(CsvFormat.BALANCE_COLOR_COLUMN),
             transferLinkId = optionalValue(CsvFormat.TRANSFER_LINK_COLUMN),
+            feeMinor = feeMinor,
         )
     }
 
@@ -198,6 +221,7 @@ class BudgetCsvParser @Inject constructor() {
             CsvFormat.BALANCE_ICON_COLUMN,
             CsvFormat.BALANCE_COLOR_COLUMN,
             CsvFormat.TRANSFER_LINK_COLUMN,
+            CsvFormat.FEE_COLUMN,
         )
     }
 }

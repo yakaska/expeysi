@@ -244,19 +244,22 @@ class SyncEngine @Inject constructor(
         "updatedAt" to value.updatedAt,
     )
 
-    private fun transactionFields(value: TransactionEntity) = mapOf(
-        "type" to value.type,
-        "amountMinor" to value.amountMinor,
-        "accountId" to value.accountId,
-        "categoryId" to value.categoryId,
-        "date" to value.date,
-        "note" to value.note,
-        "linkedId" to value.linkedId,
-        "counterpartyAccountId" to value.counterpartyAccountId,
-        "deleted" to value.deleted,
-        "updatedAt" to value.updatedAt,
-        "updatedBy" to (authRepository.userId ?: value.updatedBy),
-    )
+    private fun transactionFields(value: TransactionEntity) = buildMap {
+        put("type", value.type)
+        put("amountMinor", value.amountMinor)
+        put("accountId", value.accountId)
+        put("categoryId", value.categoryId)
+        put("date", value.date)
+        put("note", value.note)
+        put("linkedId", value.linkedId)
+        put("counterpartyAccountId", value.counterpartyAccountId)
+        // Комиссия пишется только ненулевая: документы до фичи без ключа,
+        // иначе сравнение «неизменившееся» пере-заливало бы старые записи.
+        if (value.feeMinor != 0L) put("feeMinor", value.feeMinor)
+        put("deleted", value.deleted)
+        put("updatedAt", value.updatedAt)
+        put("updatedBy", authRepository.userId ?: value.updatedBy)
+    }
 
     /** Неизменившееся содержимое не пишется: без снимка удалённой стороны запись не пропускается. */
     private fun isUnchanged(name: String, id: String, fields: Map<String, Any?>): Boolean {
@@ -416,6 +419,7 @@ class SyncEngine @Inject constructor(
             // Поля перевода: у документов до фичи их нет — резолвятся в пустые.
             linkedId = document.getString("linkedId") ?: "",
             counterpartyAccountId = document.getString("counterpartyAccountId") ?: "",
+            feeMinor = document.getLong("feeMinor") ?: 0,
             deleted = document.getBoolean("deleted") ?: false,
             updatedAt = document.getLong("updatedAt") ?: 0,
             updatedBy = document.getString("updatedBy") ?: "",
