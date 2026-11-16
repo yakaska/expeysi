@@ -24,6 +24,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Deep link на онбординг с кодом семьи: expeysi://join?code=КОД.
+                 Открывает экран с предзаполненным полем кода, без автоотправки. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="expeysi" android:host="join" />
+            </intent-filter>
         </activity>
 
         <!-- Хранилище per-app языка (AppCompatDelegate.setApplicationLocales),

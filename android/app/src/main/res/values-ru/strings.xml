@@ -12,7 +12,9 @@
     <string name="family_join_title">Присоединиться</string>
     <string name="family_join_description">Введите код приглашения от другого участника семьи.</string>
     <string name="family_code_label">Код семьи</string>
-    <string name="family_paste">Вставить</string>
+    <string name="family_paste">Вставить код</string>
+    <string name="family_scan_qr">Сканировать QR-код</string>
+    <string name="family_code_hint">20 символов: буквы и цифры (пробелы и дефисы игнорируются)</string>
     <string name="family_join_action">Присоединиться</string>
     <string name="home_select_balance">Выбрать баланс</string>
     <string name="home_edit_balance">Изменить баланс…</string>
@@ -133,6 +135,8 @@
     <string name="drawer_section_reports">Отчёты</string>
     <string name="drawer_section_analytics">Аналитика</string>
     <string name="drawer_section_data">Данные</string>
+    <string name="drawer_section_family">Семья</string>
+    <string name="drawer_invite">Пригласить</string>
     <string name="drawer_section_misc">Разное</string>
     <string name="drawer_section_interface">Настройки интерфейса</string>
     <string name="drawer_home">Главная</string>
@@ -199,6 +203,15 @@
     <string name="family_error_connect">Не удалось подключить семью</string>
     <string name="family_error_not_signed_in">Пользователь не вошёл</string>
     <string name="family_error_empty_code">Введите код семьи</string>
+    <string name="family_error_invalid_format">Похоже, это не код семьи. Проверьте код и попробуйте ещё раз.</string>
+    <string name="family_error_not_found">Код не найден. Проверьте его и попробуйте ещё раз.</string>
+    <string name="family_error_expired">Срок действия этого кода истёк. Попросите новый код.</string>
+    <string name="family_error_no_connection">Нет соединения. Проверьте сеть и повторите попытку.</string>
+    <string name="family_error_check_failed">Не удалось проверить код. Попробуйте ещё раз.</string>
+    <string name="family_error_unknown">Что-то пошло не так. Попробуйте ещё раз.</string>
+    <string name="invite_title">Пригласить в семью</string>
+    <string name="invite_qr_hint">Попросите участника семьи отсканировать этот код в Expeysi или скопируйте код ниже.</string>
+    <string name="invite_qr_cd">QR-код для присоединения к семье</string>
     <!-- %1$d — номер строки CSV. -->
     <string name="add_delete_title">Удалить операцию?</string>
     <string name="add_delete_text">Запись исчезнет из списка и перестанет влиять на баланс.</string>
