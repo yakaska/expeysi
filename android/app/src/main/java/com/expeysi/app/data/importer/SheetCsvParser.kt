@@ -18,8 +18,8 @@ import javax.inject.Inject
  * пример — test-import.csv). Признак формата — первая колонка «ID»;
  * дальше идут «Дата», «Время», «Название счета», «Владелец счета», «Группа»,
  * «Категория», «Сумма», «Валюта», «Комментарий», числовые «ЦВЕТ» и «ИКОНКА»
- * оформления категории и служебные колонки внешнего приложения (метка
- * времени, признак запланированной строки), которые импортер не читает.
+ * оформления категории; из служебных колонок внешнего приложения читается
+ * метка времени экспорта, признак запланированной строки — нет.
  *
  * Отличия от формата «Бюджета» (один заголовок в [CsvFormat]):
  * - суммы приходят в записи Excel, включая научную нотацию («-8e+06»,
@@ -33,10 +33,13 @@ import javax.inject.Inject
  *   код ключа не задает — категория остается с оформлением по умолчанию,
  *   существующая не перекрашивается.
  * - колонка «Связка перевода» отсутствует: ноги переводов (категория
- *   «Перевод») сводятся парами — один и тот же момент «дата+время»,
- *   противоположные знаки, при нескольких кандидатах предпочтение сумме,
- *   равной сумме списания. Свежая связка каждой пары восстанавливает
- *   настоящий перевод; непарные строки остаются обычными операциями.
+ *   «Перевод») сводятся парами по служебной метке времени экспорта —
+ *   зачисление пары ровно на 100 мс позже списания, что отсекает
+ *   постороннее начисление той же минуты. Метки нет или метка ноги не
+ *   распознана — работает эвристика момента «дата+время»: противоположные
+ *   знаки, при нескольких кандидатах предпочтение сумме, равной сумме
+ *   списания. Свежая связка каждой пары восстанавливает настоящий перевод;
+ *   непарные строки остаются обычными операциями.
  *
  * Разделитель опознаётся по заголовку. На выходе — те же
  * [BudgetTransaction] в [BudgetImportService]: дальше импорт идёт общим
@@ -58,8 +61,9 @@ class SheetCsvParser @Inject constructor() {
         val columns = REQUIRED_COLUMNS.mapValues { (_, name) ->
             header[name] ?: throw BudgetImportException(BudgetImportError.MISSING_COLUMN, column = name)
         }
-        // Комментарий, владелец, группа и оформление присутствуют не в каждой
-        // выгрузке; их отсутствие читается как пустые значения.
+        // Комментарий, владелец, группа, оформление и метка времени экспорта
+        // присутствуют не в каждой выгрузке; их отсутствие читается как
+        // пустые значения.
         val optionalColumns = OPTIONAL_COLUMNS
             .mapNotNull { (key, name) -> header[name]?.let { index -> key to index } }
             .toMap()
@@ -80,7 +84,7 @@ class SheetCsvParser @Inject constructor() {
         columns: Map<String, Int>,
         optionalColumns: Map<String, Int>,
         line: Int,
-    ): BudgetTransaction {
+    ): SheetRow {
         fun value(column: String) = values[columns.getValue(column)].trim()
 
         // Колонки могут отсутствовать; строка может быть короче заявленных колонок.
@@ -137,51 +141,96 @@ class SheetCsvParser @Inject constructor() {
         val categoryColorKey = optionalValue("color")?.let { colorKey(it) }
         val categoryIconKey = optionalValue("icon")?.let { iconKey(it) }
 
-        return BudgetTransaction(
-            accountName = accountName,
-            categoryName = categoryName,
-            type = if (amount.signum() < 0) TxType.EXPENSE else TxType.INCOME,
-            amountMinor = amountMinor,
-            currencyCode = currencyCode,
-            date = date,
-            note = optionalValue("note").orEmpty(),
-            balanceName = balanceName,
-            categoryIconKey = categoryIconKey,
-            categoryColorKey = categoryColorKey,
+        // Служебная метка времени экспорта: нечисловая клетка метки не задает —
+        // файл с нераспознанной меткой сводит пары эвристикой момента.
+        val exportMillis = optionalValue("timestamp")?.let(::styleCode)
+
+        return SheetRow(
+            item = BudgetTransaction(
+                accountName = accountName,
+                categoryName = categoryName,
+                type = if (amount.signum() < 0) TxType.EXPENSE else TxType.INCOME,
+                amountMinor = amountMinor,
+                currencyCode = currencyCode,
+                date = date,
+                note = optionalValue("note").orEmpty(),
+                balanceName = balanceName,
+                categoryIconKey = categoryIconKey,
+                categoryColorKey = categoryColorKey,
+            ),
+            exportMillis = exportMillis,
         )
     }
 
+    /** Разобранная строка файла: операция и метка времени экспорта, если колонка есть и метка распознана. */
+    private data class SheetRow(
+        val item: BudgetTransaction,
+        val exportMillis: Long?,
+    )
+
     /**
-     * Сводит ноги переводов пары: категория «Перевод» у обеих строк, один и тот
-     * же момент (дата+время — до миллисекунд уже разобранных дат) и
-     * противоположные знаки. Списание берёт в пару зачисление с равной суммой,
-     * иначе первое свободное противоположное в порядке файла. Каждой паре
-     * достаётся свежая связка — по ней сервис соберёт настоящий перевод,
-     * в том числе из пары на одном счёте. Непарные строки связки не получают
-     * и остаются обычными операциями — строки файла не выбрасываются.
+     * Сводит ноги переводов пары: категория «Перевод» у обеих строк и
+     * противоположные знаки. У всех ног есть метка времени экспорта — связка
+     * точная: зачисление пары ровно на [TRANSFER_PAIR_OFFSET_MILLIS] позже
+     * списания, так и пишет экспорт в реальных выгрузках, включая межвалютные
+     * пары и пары в одну минуту с посторонними строками. Метки нет или метка
+     * ноги не распознана — работает эвристика момента «дата+время»: списание
+     * берёт в пару зачисление с равной суммой, иначе первое свободное
+     * противоположное в порядке файла. Каждой паре достаётся свежая связка —
+     * по ней сервис соберёт настоящий перевод. Непарные строки связки не
+     * получают и остаются обычными операциями — строки файла не выбрасываются.
      */
-    private fun linkTransferPairs(items: List<BudgetTransaction>): List<BudgetTransaction> {
+    private fun linkTransferPairs(rows: List<SheetRow>): List<BudgetTransaction> {
         val transferCategory = normalizeBudgetCategoryName(CsvFormat.TRANSFER_ROW_CATEGORY)
-        val byMoment = items.withIndex()
-            .filter { (_, item) -> normalizeBudgetCategoryName(item.categoryName) == transferCategory }
-            .groupBy { (_, item) -> item.date }
-        val result = items.toMutableList()
-        byMoment.values.forEach { legs ->
-            val outIndexes = legs.filter { it.value.type == TxType.EXPENSE }.map { it.index }
-            val freeInIndexes = legs.filter { it.value.type == TxType.INCOME }.map { it.index }.toMutableList()
+        val legs = rows.withIndex()
+            .filter { (_, row) -> normalizeBudgetCategoryName(row.item.categoryName) == transferCategory }
+        val result = rows.map { it.item }.toMutableList()
+        if (legs.all { it.value.exportMillis != null }) {
+            linkByExportStamp(legs, result)
+        } else {
+            linkByMoment(legs, result)
+        }
+        return result
+    }
+
+    /** Связка по меткам экспорта: зачисление пары — ровно на [TRANSFER_PAIR_OFFSET_MILLIS] позже списания. */
+    private fun linkByExportStamp(
+        legs: List<IndexedValue<SheetRow>>,
+        result: MutableList<BudgetTransaction>,
+    ) {
+        val freeIncomes = legs.filter { it.value.item.type == TxType.INCOME }.toMutableList()
+        legs.filter { it.value.item.type == TxType.EXPENSE }.forEach { out ->
+            val stamp = out.value.exportMillis ?: return@forEach
+            val linked = freeIncomes.firstOrNull { it.value.exportMillis == stamp + TRANSFER_PAIR_OFFSET_MILLIS }
+                ?: return@forEach
+            freeIncomes.remove(linked)
+            linkPair(out.index, linked.index, result)
+        }
+    }
+
+    /** Эвристика момента «дата+время»: выгрузки без метки или с нераспознанными метками. */
+    private fun linkByMoment(
+        legs: List<IndexedValue<SheetRow>>,
+        result: MutableList<BudgetTransaction>,
+    ) {
+        legs.groupBy { it.value.item.date }.forEach { (_, momentLegs) ->
+            val outIndexes = momentLegs.filter { it.value.item.type == TxType.EXPENSE }.map { it.index }
+            val freeInIndexes = momentLegs.filter { it.value.item.type == TxType.INCOME }.map { it.index }.toMutableList()
             outIndexes.forEach { out ->
                 val linked = freeInIndexes.firstOrNull { result[it].amountMinor == result[out].amountMinor }
                     ?: freeInIndexes.firstOrNull()
                     ?: return@forEach
                 freeInIndexes.remove(linked)
-                // Свежая связка на каждую пару: копии импорта независимы
-                // от пар в живых данных и от других загрузок.
-                val link = UUID.randomUUID().toString()
-                result[out] = result[out].copy(transferLinkId = link)
-                result[linked] = result[linked].copy(transferLinkId = link)
+                linkPair(out, linked, result)
             }
         }
-        return result
+    }
+
+    /** Свежая связка на каждую пару: копии импорта независимы от пар в живых данных и от других загрузок. */
+    private fun linkPair(out: Int, linked: Int, result: MutableList<BudgetTransaction>) {
+        val link = UUID.randomUUID().toString()
+        result[out] = result[out].copy(transferLinkId = link)
+        result[linked] = result[linked].copy(transferLinkId = link)
     }
 
     /**
@@ -220,6 +269,22 @@ class SheetCsvParser @Inject constructor() {
         private const val OWNER_COLUMN = "Владелец счета"
         private const val GROUP_COLUMN = "Группа"
 
+        /**
+         * Последняя колонка заголовка реальных выгрузок: внешняя таблица
+         * склеивает два имени — метки времени и признака запланированной
+         * строки. Строки при этом дают 15 полей: поле этой колонки — метка
+         * времени экспорта, следующее за ней — признак (импортером
+         * не читается).
+         */
+        private const val TIMESTAMP_COLUMN = "Отметка времениЗапланированные"
+
+        /**
+         * Метка зачисления пары ровно на столько позже метки списания:
+         * реальные выгрузки (в том числе межвалютные) пишут зачисление
+         * через 0,1 с после списания — отсюда точная связка по меткам.
+         */
+        private const val TRANSFER_PAIR_OFFSET_MILLIS = 100L
+
         private val CURRENCY_REGEX = Regex("[A-Z]{3}")
         private val REQUIRED_COLUMNS = mapOf(
             "date" to "Дата",
@@ -235,6 +300,7 @@ class SheetCsvParser @Inject constructor() {
             "group" to GROUP_COLUMN,
             "color" to "ЦВЕТ",
             "icon" to "ИКОНКА",
+            "timestamp" to TIMESTAMP_COLUMN,
         )
 
         /**

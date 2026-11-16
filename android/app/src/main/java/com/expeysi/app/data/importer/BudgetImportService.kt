@@ -93,8 +93,8 @@ class BudgetImportService @Inject constructor(
 
         // Строки со связкой перевода восстанавливаются парой ног transfer_out /
         // transfer_in; группа без валидной пары (одинокая нога, лишние ноги той
-        // же связки) целиком остаётся обычными операциями — строки файла
-        // не выбрасываются.
+        // же связки, обе стороны на одном счёте) целиком остаётся обычными
+        // операциями — строки файла не выбрасываются.
         val (linkedRows, plainRows) = operations.partition { !it.transferLinkId.isNullOrEmpty() }
         val transferLegs = mutableListOf<TransactionEntity>()
         val degenerateRows = mutableListOf<BudgetTransaction>()
@@ -194,15 +194,12 @@ internal fun normalizeBudgetCategoryName(name: String): String = name.trim().low
  * списания счёта-источника, строка дохода — нога зачисления получателя; суммы
  * парсер уже хранит без знака. Идентификаторы ног и связка свежие: копия
  * импорта независима от пар в живых данных и от других загрузок того же файла,
- * а счёт-контрагент каждой ноги — второй счёт пары; у пары на одном счёте
- * контрагент — тот же счёт: остаток пары нейтрален, итоги доходов и расходов
- * она не искажает (иначе её строки дублировали бы деньги дважды).
- * [categoryId] пустой: у ног перевода категории нет, категория «Перевод»
- * из строки отбрасывается.
+ * а счёт-контрагент каждой ноги — второй счёт пары. [categoryId] пустой:
+ * у ног перевода категории нет, категория «Перевод» из строки отбрасывается.
  * Пустой список — связка вырожденная, и ВСЕ её строки остаются обычными
- * операциями: не ровно один расход и один доход. Строки группы целиком
- * импортируются своими знаками — ни одна строка файла не выбрасывается,
- * остатки складываются по арифметике CSV.
+ * операциями: не ровно один расход и один доход, либо обе стороны на одном
+ * счёте. Строки группы целиком импортируются своими знаками — ни одна строка
+ * файла не выбрасывается, остатки складываются по арифметике CSV.
  */
 internal fun transferLegsOf(
     rows: List<BudgetTransaction>,
@@ -216,6 +213,7 @@ internal fun transferLegsOf(
     val inRow = ins.single()
     val outAccount = accountByKey.getValue(out.accountKey())
     val inAccount = accountByKey.getValue(inRow.accountKey())
+    if (outAccount.id == inAccount.id) return emptyList()
     val linkedId = UUID.randomUUID().toString()
     return listOf(
         TransactionEntity(

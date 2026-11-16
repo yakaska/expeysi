@@ -12,9 +12,7 @@ import org.junit.Test
 
 /**
  * Перекраска существующих категорий при импорте: файл экспорта Expeysi обязан
- * возвращать оформление, файлы внешнего «Бюджета» его не трогают. Реконструкция
- * перевода из связки: пары на разных счетах и на одном счёте — настоящие
- * ноги, вырожденные группы остаются операциями.
+ * возвращать оформление, файлы внешнего «Бюджета» его не трогают.
  * Имена копий балансов: префикс «импорт » и нумерация повторов.
  */
 class BudgetImportServiceTest {
@@ -186,28 +184,13 @@ class BudgetImportServiceTest {
     }
 
     @Test
-    fun `списание и зачисление на одном счете восстанавливаются переводом`() {
-        val legs = transferLegsOf(
-            listOf(
-                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
-                item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
-            ),
-            accounts,
-            nowMillis = 77,
+    fun `списание и зачисление на одном счете не реконструируются`() {
+        val group = listOf(
+            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
+            item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
         )
 
-        assertEquals(2, legs.size)
-        val out = legs.first()
-        val inLeg = legs.last()
-        assertEquals(TxType.TRANSFER_OUT.wire, out.type)
-        assertEquals("acc1", out.accountId)
-        assertEquals(TxType.TRANSFER_IN.wire, inLeg.type)
-        assertEquals("acc1", inLeg.accountId)
-        // Контрагент пары на одном счёте — тот же счёт: остаток пары нейтрален,
-        // в итоги доходов и расходов ноги не попадают.
-        assertEquals("acc1", out.counterpartyAccountId)
-        assertEquals("acc1", inLeg.counterpartyAccountId)
-        assertEquals(out.linkedId, inLeg.linkedId)
+        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
     }
 
     @Test
