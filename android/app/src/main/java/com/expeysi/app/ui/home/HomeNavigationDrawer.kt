@@ -1,12 +1,7 @@
 package com.expeysi.app.ui.home
 
 import android.Manifest
-import android.app.LocaleManager
-import android.content.Context
-import android.content.pm.PackageManager
-import android.content.res.Resources
 import android.os.Build
-import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -66,10 +61,12 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,10 +74,6 @@ import com.expeysi.app.R
 import com.expeysi.app.data.ThemeMode
 import com.expeysi.app.ui.common.rememberClipboardCopy
 import com.expeysi.app.ui.theme.ThemeViewModel
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
-import java.text.DateFormat as JavaTextDateFormat
 
 /** Дисплейный шрифт со стилизацией «под иврит» для имени приложения в шапке drawer. */
 private val SholomFontFamily = FontFamily(Font(R.font.sholom))
@@ -117,6 +110,14 @@ fun HomeNavigationDrawer(
     val reminderViewModel: ReminderViewModel = hiltViewModel()
     val reminderState by reminderViewModel.state.collectAsStateWithLifecycle()
     val permissionDeniedMessage = stringResource(R.string.reminder_permission_denied)
+    // Состояние тоглера для TalkBack (merged в строку) и время форматируем только
+    // при изменении входов: чтение настройки TIME_12_24 в каждой рекомпозиции лишнее.
+    val reminderToggleStateDescription = stringResource(
+        if (reminderState.enabled) R.string.common_on else R.string.common_off,
+    )
+    val reminderTimeLabel = remember(context, reminderState.hour, reminderState.minute) {
+        formatDeviceTime(context, reminderState.hour, reminderState.minute)
+    }
     // Разрешение на уведомления спрашиваем при включении тоглера на Android 13+;
     // отказ оставляет напоминание выключенным и объясняет это тостом.
     val requestNotificationPermission = rememberLauncherForActivityResult(
@@ -131,9 +132,20 @@ fun HomeNavigationDrawer(
     val onReminderToggle: (Boolean) -> Unit = { enabled ->
         when {
             !enabled -> reminderViewModel.setEnabled(false)
-            reminderNeedsNotificationPermission(context) ->
-                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            else -> reminderViewModel.setEnabled(true)
+            else -> when (
+                reminderToggleAction(
+                    sdkInt = Build.VERSION.SDK_INT,
+                    hasPostNotificationPermission = !reminderNeedsNotificationPermission(context),
+                    notificationsEnabledInSystem = NotificationManagerCompat.from(context)
+                        .areNotificationsEnabled(),
+                )
+            ) {
+                ReminderToggleAction.ENABLE -> reminderViewModel.setEnabled(true)
+                ReminderToggleAction.REQUEST_PERMISSION ->
+                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                ReminderToggleAction.BLOCKED ->
+                    Toast.makeText(context, permissionDeniedMessage, Toast.LENGTH_LONG).show()
+            }
         }
     }
     ModalNavigationDrawer(
@@ -267,11 +279,7 @@ fun HomeNavigationDrawer(
                             Column {
                                 Text(stringResource(R.string.drawer_reminder))
                                 Text(
-                                    formatDeviceTime(
-                                        context,
-                                        reminderState.hour,
-                                        reminderState.minute,
-                                    ),
+                                    reminderTimeLabel,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
@@ -284,6 +292,13 @@ fun HomeNavigationDrawer(
                             Switch(
                                 checked = reminderState.enabled,
                                 onCheckedChange = onReminderToggle,
+                                modifier = Modifier.semantics {
+                                    // Строка целиком читается TalkBack как «Напоминание,
+                                    // <время>, включено/выключено». Клик по строке остаётся
+                                    // открытием выбора времени, тоглер-toggle — действием
+                                    // самого Switch.
+                                    stateDescription = reminderToggleStateDescription
+                                },
                             )
                         },
                         modifier = Modifier.padding(horizontal = 12.dp),
@@ -488,70 +503,6 @@ private fun ReminderTimePickerDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     )
-}
-
-/**
- * Время в формате устройства (как часы в системной панели): настройка «24-часовой
- * формат», а без неё — короткий локализованный шаблон. Локаль берём системную,
- * а не контекста: у приложения свой per-app язык, и его подмена не должна
- * менять формат часов.
- */
-private fun formatDeviceTime(context: Context, hour: Int, minute: Int): String {
-    val pattern = if (deviceUses24Hour(context)) "HH:mm" else "h:mm a"
-    val formatter = SimpleDateFormat(pattern, deviceLocale(context))
-    val moment = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, hour)
-        set(Calendar.MINUTE, minute)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-    }.time
-    return formatter.format(moment)
-}
-
-/** 24h или 12h: системная настройка TIME_12_24, если задана, иначе —
- *  правила локали устройства. Формат не зависит от языка приложения. */
-private fun deviceUses24Hour(context: Context): Boolean {
-    val setting = Settings.System.getString(context.contentResolver, Settings.System.TIME_12_24)
-    if (setting != null) {
-        return setting == "24"
-    }
-    return is24HourLocale(deviceLocale(context))
-}
-
-/**
- * Локаль устройства, а не приложения: per-app язык не должен влиять на
- * формат часов. LocaleManager.systemLocales даёт именно системный список;
- * Resources.getSystem() на новых API тоже подменяется per-app языком, поэтому
- * годится только как fallback до Android 13, где такого механизма не было.
- */
-private fun deviceLocale(context: Context): Locale {
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        val systemLocales = context.getSystemService(LocaleManager::class.java)?.systemLocales
-        if (systemLocales != null && !systemLocales.isEmpty) {
-            return systemLocales[0]
-        }
-    }
-    return Resources.getSystem().configuration.locales[0]
-}
-
-/** Эквивалент скрытого DateFormat.is24HourLocale: H или k первым в коротком шаблоне — 24h. */
-private fun is24HourLocale(locale: Locale): Boolean {
-    val format = JavaTextDateFormat.getTimeInstance(JavaTextDateFormat.SHORT, locale)
-    val pattern = (format as? SimpleDateFormat)?.toPattern().orEmpty()
-    return pattern.firstOrNull() == 'H' || pattern.firstOrNull() == 'k'
-}
-
-/**
- * POST_NOTIFICATIONS — рантайм-разрешение Android 13+; до 13-го уведомления
- * включены по умолчанию и запрос не нужен.
- */
-private fun reminderNeedsNotificationPermission(context: Context): Boolean {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        // До Android 13 уведомления включены по умолчанию, запрос не нужен.
-        return false
-    }
-    return ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-        PackageManager.PERMISSION_GRANTED
 }
 
 @Composable

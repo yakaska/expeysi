@@ -127,6 +127,8 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
+    <string name="common_on">включено</string>
+    <string name="common_off">выключено</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Отчёты</string>
     <string name="drawer_section_analytics">Аналитика</string>

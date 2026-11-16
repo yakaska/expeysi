@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,13 +29,13 @@ class ReminderStore @Inject constructor(
     /** Включает или выключает напоминание, время не трогает. */
     fun setEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_ENABLED, enabled).apply()
-        _state.value = _state.value.copy(enabled = enabled)
+        _state.update { it.copy(enabled = enabled) }
     }
 
     /** Выбирает время напоминания, включённость не трогает. */
     fun setTime(hour: Int, minute: Int) {
         prefs.edit().putInt(KEY_HOUR, hour).putInt(KEY_MINUTE, minute).apply()
-        _state.value = _state.value.copy(hour = hour, minute = minute)
+        _state.update { it.copy(hour = hour, minute = minute) }
     }
 
     private fun SharedPreferences.restore(): ReminderState = ReminderState(

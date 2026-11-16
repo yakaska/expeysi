@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.expeysi.app.R
 
@@ -30,13 +29,14 @@ internal object ReminderNotifications {
 
     /** Уведомление: тап по нему просто открывает приложение. */
     fun build(context: Context): Notification {
+        // getLaunchIntentForPackage уже ставит FLAG_ACTIVITY_NEW_TASK.
         val contentIntent = context.packageManager
             .getLaunchIntentForPackage(context.packageName)
             ?.let { launchIntent ->
                 PendingIntent.getActivity(
                     context,
                     0,
-                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+                    launchIntent,
                     PendingIntent.FLAG_IMMUTABLE,
                 )
             }

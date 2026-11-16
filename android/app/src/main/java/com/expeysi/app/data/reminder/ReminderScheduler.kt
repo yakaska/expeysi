@@ -8,7 +8,8 @@ import androidx.work.WorkManager
 import com.expeysi.app.data.ReminderStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Duration
-import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -35,10 +36,9 @@ class ReminderScheduler @Inject constructor(
             workManager.cancelUniqueWork(WORK_NAME)
             return
         }
+        val next = nextOccurrence(state.hour, state.minute)
         val request: OneTimeWorkRequest = OneTimeWorkRequestBuilder<ReminderWorker>()
-            .setInitialDelay(
-                Duration.between(LocalDateTime.now(), nextOccurrence(state.hour, state.minute)),
-            )
+            .setInitialDelay(Duration.between(ZonedDateTime.now(), next))
             .build()
         workManager.enqueueUniqueWork(WORK_NAME, policy, request)
     }
@@ -47,14 +47,24 @@ class ReminderScheduler @Inject constructor(
         /** Имя уникальной запланированной работы напоминания. */
         const val WORK_NAME = "expense_reminder"
 
-        /** Ближайший момент строго после [now] с локальным временем [hour]:[minute]. */
+        /**
+         * Ближайший момент строго после [now], когда на часах в зоне [zone] будет
+         * [hour]:[minute]. Зона по умолчанию — телефон; [now] и [zone] отдельными
+         * параметрами — для тестируемости. Смена часового пояса после планирования
+         * не отслеживается: расписание пересчитается при следующем sync.
+         */
         fun nextOccurrence(
             hour: Int,
             minute: Int,
-            now: LocalDateTime = LocalDateTime.now(),
-        ): LocalDateTime {
-            val candidate = now.toLocalDate().atTime(hour, minute)
-            return if (candidate.isAfter(now)) candidate else candidate.plusDays(1)
+            now: ZonedDateTime = ZonedDateTime.now(),
+            zone: ZoneId = ZoneId.systemDefault(),
+        ): ZonedDateTime {
+            val candidate = now.toLocalDate().atTime(hour, minute).atZone(zone)
+            if (candidate.isAfter(now)) {
+                return candidate
+            }
+            // atZone сдвигает вперёд через DST-пропуск — повторяем его же правило на завтра.
+            return candidate.toLocalDate().plusDays(1).atTime(hour, minute).atZone(zone)
         }
     }
 }
