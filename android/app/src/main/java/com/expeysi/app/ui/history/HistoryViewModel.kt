@@ -23,11 +23,11 @@ import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.UiText
-import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.home.TransferAccount
 import com.expeysi.app.ui.home.TransferCard
 import com.expeysi.app.ui.home.TransferSide
+import com.expeysi.app.ui.icons.CategoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

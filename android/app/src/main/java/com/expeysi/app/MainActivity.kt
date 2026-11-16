@@ -44,6 +44,7 @@ import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
 import com.expeysi.app.ui.home.HomeScreen
 import com.expeysi.app.ui.home.HomeViewModel
+import com.expeysi.app.ui.home.ImportBalancesScreen
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -79,6 +80,7 @@ private fun AppNavigation() {
     val homeViewModel: HomeViewModel = hiltViewModel()
     val homeUiState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val importState by homeViewModel.importState.collectAsStateWithLifecycle()
+    val importBalancesState by homeViewModel.importBalancesState.collectAsStateWithLifecycle()
     val leaveState by homeViewModel.leaveState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -102,6 +104,13 @@ private fun AppNavigation() {
             Toast.makeText(context, R.string.family_leave_error, Toast.LENGTH_LONG).show()
             homeViewModel.consumeLeaveFamilyError()
         }
+    }
+    if (importBalancesState.visible) {
+        ImportBalancesScreen(
+            state = importBalancesState,
+            onConfirm = homeViewModel::confirmImportBalances,
+            onDismiss = homeViewModel::dismissImportBalances,
+        )
     }
 
     HomeNavigationDrawer(

@@ -6,11 +6,11 @@ import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.home.TransferAccount
 import com.expeysi.app.ui.home.TransferCard
 import com.expeysi.app.ui.home.TransferSide
-import java.time.LocalDate
-import java.time.ZoneId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.ZoneId
 
 class HistoryGroupingTest {
 

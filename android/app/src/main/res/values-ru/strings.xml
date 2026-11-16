@@ -179,6 +179,12 @@
     <string name="import_error_amount_too_large">Строка %1$d: сумма слишком большая или имеет больше двух знаков</string>
     <string name="import_error_bad_date">Строка %1$d: некорректные дата или время</string>
     <string name="import_error_unclosed_quote">Строка %1$d: незакрытая кавычка</string>
+    <!-- %1$s — нетто операций файла по счету, показано в поле остатков. -->
+    <string name="import_balances_file_net">Из операций файла: %1$s</string>
+    <string name="import_balances_title">Остатки счетов</string>
+    <string name="import_balances_description">В файле импорта нет остатков. Впишите, сколько на каждом счете сейчас — импорт превратит это в остаток счета. Пустое поле: остаток считается только по операциям файла.</string>
+    <string name="import_balances_field_hint">Сколько сейчас</string>
+    <string name="import_balances_import">Импортировать</string>
     <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
     <string name="export_button">Экспортировать в CSV</string>
     <string name="export_description">Выберите типы операций для экспорта. Балансы счетов экспортируются всегда.</string>

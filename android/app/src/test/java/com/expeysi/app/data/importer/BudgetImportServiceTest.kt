@@ -1,5 +1,6 @@
 package com.expeysi.app.data.importer
 
+import com.expeysi.app.data.csv.CsvFormat
 import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.domain.TxType
@@ -11,7 +12,9 @@ import org.junit.Test
 
 /**
  * Перекраска существующих категорий при импорте: файл экспорта Expeysi обязан
- * возвращать оформление, файлы внешнего «Бюджета» его не трогают.
+ * возвращать оформление, файлы внешнего «Бюджета» его не трогают. Реконструкция
+ * перевода из связки: пары на разных счетах и на одном счёте — настоящие
+ * ноги, вырожденные группы остаются операциями.
  * Имена копий балансов: префикс «импорт » и нумерация повторов.
  */
 class BudgetImportServiceTest {
@@ -183,13 +186,28 @@ class BudgetImportServiceTest {
     }
 
     @Test
-    fun `списание и зачисление на одном счете не реконструируются`() {
-        val group = listOf(
-            item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
-            item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+    fun `списание и зачисление на одном счете восстанавливаются переводом`() {
+        val legs = transferLegsOf(
+            listOf(
+                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 30_000, transferLinkId = "L1"),
+                item(accountName = "Карта", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+            ),
+            accounts,
+            nowMillis = 77,
         )
 
-        assertTrue(transferLegsOf(group, accounts, nowMillis = 77).isEmpty())
+        assertEquals(2, legs.size)
+        val out = legs.first()
+        val inLeg = legs.last()
+        assertEquals(TxType.TRANSFER_OUT.wire, out.type)
+        assertEquals("acc1", out.accountId)
+        assertEquals(TxType.TRANSFER_IN.wire, inLeg.type)
+        assertEquals("acc1", inLeg.accountId)
+        // Контрагент пары на одном счёте — тот же счёт: остаток пары нейтрален,
+        // в итоги доходов и расходов ноги не попадают.
+        assertEquals("acc1", out.counterpartyAccountId)
+        assertEquals("acc1", inLeg.counterpartyAccountId)
+        assertEquals(out.linkedId, inLeg.linkedId)
     }
 
     @Test
@@ -225,6 +243,46 @@ class BudgetImportServiceTest {
 
         assertNotEquals(firstLink, secondLink)
     }
+
+    @Test
+    fun `нетто по счетам считается со знаком без служебных строк остатков`() {
+        // Экран остатков показывает, что даст импорт без правки: служебные
+        // строки «Начальный остаток» уходят отдельно и в нетто не входят.
+        val nets = accountNets(
+            listOf(
+                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 10_000),
+                item(accountName = "Карта", type = TxType.INCOME, amountMinor = 2_500),
+                item(accountName = "Кошелёк", type = TxType.INCOME, amountMinor = 30_000, transferLinkId = "L1"),
+                item(accountName = "Карта", type = TxType.EXPENSE, amountMinor = 5_000, transferLinkId = "L2"),
+                openingBalance(150_000),
+            ),
+        )
+
+        assertEquals(2, nets.size)
+        assertEquals(-12_500L, nets[AccountKey("Карта", "RUB", null)])
+        assertEquals(30_000L, nets[AccountKey("Кошелёк", "RUB", null)])
+    }
+
+    @Test
+    fun `введенный остаток превращается в opening разницей с нетто`() {
+        // «Сейчас на счете 35 000», нетто операций файла −10 794,51:
+        // счет должен начаться с 45 794,51, чтобы импорт показал 35 000.
+        assertEquals(45_794_51L, openingFromCurrent(currentMinor = 35_000_00L, netMinor = -10_794_51L))
+        // Счет пуст или закрыт: 0 − net = −net.
+        assertEquals(99_999_73L, openingFromCurrent(currentMinor = 0L, netMinor = -99_999_73L))
+        // Нетто совпадает с реальностью — остаток импорта нулевой.
+        assertEquals(0L, openingFromCurrent(currentMinor = 100_000_00L, netMinor = 100_000_00L))
+    }
+
+    private fun openingBalance(amountMinor: Long) = BudgetTransaction(
+        accountName = "Карта",
+        categoryName = CsvFormat.OPENING_ROW_CATEGORY,
+        type = TxType.INCOME,
+        amountMinor = amountMinor,
+        currencyCode = "RUB",
+        date = 1,
+        note = "Открытие",
+    )
 
     private val accounts = mapOf(
         AccountKey("Карта", "RUB", null) to account("acc1"),

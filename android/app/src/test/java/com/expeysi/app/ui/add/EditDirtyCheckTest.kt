@@ -1,13 +1,11 @@
 package com.expeysi.app.ui.add
 
 import com.expeysi.app.data.db.TransactionEntity
-import com.expeysi.app.domain.Money
-import java.time.LocalDate
-import java.time.LocalTime
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Dirty-проверка экранов правки: неизменённая запись не меняет Save,

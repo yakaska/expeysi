@@ -110,8 +110,7 @@ fun groupItems(items: List<TransactionItem>): List<HistoryListEntry> {
         seriesDate = null
     }
 
-    fun dateOf(millis: Long): LocalDate =
-        Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+    fun dateOf(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
 
     items.forEach { item ->
         val key = item.transferCard?.groupKey.orEmpty()

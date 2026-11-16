@@ -74,11 +74,11 @@ import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import kotlinx.coroutines.launch
 
 private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM HH:mm")
 private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMMM")
@@ -711,6 +711,9 @@ private fun AccountsView(
                             Text(
                                 text = categoryDisplayName(categoryTotal.categoryId, category?.name ?: ""),
                                 style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 16.dp),
                             )
                             Text(
                                 text = "${Money.formatAuto(if (categoryTotal.expenseMinor == 0L) categoryTotal.incomeMinor else categoryTotal.expenseMinor)} ${state.currencySymbol}",
