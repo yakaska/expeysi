@@ -129,6 +129,8 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">No transactions in this period</string>
     <string name="common_retry">Retry</string>
+    <string name="common_on">On</string>
+    <string name="common_off">Off</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Reports</string>
     <string name="drawer_section_analytics">Analytics</string>
@@ -145,6 +147,13 @@
     <string name="theme_system">System default</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="drawer_reminder">Reminder</string>
+    <!-- Напоминание о внесении расходов за сегодня: канал и текст уведомления. -->
+    <string name="reminder_channel_name">Expense reminders</string>
+    <string name="reminder_channel_description">Daily reminder to log today\'s expenses</string>
+    <string name="reminder_notification_title">Time to log today\'s expenses</string>
+    <string name="reminder_notification_text">Open Expeysi and record what you have spent today.</string>
+    <string name="reminder_permission_denied">Notifications are blocked — the reminder will not be shown. Allow notifications in system settings.</string>
     <string name="history_detail_title_parts">%1$s · %2$s</string>
     <!-- %1$s — количество импортированных операций. -->
     <string name="import_done">Imported transactions: %1$d</string>

@@ -65,6 +65,13 @@ android {
         compose = true
     }
 
+    testOptions {
+        // Robolectric-тесты ReminderWorker читают strings.xml (канал уведомления).
+        unitTests {
+            isIncludeAndroidResources = true
+        }
+    }
+
     sourceSets {
         // Схемы Room идут ассетами androidTest: MigrationTestHelper читает из них
         // v8 и v9 при валидации миграции 8→9.
@@ -138,6 +145,9 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation(libs.androidx.hilt.work)
+    ksp(libs.androidx.hilt.compiler)
+    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.androidx.navigation.compose)
 
     implementation(platform(libs.firebase.bom))
@@ -148,6 +158,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.androidx.work.testing)
+    testImplementation(libs.robolectric)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.room.testing)

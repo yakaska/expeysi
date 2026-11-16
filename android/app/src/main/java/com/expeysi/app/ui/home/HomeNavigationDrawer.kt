@@ -1,6 +1,10 @@
 package com.expeysi.app.ui.home
 
+import android.Manifest
+import android.os.Build
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -16,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AccountBalanceWallet
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.DarkMode
@@ -30,6 +35,7 @@ import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
@@ -38,8 +44,11 @@ import androidx.compose.material3.NavigationDrawerItem
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,9 +61,12 @@ import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -88,12 +100,54 @@ fun HomeNavigationDrawer(
     var showLeaveConfirmation by remember { mutableStateOf(false) }
     var showLanguagePicker by remember { mutableStateOf(false) }
     var showThemePicker by remember { mutableStateOf(false) }
+    var showReminderPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val copiedMessage = stringResource(R.string.home_family_code_copied)
     val copyLabel = stringResource(R.string.common_copy)
     val copyToClipboard = rememberClipboardCopy()
     val themeViewModel: ThemeViewModel = hiltViewModel()
     val themeMode by themeViewModel.mode.collectAsStateWithLifecycle()
+    val reminderViewModel: ReminderViewModel = hiltViewModel()
+    val reminderState by reminderViewModel.state.collectAsStateWithLifecycle()
+    val permissionDeniedMessage = stringResource(R.string.reminder_permission_denied)
+    // Состояние тоглера для TalkBack (merged в строку) и время форматируем только
+    // при изменении входов: чтение настройки TIME_12_24 в каждой рекомпозиции лишнее.
+    val reminderToggleStateDescription = stringResource(
+        if (reminderState.enabled) R.string.common_on else R.string.common_off,
+    )
+    val reminderTimeLabel = remember(context, reminderState.hour, reminderState.minute) {
+        formatDeviceTime(context, reminderState.hour, reminderState.minute)
+    }
+    // Разрешение на уведомления спрашиваем при включении тоглера на Android 13+;
+    // отказ оставляет напоминание выключенным и объясняет это тостом.
+    val requestNotificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { granted ->
+        if (granted) {
+            reminderViewModel.setEnabled(true)
+        } else {
+            Toast.makeText(context, permissionDeniedMessage, Toast.LENGTH_LONG).show()
+        }
+    }
+    val onReminderToggle: (Boolean) -> Unit = { enabled ->
+        when {
+            !enabled -> reminderViewModel.setEnabled(false)
+            else -> when (
+                reminderToggleAction(
+                    sdkInt = Build.VERSION.SDK_INT,
+                    hasPostNotificationPermission = !reminderNeedsNotificationPermission(context),
+                    notificationsEnabledInSystem = NotificationManagerCompat.from(context)
+                        .areNotificationsEnabled(),
+                )
+            ) {
+                ReminderToggleAction.ENABLE -> reminderViewModel.setEnabled(true)
+                ReminderToggleAction.REQUEST_PERMISSION ->
+                    requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+                ReminderToggleAction.BLOCKED ->
+                    Toast.makeText(context, permissionDeniedMessage, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
@@ -217,6 +271,38 @@ fun HomeNavigationDrawer(
                         onClick = { showThemePicker = true },
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
+                    NavigationDrawerItem(
+                        label = {
+                            // Время выбранного напоминания второй строкой: supporting-текста
+                            // у NavigationDrawerItem в этой версии material3 нет. Время
+                            // показывается в формате устройства (12/24-hour).
+                            Column {
+                                Text(stringResource(R.string.drawer_reminder))
+                                Text(
+                                    reminderTimeLabel,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.Alarm, contentDescription = null) },
+                        onClick = { showReminderPicker = true },
+                        badge = {
+                            Switch(
+                                checked = reminderState.enabled,
+                                onCheckedChange = onReminderToggle,
+                                modifier = Modifier.semantics {
+                                    // Строка целиком читается TalkBack как «Напоминание,
+                                    // <время>, включено/выключено». Клик по строке остаётся
+                                    // открытием выбора времени, тоглер-toggle — действием
+                                    // самого Switch.
+                                    stateDescription = reminderToggleStateDescription
+                                },
+                            )
+                        },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
                     DrawerSection(stringResource(R.string.drawer_section_misc))
                     NavigationDrawerItem(
                         label = { Text(stringResource(R.string.history_mode_categories)) },
@@ -290,6 +376,17 @@ fun HomeNavigationDrawer(
             onSelect = { selected ->
                 showThemePicker = false
                 themeViewModel.setMode(selected)
+            },
+        )
+    }
+    if (showReminderPicker) {
+        ReminderTimePickerDialog(
+            initialHour = reminderState.hour,
+            initialMinute = reminderState.minute,
+            onDismiss = { showReminderPicker = false },
+            onSelect = { hour, minute ->
+                showReminderPicker = false
+                reminderViewModel.setTime(hour, minute)
             },
         )
     }
@@ -374,6 +471,37 @@ private fun ThemePickerDialog(
             }
         },
         confirmButton = {},
+    )
+}
+
+/** Диалог выбора времени напоминания: время применяется сразу, включённость не трогается. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderTimePickerDialog(
+    initialHour: Int,
+    initialMinute: Int,
+    onDismiss: () -> Unit,
+    onSelect: (hour: Int, minute: Int) -> Unit,
+) {
+    // Формат пикера должен совпадать с форматом часов устройства: 12-hour с AM/PM
+    // или 24-hour — по настройке, а без неё по локали устройства.
+    val pickerState = rememberTimePickerState(
+        initialHour = initialHour,
+        initialMinute = initialMinute,
+        is24Hour = deviceUses24Hour(LocalContext.current),
+    )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.drawer_reminder)) },
+        text = { TimePicker(state = pickerState) },
+        confirmButton = {
+            TextButton(
+                onClick = { onSelect(pickerState.hour, pickerState.minute) },
+            ) { Text(stringResource(R.string.common_ok)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
     )
 }
 

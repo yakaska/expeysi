@@ -127,6 +127,8 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
+    <string name="common_on">включено</string>
+    <string name="common_off">выключено</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Отчёты</string>
     <string name="drawer_section_analytics">Аналитика</string>
@@ -143,6 +145,13 @@
     <string name="theme_system">Как в системе</string>
     <string name="theme_light">Светлая</string>
     <string name="theme_dark">Тёмная</string>
+    <string name="drawer_reminder">Напоминание</string>
+    <!-- Напоминание о внесении расходов за сегодня: канал и текст уведомления. -->
+    <string name="reminder_channel_name">Напоминания о расходах</string>
+    <string name="reminder_channel_description">Ежедневное напоминание внести расходы за сегодня</string>
+    <string name="reminder_notification_title">Пора внести расходы за сегодня</string>
+    <string name="reminder_notification_text">Откройте Expeysi и запишите, что потратили за сегодня.</string>
+    <string name="reminder_permission_denied">Уведомления запрещены — напоминание приходить не будет. Разрешите уведомления в настройках системы.</string>
     <string name="history_detail_title_parts">%1$s · %2$s</string>
     <!-- %1$s — количество импортированных операций. -->
     <string name="import_done">Импортировано операций: %1$d</string>
