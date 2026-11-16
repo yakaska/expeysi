@@ -1,6 +1,9 @@
 package com.expeysi.app.ui.home
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Category
@@ -27,6 +32,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.QrCode2
@@ -59,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -68,6 +75,7 @@ import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import androidx.core.os.LocaleListCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -78,6 +86,9 @@ import com.expeysi.app.ui.theme.ThemeViewModel
 
 /** Дисплейный шрифт со стилизацией «под иврит» для имени приложения в шапке drawer. */
 private val SholomFontFamily = FontFamily(Font(R.font.sholom))
+
+/** Страница проекта на GitHub: открывается из блока «О приложении» в drawer. */
+private const val GITHUB_URL = "https://github.com/yakaska/expeysi"
 
 @Composable
 fun HomeNavigationDrawer(
@@ -104,6 +115,9 @@ fun HomeNavigationDrawer(
     var showThemePicker by remember { mutableStateOf(false) }
     var showReminderPicker by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    // Версия приложения — versionName из манифеста (задаётся в defaultConfig);
+    // читается один раз на контекст, элемент без версии просто не показывается.
+    val appVersionName = remember(context) { context.readAppVersionName() }
     val copiedMessage = stringResource(R.string.home_family_code_copied)
     val copyLabel = stringResource(R.string.common_copy)
     val copyToClipboard = rememberClipboardCopy()
@@ -345,6 +359,20 @@ fun HomeNavigationDrawer(
                         ),
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
+                    DrawerSection(stringResource(R.string.drawer_section_about))
+                    appVersionName?.let { version ->
+                        DrawerInfoItem(
+                            label = stringResource(R.string.drawer_about_version, version),
+                            icon = Icons.Filled.Info,
+                        )
+                    }
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_about_github)) },
+                        selected = false,
+                        icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                        onClick = { openGitHubRepository(context) },
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
                 }
             }
         },
@@ -543,3 +571,48 @@ private fun DrawerSection(title: String) {
         modifier = Modifier.padding(horizontal = 28.dp, vertical = 12.dp),
     )
 }
+
+/**
+ * Некликабельная строка drawer для информации без действия (например, версии):
+ * разметка и цвета повторяют NavigationDrawerItem, но без обработки нажатий —
+ * для TalkBack строка читается только текстом.
+ */
+@Composable
+private fun DrawerInfoItem(label: String, icon: ImageVector) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            // Как у NavigationDrawerItem: 12dp — общий для items отступ, 16dp/24dp —
+            // его внутренние отступы для иконки и текста.
+            .padding(start = 28.dp, end = 36.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        // Цвет иконки и текста — как у невыделенных NavigationDrawerItem.
+        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Spacer(Modifier.size(12.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Открывает страницу проекта на GitHub в браузере; без браузера клик игнорируется. */
+private fun openGitHubRepository(context: Context) {
+    val intent = Intent(Intent.ACTION_VIEW, GITHUB_URL.toUri())
+    runCatching { context.startActivity(intent) }
+}
+
+/** Версия приложения из манифеста (versionName); null — если прочитать не удалось. */
+private fun Context.readAppVersionName(): String? = runCatching {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        packageManager
+            .getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+            .versionName
+    } else {
+        @Suppress("DEPRECATION")
+        packageManager.getPackageInfo(packageName, 0).versionName
+    }
+}.getOrNull()

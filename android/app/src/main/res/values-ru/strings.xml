@@ -150,6 +150,10 @@
     <string name="theme_light">Светлая</string>
     <string name="theme_dark">Тёмная</string>
     <string name="drawer_reminder">Напоминание</string>
+    <string name="drawer_section_about">О приложении</string>
+    <!-- %1$s — версия приложения (versionName). -->
+    <string name="drawer_about_version">Версия %1$s</string>
+    <string name="drawer_about_github">Репозиторий на GitHub</string>
     <!-- Напоминание о внесении расходов за сегодня: канал и текст уведомления. -->
     <string name="reminder_channel_name">Напоминания о расходах</string>
     <string name="reminder_channel_description">Ежедневное напоминание внести расходы за сегодня</string>
