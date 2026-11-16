@@ -46,10 +46,9 @@ object Transfers {
      * ([TransactionEntity.feeMinor]); нога зачисления её не несёт, поэтому в
      * свёрнутой паре комиссия считается ровно один раз.
      */
-    fun feesMinor(transactions: List<TransactionEntity>): Long =
-        transactions
-            .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
-            .sumOf { it.feeMinor }
+    fun feesMinor(transactions: List<TransactionEntity>): Long = transactions
+        .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+        .sumOf { it.feeMinor }
 
     /**
      * Достраивает страницу списка: нога, чей партнёр остался за границей страницы

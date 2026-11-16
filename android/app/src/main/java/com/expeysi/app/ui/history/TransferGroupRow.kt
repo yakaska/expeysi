@@ -168,26 +168,25 @@ internal fun TransferGroupChildRow(content: @Composable () -> Unit) {
 }
 
 /** Series totals: sent semi-bold, received (conversion only) regular, muted arrow between. */
-private fun groupTotalsLine(model: TransferGroupModel, arrowColor: Color): AnnotatedString =
-    buildAnnotatedString {
-        withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
-            append(legAmountText(model.totalSentMinor, model.sentCurrencyCode, model.sentSymbol))
+private fun groupTotalsLine(model: TransferGroupModel, arrowColor: Color): AnnotatedString = buildAnnotatedString {
+    withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) {
+        append(legAmountText(model.totalSentMinor, model.sentCurrencyCode, model.sentSymbol))
+    }
+    if (model.conversion) {
+        withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = arrowColor)) {
+            append(" → ")
         }
-        if (model.conversion) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Normal, color = arrowColor)) {
-                append(" → ")
-            }
-            withStyle(SpanStyle(fontWeight = FontWeight.Normal)) {
-                append(
-                    legAmountText(
-                        model.totalReceivedMinor,
-                        model.receivedCurrencyCode,
-                        model.receivedSymbol,
-                    ),
-                )
-            }
+        withStyle(SpanStyle(fontWeight = FontWeight.Normal)) {
+            append(
+                legAmountText(
+                    model.totalReceivedMinor,
+                    model.receivedCurrencyCode,
+                    model.receivedSymbol,
+                ),
+            )
         }
     }
+}
 
 /* ----------------------------------- Previews ----------------------------------- */
 

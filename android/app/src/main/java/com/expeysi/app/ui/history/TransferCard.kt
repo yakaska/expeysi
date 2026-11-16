@@ -306,8 +306,7 @@ internal fun TransferAmountSlot(
 }
 
 /** Leg amount: fraction digits by ISO code, symbol from the currency catalog. */
-internal fun legAmountText(minor: Long, code: String, symbol: String): String =
-    "${Money.formatAmount(minor, code)} $symbol"
+internal fun legAmountText(minor: Long, code: String, symbol: String): String = "${Money.formatAmount(minor, code)} $symbol"
 
 /** Rate from the leg amounts; null when one of the legs has not synced yet. */
 private fun rateQuoteOrNull(card: TransferCard): RateQuote? {
@@ -382,8 +381,8 @@ private val previewTransferDate: Long = LocalDateTime.of(2026, 1, 15, 12, 30)
     .toInstant()
     .toEpochMilli()
 
-private const val previewSourceId = "acc-source"
-private const val previewDestinationId = "acc-dest"
+private const val PREVIEW_SOURCE_ID = "acc-source"
+private const val PREVIEW_DESTINATION_ID = "acc-dest"
 
 private val previewCurrencySymbols = mapOf("RUB" to "₽", "USD" to "$", "VND" to "₫")
 
@@ -410,12 +409,12 @@ internal fun previewTransfer(
         id = id,
         type = if (outLeg) TxType.TRANSFER_OUT.wire else TxType.TRANSFER_IN.wire,
         amountMinor = if (outLeg) sentMinor + feeMinor else receivedMinor,
-        accountId = if (outLeg) previewSourceId else previewDestinationId,
+        accountId = if (outLeg) PREVIEW_SOURCE_ID else PREVIEW_DESTINATION_ID,
         categoryId = "",
         date = previewTransferDate,
         note = note,
         linkedId = "link-$id",
-        counterpartyAccountId = if (outLeg) previewDestinationId else previewSourceId,
+        counterpartyAccountId = if (outLeg) PREVIEW_DESTINATION_ID else PREVIEW_SOURCE_ID,
         feeMinor = if (outLeg) feeMinor else 0,
         updatedAt = 0,
     )
@@ -430,13 +429,13 @@ internal fun previewTransfer(
         counterpartAccountName = destinationName,
         transferCard = TransferCard(
             source = TransferAccount(
-                id = previewSourceId,
+                id = PREVIEW_SOURCE_ID,
                 name = sourceName,
                 iconKey = sourceIcon,
                 colorKey = sourceColorKey,
             ),
             destination = TransferAccount(
-                id = previewDestinationId,
+                id = PREVIEW_DESTINATION_ID,
                 name = destinationName,
                 iconKey = destinationIcon,
                 colorKey = destinationColorKey,
@@ -451,7 +450,7 @@ internal fun previewTransfer(
             ownSide = if (outLeg) TransferSide.SOURCE else TransferSide.DESTINATION,
             date = previewTransferDate,
             note = note,
-            groupKey = "$previewSourceId|$previewDestinationId|$sourceCode|$receivedCode",
+            groupKey = "$PREVIEW_SOURCE_ID|$PREVIEW_DESTINATION_ID|$sourceCode|$receivedCode",
         ),
     )
 }

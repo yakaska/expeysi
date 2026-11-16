@@ -272,13 +272,15 @@ class HomeViewModel @Inject constructor(
                 // Комиссия перевода — реальный расход дня: с ног-списаний
                 // комиссия входит в окно расходов сверх обычных расходов;
                 // у ноги зачисления комиссии нет.
-                (if (type == TxType.EXPENSE) {
-                    balanceTxs
-                        .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
-                        .map { txDayAmount(it, it.feeMinor) }
-                } else {
-                    emptyList()
-                }),
+                (
+                    if (type == TxType.EXPENSE) {
+                        balanceTxs
+                            .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+                            .map { txDayAmount(it, it.feeMinor) }
+                    } else {
+                        emptyList()
+                    }
+                    ),
             todayStart,
         )
 
