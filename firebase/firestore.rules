@@ -14,7 +14,14 @@ service cloud.firestore {
 
     match /families/{familyId} {
       // Создать семью может любой вошедший пользователь (он станет первым членом).
-      allow create: if isSignedIn();
+      // В создаваемом документе требуется поле name: отсекает неявное создание
+      // пустого родителя при записи члена в несуществующую семью — «присоединение»
+      // по несуществующему коду не должно порождать фиктивные семьи.
+      allow create: if isSignedIn() && request.resource.data.name is string;
+      // Проверка кода перед присоединением: вошедший пользователь может убедиться,
+      // что семья существует (только get одного документа; list всех семей —
+      // по-прежнему только для участников).
+      allow get: if isSignedIn();
       allow read, update, delete: if isMember(familyId);
 
       match /members/{uid} {

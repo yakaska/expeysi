@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Translate
@@ -93,6 +94,7 @@ fun HomeNavigationDrawer(
     onExportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
+    onInviteClick: () -> Unit,
     onLeaveFamilyClick: () -> Unit,
     familyCode: String? = null,
     content: @Composable () -> Unit,
@@ -316,6 +318,14 @@ fun HomeNavigationDrawer(
                         selected = false,
                         icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
                         onClick = onAccountsClick,
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                    )
+                    DrawerSection(stringResource(R.string.drawer_section_family))
+                    NavigationDrawerItem(
+                        label = { Text(stringResource(R.string.drawer_invite)) },
+                        selected = false,
+                        icon = { Icon(Icons.Filled.QrCode2, contentDescription = null) },
+                        onClick = onInviteClick,
                         modifier = Modifier.padding(horizontal = 12.dp),
                     )
                     NavigationDrawerItem(

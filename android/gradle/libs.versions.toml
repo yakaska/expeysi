@@ -19,6 +19,8 @@ androidxTestCore = "1.7.0"
 googleServices = "4.4.3"
 firebaseBom = "34.4.0"
 playServicesAuth = "21.4.0"
+playServicesCodeScanner = "16.1.0"
+zxingCore = "3.5.4"
 coroutinesPlayServices = "1.10.2"
 ktlint = "14.2.0"
 
@@ -56,6 +58,8 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
+play-services-code-scanner = { group = "com.google.android.gms", name = "play-services-code-scanner", version.ref = "playServicesCodeScanner" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxingCore" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesPlayServices" }
 

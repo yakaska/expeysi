@@ -39,6 +39,7 @@ import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.export.ExportScreen
 import com.expeysi.app.ui.family.FamilyScreen
+import com.expeysi.app.ui.family.InviteScreen
 import com.expeysi.app.ui.history.HistoryScreen
 import com.expeysi.app.ui.home.HomeNavigationDrawer
 import com.expeysi.app.ui.home.HomeScreen
@@ -52,6 +53,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // expeysi://join?code=КОД — предзаполняем поле кода на экране онбординга;
+        // отправка только вручную. Открывается и через сканирование QR-кода.
+        val deepLinkCode = intent?.data
+            ?.takeIf { it.scheme == "expeysi" && it.host == "join" }
+            ?.getQueryParameter("code")
         setContent {
             ExpeysiTheme {
                 val sessionViewModel: SessionViewModel = hiltViewModel()
@@ -59,7 +65,7 @@ class MainActivity : AppCompatActivity() {
                 val familyId by sessionViewModel.familyId.collectAsStateWithLifecycle()
                 when {
                     !isSignedIn -> AuthScreen()
-                    familyId == null -> FamilyScreen()
+                    familyId == null -> FamilyScreen(initialCode = deepLinkCode)
                     else -> AppNavigation()
                 }
             }
@@ -178,6 +184,12 @@ private fun AppNavigation() {
                 navController.navigate("accounts")
             }
         },
+        onInviteClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("family-invite")
+            }
+        },
         onLeaveFamilyClick = homeViewModel::leaveFamily,
         familyCode = homeUiState.familyId,
     ) {
@@ -284,6 +296,12 @@ private fun AppNavigation() {
             }
             composable("data-export") {
                 ExportScreen(onBack = { navigateBack() })
+            }
+            composable("family-invite") {
+                InviteScreen(
+                    onBack = { navigateBack() },
+                    familyCode = homeUiState.familyId.orEmpty(),
+                )
             }
             composable(
                 route = "add?type={type}",

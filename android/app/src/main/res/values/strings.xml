@@ -13,7 +13,10 @@
     <string name="family_join_title">Join a family</string>
     <string name="family_join_description">Enter the invitation code from another family member.</string>
     <string name="family_code_label">Family code</string>
-    <string name="family_paste">Paste</string>
+    <string name="family_paste">Paste code</string>
+    <string name="family_scan_qr">Scan QR code</string>
+    <!-- Код — 20-символьный Firestore-ID (см. docs/data-model.md): буквы и цифры, регистр важен. -->
+    <string name="family_code_hint">20 characters: letters and digits (spaces and dashes are ignored)</string>
     <string name="family_join_action">Join</string>
     <string name="home_select_balance">Select balance</string>
     <string name="home_edit_balance">Edit balance…</string>
@@ -59,7 +62,7 @@
     <string name="common_back">Back</string>
     <string name="drawer_category_comparison">Category comparison</string>
     <string name="drawer_expenses_report">Expenses</string>
-    <string name="drawer_incomes_report">Income</string>
+    <string name="drawer_incomes_report">Incomes</string>
     <string name="drawer_transfers_report">Transfers</string>
     <string name="drawer_data_export">Export</string>
     <string name="drawer_data_import">Import</string>
@@ -135,6 +138,8 @@
     <string name="drawer_section_reports">Reports</string>
     <string name="drawer_section_analytics">Analytics</string>
     <string name="drawer_section_data">Data</string>
+    <string name="drawer_section_family">Family</string>
+    <string name="drawer_invite">Invite</string>
     <string name="drawer_section_misc">Miscellaneous</string>
     <string name="drawer_section_interface">Interface settings</string>
     <string name="drawer_home">Home</string>
@@ -201,6 +206,16 @@
     <string name="family_error_connect">Couldn’t set up the family</string>
     <string name="family_error_not_signed_in">The user isn’t signed in</string>
     <string name="family_error_empty_code">Enter the family code</string>
+    <string name="family_error_invalid_format">Doesn\'t look like a family code. Check the code and try again.</string>
+    <string name="family_error_not_found">Code not found. Check it and try again.</string>
+    <string name="family_error_expired">This code has expired. Ask for a new one.</string>
+    <string name="family_error_no_connection">No connection. Check your network and retry.</string>
+    <string name="family_error_check_failed">Couldn\'t verify the code. Try again.</string>
+    <string name="family_error_unknown">Something went wrong. Try again.</string>
+    <string name="invite_title">Invite to family</string>
+    <!-- QR-код содержит deep link expeysi://join?code=... (см. FamilyCode.joinLink). -->
+    <string name="invite_qr_hint">Ask your family member to scan this code in Expeysi, or copy the code below.</string>
+    <string name="invite_qr_cd">QR code for joining the family</string>
     <!-- %1$d — номер строки CSV. -->
     <string name="add_delete_title">Delete transaction?</string>
     <string name="add_delete_text">The record will disappear from the list and will no longer affect the balance.</string>
