@@ -5,6 +5,8 @@ import androidx.room.withTransaction
 import com.expeysi.app.data.db.AppDatabase
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Source
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
@@ -38,6 +40,23 @@ class FamilyRepository @Inject constructor(
         val uid = checkSignedIn()
         val familyId = code.trim()
         if (familyId.isEmpty()) throw FamilyCodeEmptyException()
+        // Сначала проверяем существование семьи: запись члена в несуществующую
+        // семью неявно создала бы родительский документ, и «любая строка
+        // подходящего формата» присоединялась бы к фиктивной семье.
+        // Source.SERVER: офлайн-кэш не подмешивается — без сети будет ошибка
+        // соединения, а не ложное «код не найден».
+        val family = try {
+            firestore.collection("families").document(familyId)
+                .get(Source.SERVER)
+                .await()
+        } catch (e: Exception) {
+            if (e is CancellationException) throw e
+            // Сбой самой проверки (правила не дают get, проблемы сервера) —
+            // отдельная ошибка: причина внутри, чтобы не путать её с
+            // «код не найден».
+            throw FamilyCodeCheckException(e)
+        }
+        if (!family.exists()) throw FamilyNotFoundException()
         firestore.collection("families").document(familyId)
             .collection("members").document(uid)
             .set(memberData(uid))
@@ -104,3 +123,13 @@ private const val MEMBER_DELETE_TIMEOUT_MILLIS = 10_000L
 
 /** Вызован вход в семью с пустым кодом; текст показа резолвится в UI-слое. */
 class FamilyCodeEmptyException : Exception()
+
+/** Семья с таким кодом не найдена (проверка перед присоединением); текст показа резолвится в UI-слое. */
+class FamilyNotFoundException : Exception()
+
+/**
+ * Сам запрос проверки семьи не удался (правила не дают get, проблемы сервера);
+ * причина внутри для разбора в UI-слое. Не путать с FamilyNotFoundException:
+ * это «не удалось проверить», а не «код не найден».
+ */
+class FamilyCodeCheckException(cause: Throwable) : Exception(cause)
