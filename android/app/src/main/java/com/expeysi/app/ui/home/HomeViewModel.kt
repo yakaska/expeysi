@@ -17,9 +17,13 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
+import com.expeysi.app.data.importer.AccountKey
 import com.expeysi.app.data.importer.BudgetImportError
 import com.expeysi.app.data.importer.BudgetImportException
 import com.expeysi.app.data.importer.BudgetImportService
+import com.expeysi.app.data.importer.BudgetTransaction
+import com.expeysi.app.data.importer.accountNets
+import com.expeysi.app.data.importer.openingFromCurrent
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.Transfers
@@ -125,6 +129,20 @@ data class ImportUiState(
     val message: UiText? = null,
 )
 
+/** Одна строка экрана остатков импорта: счёт файла и нетто его операций. */
+data class ImportBalanceRow(
+    val accountName: String,
+    val currencyCode: String,
+    val balanceName: String?,
+    val netMinor: Long,
+)
+
+data class ImportBalancesUiState(
+    val visible: Boolean = false,
+    val inProgress: Boolean = false,
+    val rows: List<ImportBalanceRow> = emptyList(),
+)
+
 data class LeaveFamilyUiState(
     val inProgress: Boolean = false,
     val failed: Boolean = false,
@@ -171,6 +189,11 @@ class HomeViewModel @Inject constructor(
     private val zone: ZoneId = ZoneId.systemDefault()
     private val _importState = MutableStateFlow(ImportUiState())
     val importState: StateFlow<ImportUiState> = _importState.asStateFlow()
+    private val _importBalancesState = MutableStateFlow(ImportBalancesUiState())
+    val importBalancesState: StateFlow<ImportBalancesUiState> = _importBalancesState.asStateFlow()
+
+    /** Разобранный файл, ждущий подтверждения остатков на экране импорта. */
+    private var pendingImport: BudgetImportService.ImportPreview? = null
     private val _leaveState = MutableStateFlow(LeaveFamilyUiState())
     val leaveState: StateFlow<LeaveFamilyUiState> = _leaveState.asStateFlow()
 
@@ -272,13 +295,15 @@ class HomeViewModel @Inject constructor(
                 // Комиссия перевода — реальный расход дня: с ног-списаний
                 // комиссия входит в окно расходов сверх обычных расходов;
                 // у ноги зачисления комиссии нет.
-                (if (type == TxType.EXPENSE) {
-                    balanceTxs
-                        .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
-                        .map { txDayAmount(it, it.feeMinor) }
-                } else {
-                    emptyList()
-                }),
+                (
+                    if (type == TxType.EXPENSE) {
+                        balanceTxs
+                            .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
+                            .map { txDayAmount(it, it.feeMinor) }
+                    } else {
+                        emptyList()
+                    }
+                    ),
             todayStart,
         )
 
@@ -349,26 +374,93 @@ class HomeViewModel @Inject constructor(
         savedStateHandle[KEY_PERIOD_DAYS] = days
     }
 
+    /**
+     * Файл импорта: сначала разбирается без записи. Внешняя таблица открывает
+     * экран остатков («сколько на счете сейчас» — файла их не содержит),
+     * файл «Бюджета» записывается сразу — его остатки лежат в строках файла.
+     */
     fun importBudget(input: InputStream?) {
-        if (_importState.value.inProgress) return
+        if (_importState.value.inProgress || _importBalancesState.value.inProgress) return
         if (input == null) {
             _importState.update { it.copy(message = UiText.Res(R.string.import_error_open)) }
             return
         }
         viewModelScope.launch {
             _importState.update { it.copy(inProgress = true, message = null) }
-            val message = try {
-                val result = withContext(Dispatchers.IO) { budgetImportService.import(input) }
-                UiText.Res(R.string.import_done, result.transactionCount)
-            } catch (e: BudgetImportException) {
-                budgetImportMessage(e)
-            } catch (e: Exception) {
-                UiText.Res(R.string.import_error_generic)
-            } finally {
-                _importState.update { it.copy(inProgress = false) }
+            val preview = runCatching { withContext(Dispatchers.IO) { budgetImportService.parse(input) } }
+                .onFailure { throwable ->
+                    _importState.update {
+                        it.copy(
+                            inProgress = false,
+                            message = (throwable as? BudgetImportException)?.let(::budgetImportMessage)
+                                ?: UiText.Res(R.string.import_error_generic),
+                        )
+                    }
+                }
+                .getOrNull() ?: return@launch
+            _importState.update { it.copy(inProgress = false) }
+            if (preview.sheetFormat) {
+                pendingImport = preview
+                _importBalancesState.update {
+                    ImportBalancesUiState(visible = true, rows = importBalanceRows(preview.items))
+                }
+            } else {
+                runImport(preview.items, emptyMap())
             }
-            _importState.update { it.copy(message = message) }
         }
+    }
+
+    /**
+     * Подтверждение остатков с экрана: каждое введенное «сколько сейчас»
+     * превращается в первоначальный остаток счета — разницу между введенным
+     * и нетто операций файла. Пустые поля счета импорта не задают.
+     */
+    fun confirmImportBalances(filled: Map<Int, Long>) {
+        val state = _importBalancesState.value
+        if (!state.visible || state.inProgress) return
+        val pending = pendingImport ?: return
+        val overrides = state.rows.mapIndexedNotNull { index, row ->
+            filled[index]?.let { current ->
+                AccountKey(row.accountName, row.currencyCode, row.balanceName) to
+                    openingFromCurrent(current, row.netMinor)
+            }
+        }.toMap()
+        viewModelScope.launch {
+            _importBalancesState.update { it.copy(inProgress = true) }
+            runImport(pending.items, overrides)
+            pendingImport = null
+            _importBalancesState.value = ImportBalancesUiState()
+        }
+    }
+
+    /** Экран остатков закрыт без импорта: разобранные строки забываются. */
+    fun dismissImportBalances() {
+        pendingImport = null
+        _importBalancesState.value = ImportBalancesUiState()
+    }
+
+    private fun importBalanceRows(items: List<BudgetTransaction>): List<ImportBalanceRow> = accountNets(items).map { (key, net) ->
+        ImportBalanceRow(
+            accountName = key.name,
+            currencyCode = key.currency,
+            balanceName = key.balanceName,
+            netMinor = net,
+        )
+    }
+
+    private suspend fun runImport(items: List<BudgetTransaction>, overrides: Map<AccountKey, Long>) {
+        _importState.update { it.copy(inProgress = true, message = null) }
+        val message = try {
+            val result = withContext(Dispatchers.IO) { budgetImportService.importParsed(items, overrides) }
+            UiText.Res(R.string.import_done, result.transactionCount)
+        } catch (e: BudgetImportException) {
+            budgetImportMessage(e)
+        } catch (e: Exception) {
+            UiText.Res(R.string.import_error_generic)
+        } finally {
+            _importState.update { it.copy(inProgress = false) }
+        }
+        _importState.update { it.copy(message = message) }
     }
 
     /** Ошибка разбора CSV → текст для показа; строка CSV подставляется аргументом. */

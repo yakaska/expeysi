@@ -15,9 +15,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.expeysi.app.R
+import com.expeysi.app.ui.home.TransferAccount
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
-import com.expeysi.app.ui.home.TransferAccount
 
 /**
  * Аватар счёта в карточках переводов: тональный круг с иконкой счёта, без

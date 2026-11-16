@@ -44,6 +44,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DrawerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
@@ -57,6 +58,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,6 +75,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.net.toUri
@@ -167,212 +170,226 @@ fun HomeNavigationDrawer(
     ModalNavigationDrawer(
         drawerState = drawerState,
         drawerContent = {
-            ModalDrawerSheet(modifier = Modifier.fillMaxWidth(2f / 3f)) {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RectangleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+            // 3/4 ширины окна: узже Material-дефолта, но с запасом на самый длинный
+            // пункт («Напоминание» рядом со Switch-бейджем) и увеличенный шрифт.
+            ModalDrawerSheet(modifier = Modifier.fillMaxWidth(3f / 4f)) {
+                // Подписи пунктов — bodyMedium (14sp): подпись самого длинного пункта
+                // («Напоминание» рядом со Switch-бейджем) влезает в шторку даже на
+                // Samsung, где One UI-шрифт шире Roboto. Заголовок шапки и секций
+                // задаёт стиль явно, поэтому остаётся как был.
+                CompositionLocalProvider(LocalTextStyle provides MaterialTheme.typography.bodyMedium) {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RectangleShape,
+                            color = MaterialTheme.colorScheme.primaryContainer,
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.expeysi_icon),
-                                contentDescription = null,
-                                modifier = Modifier
-                                    .size(72.dp)
-                                    .clip(CircleShape),
-                            )
-                            Spacer(Modifier.size(12.dp))
-                            Column {
-                                Text(
-                                    stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.headlineSmall
-                                        .copy(fontFamily = SholomFontFamily),
+                            Row(
+                                modifier = Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.expeysi_icon),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(CircleShape),
                                 )
-                                familyCode?.let { code ->
+                                Spacer(Modifier.size(12.dp))
+                                Column {
                                     Text(
-                                        stringResource(R.string.home_family_code, code),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.clickable(
-                                            onClickLabel = copyLabel,
-                                        ) {
-                                            copyToClipboard("family code", code)
-                                            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
-                                        },
+                                        stringResource(R.string.app_name),
+                                        style = MaterialTheme.typography.headlineSmall
+                                            .copy(fontFamily = SholomFontFamily),
                                     )
+                                    familyCode?.let { code ->
+                                        Text(
+                                            stringResource(R.string.home_family_code, code),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.clickable(
+                                                onClickLabel = copyLabel,
+                                            ) {
+                                                copyToClipboard("family code", code)
+                                                Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+                                            },
+                                        )
+                                    }
                                 }
                             }
                         }
-                    }
-                    DrawerSection(stringResource(R.string.drawer_section_reports))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_home)) },
-                        selected = true,
-                        icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-                        onClick = onHomeClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_expenses_report)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
-                        onClick = onExpensesReportClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_incomes_report)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
-                        onClick = onIncomesReportClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_transfers_report)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null) },
-                        onClick = onTransfersReportClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_analytics))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.analysis_title)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.PieChart, contentDescription = null) },
-                        onClick = onAnalysisClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_category_comparison)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.CompareArrows, contentDescription = null) },
-                        onClick = onCategoryComparisonClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_data))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_data_export)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.FileDownload, contentDescription = null) },
-                        onClick = onExportClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_data_import)) },
-                        selected = false,
-                        icon = {
-                            if (importing) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            } else {
-                                Icon(Icons.Filled.FileUpload, contentDescription = null)
-                            }
-                        },
-                        onClick = { if (!importing) onImportClick() },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_interface))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_language)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.Translate, contentDescription = null) },
-                        onClick = { showLanguagePicker = true },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_theme)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
-                        onClick = { showThemePicker = true },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = {
-                            // Время выбранного напоминания второй строкой: supporting-текста
-                            // у NavigationDrawerItem в этой версии material3 нет. Время
-                            // показывается в формате устройства (12/24-hour).
-                            Column {
-                                Text(stringResource(R.string.drawer_reminder))
-                                Text(
-                                    reminderTimeLabel,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        DrawerSection(stringResource(R.string.drawer_section_reports))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_home)) },
+                            selected = true,
+                            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                            onClick = onHomeClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_expenses_report)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.ReceiptLong, contentDescription = null) },
+                            onClick = onExpensesReportClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_incomes_report)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.Payments, contentDescription = null) },
+                            onClick = onIncomesReportClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_transfers_report)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null) },
+                            onClick = onTransfersReportClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_analytics))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.analysis_title)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.PieChart, contentDescription = null) },
+                            onClick = onAnalysisClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_category_comparison)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.CompareArrows, contentDescription = null) },
+                            onClick = onCategoryComparisonClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_data))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_data_export)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.FileDownload, contentDescription = null) },
+                            onClick = onExportClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_data_import)) },
+                            selected = false,
+                            icon = {
+                                if (importing) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                } else {
+                                    Icon(Icons.Filled.FileUpload, contentDescription = null)
+                                }
+                            },
+                            onClick = { if (!importing) onImportClick() },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_interface))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_language)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.Translate, contentDescription = null) },
+                            onClick = { showLanguagePicker = true },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_theme)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.DarkMode, contentDescription = null) },
+                            onClick = { showThemePicker = true },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = {
+                                // Время выбранного напоминания второй строкой: supporting-текста
+                                // у NavigationDrawerItem в этой версии material3 нет. Время
+                                // показывается в формате устройства (12/24-hour).
+                                Column {
+                                    Text(
+                                        stringResource(R.string.drawer_reminder),
+                                        maxLines = 1,
+                                        // Многоточие вместо разрыва слова на экстремальных
+                                        // масштабах шрифта; при обычных — не видно.
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Text(
+                                        reminderTimeLabel,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.Alarm, contentDescription = null) },
+                            onClick = { showReminderPicker = true },
+                            badge = {
+                                Switch(
+                                    checked = reminderState.enabled,
+                                    onCheckedChange = onReminderToggle,
+                                    modifier = Modifier.semantics {
+                                        // Строка целиком читается TalkBack как «Напоминание,
+                                        // <время>, включено/выключено». Клик по строке остаётся
+                                        // открытием выбора времени, тоглер-toggle — действием
+                                        // самого Switch.
+                                        stateDescription = reminderToggleStateDescription
+                                    },
                                 )
-                            }
-                        },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.Alarm, contentDescription = null) },
-                        onClick = { showReminderPicker = true },
-                        badge = {
-                            Switch(
-                                checked = reminderState.enabled,
-                                onCheckedChange = onReminderToggle,
-                                modifier = Modifier.semantics {
-                                    // Строка целиком читается TalkBack как «Напоминание,
-                                    // <время>, включено/выключено». Клик по строке остаётся
-                                    // открытием выбора времени, тоглер-toggle — действием
-                                    // самого Switch.
-                                    stateDescription = reminderToggleStateDescription
-                                },
+                            },
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_misc))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.history_mode_categories)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.Category, contentDescription = null) },
+                            onClick = onCategoriesClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.home_accounts)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
+                            onClick = onAccountsClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_family))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_invite)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.QrCode2, contentDescription = null) },
+                            onClick = onInviteClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.family_leave_action)) },
+                            selected = false,
+                            icon = {
+                                if (leavingFamily) {
+                                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                                } else {
+                                    Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
+                                }
+                            },
+                            onClick = { if (!leavingFamily) showLeaveConfirmation = true },
+                            colors = NavigationDrawerItemDefaults.colors(
+                                unselectedTextColor = MaterialTheme.colorScheme.error,
+                                unselectedIconColor = MaterialTheme.colorScheme.error,
+                            ),
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
+                        DrawerSection(stringResource(R.string.drawer_section_about))
+                        appVersionName?.let { version ->
+                            DrawerInfoItem(
+                                label = stringResource(R.string.drawer_about_version, version),
+                                icon = Icons.Filled.Info,
                             )
-                        },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_misc))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.history_mode_categories)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.Category, contentDescription = null) },
-                        onClick = onCategoriesClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.home_accounts)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.AccountBalanceWallet, contentDescription = null) },
-                        onClick = onAccountsClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_family))
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_invite)) },
-                        selected = false,
-                        icon = { Icon(Icons.Filled.QrCode2, contentDescription = null) },
-                        onClick = onInviteClick,
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.family_leave_action)) },
-                        selected = false,
-                        icon = {
-                            if (leavingFamily) {
-                                CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                            } else {
-                                Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
-                            }
-                        },
-                        onClick = { if (!leavingFamily) showLeaveConfirmation = true },
-                        colors = NavigationDrawerItemDefaults.colors(
-                            unselectedTextColor = MaterialTheme.colorScheme.error,
-                            unselectedIconColor = MaterialTheme.colorScheme.error,
-                        ),
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
-                    DrawerSection(stringResource(R.string.drawer_section_about))
-                    appVersionName?.let { version ->
-                        DrawerInfoItem(
-                            label = stringResource(R.string.drawer_about_version, version),
-                            icon = Icons.Filled.Info,
+                        }
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.drawer_about_github)) },
+                            selected = false,
+                            icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
+                            onClick = { openGitHubRepository(context) },
+                            modifier = Modifier.padding(horizontal = 12.dp),
                         )
                     }
-                    NavigationDrawerItem(
-                        label = { Text(stringResource(R.string.drawer_about_github)) },
-                        selected = false,
-                        icon = { Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null) },
-                        onClick = { openGitHubRepository(context) },
-                        modifier = Modifier.padding(horizontal = 12.dp),
-                    )
                 }
             }
         },
@@ -593,7 +610,7 @@ private fun DrawerInfoItem(label: String, icon: ImageVector) {
         Spacer(Modifier.size(12.dp))
         Text(
             label,
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

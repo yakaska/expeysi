@@ -182,6 +182,12 @@
     <string name="import_error_amount_too_large">Line %1$d: the amount is too large or has more than two decimal places</string>
     <string name="import_error_bad_date">Line %1$d: invalid date or time</string>
     <string name="import_error_unclosed_quote">Line %1$d: unclosed quote</string>
+    <!-- %1$s — нетто операций файла по счету, показано в поле остатков. -->
+    <string name="import_balances_file_net">From file operations: %1$s</string>
+    <string name="import_balances_title">Account balances</string>
+    <string name="import_balances_description">The import file has no opening balances. Enter how much is on each account now — the import turns it into the account balance. Empty field: the balance is counted from the file operations only.</string>
+    <string name="import_balances_field_hint">Amount now</string>
+    <string name="import_balances_import">Import</string>
     <!-- Экспорт CSV: файл возвращается в приложение через «Импорт». -->
     <string name="export_button">Export to CSV</string>
     <string name="export_description">Select transaction types to export. Account balances are always exported.</string>

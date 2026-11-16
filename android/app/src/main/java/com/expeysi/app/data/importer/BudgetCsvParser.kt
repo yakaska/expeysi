@@ -37,9 +37,12 @@ data class BudgetTransaction(
 class BudgetCsvParser @Inject constructor() {
     private val zone: ZoneId = ZoneId.systemDefault()
 
-    fun parse(input: InputStream): List<BudgetTransaction> {
-        val text = input.bufferedReader(Charsets.UTF_8).use { it.readText() }.removePrefix("\uFEFF")
-        val rows = parseRows(text, detectDelimiter(text)).filter { row -> row.values.any { it.isNotBlank() } }
+    fun parse(input: InputStream): List<BudgetTransaction> = parseText(
+        input.bufferedReader(Charsets.UTF_8).use { it.readText() },
+    )
+
+    fun parseText(text: String): List<BudgetTransaction> {
+        val rows = parseCsvRows(text, detectCsvDelimiter(text)).filter { row -> row.values.any { it.isNotBlank() } }
         if (rows.isEmpty()) throw BudgetImportException(BudgetImportError.EMPTY_FILE)
 
         val header = rows.first().values.mapIndexed { index, name -> name.trim() to index }.toMap()
@@ -143,63 +146,6 @@ class BudgetCsvParser @Inject constructor() {
             feeMinor = feeMinor,
         )
     }
-
-    /**
-     * Разделитель опознаётся по заголовочной строке: где встречается чаще — тот и
-     * разделитель. Запятые файлы пишут Excel; имена колонок не содержат ни запятых,
-     * ни точек с запятой, поэтому подсчёт однозначен.
-     */
-    private fun detectDelimiter(text: String): Char {
-        val head = text.substringBefore('\n', "").ifEmpty { text }
-        return if (head.count { it == ',' } > head.count { it == ';' }) ',' else ';'
-    }
-
-    private fun parseRows(text: String, delimiter: Char): List<CsvRow> {
-        val rows = mutableListOf<CsvRow>()
-        var row = mutableListOf<String>()
-        var field = StringBuilder()
-        var line = 1
-        var rowLine = 1
-        var inQuotes = false
-        var index = 0
-
-        fun endField() {
-            row.add(field.toString())
-            field = StringBuilder()
-        }
-
-        fun endRow() {
-            endField()
-            rows.add(CsvRow(row, rowLine))
-            row = mutableListOf()
-            rowLine = line + 1
-        }
-
-        while (index < text.length) {
-            val char = text[index]
-            when {
-                inQuotes && char == '"' && text.getOrNull(index + 1) == '"' -> {
-                    field.append('"')
-                    index++
-                }
-                char == '"' -> inQuotes = !inQuotes
-                !inQuotes && char == delimiter -> endField()
-                !inQuotes && (char == '\n' || char == '\r') -> {
-                    endRow()
-                    if (char == '\r' && text.getOrNull(index + 1) == '\n') index++
-                    line++
-                    rowLine = line
-                }
-                else -> field.append(char)
-            }
-            index++
-        }
-        if (inQuotes) throw BudgetImportException(BudgetImportError.UNCLOSED_QUOTE, line = rowLine)
-        if (field.isNotEmpty() || row.isNotEmpty()) endRow()
-        return rows
-    }
-
-    private data class CsvRow(val values: List<String>, val line: Int)
 
     private companion object {
         val CURRENCY_REGEX = Regex("[A-Z]{3}")

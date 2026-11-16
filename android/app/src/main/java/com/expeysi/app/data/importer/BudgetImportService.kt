@@ -26,13 +26,46 @@ data class BudgetImportResult(
 class BudgetImportService @Inject constructor(
     private val database: AppDatabase,
     private val parser: BudgetCsvParser,
+    private val sheetCsvParser: SheetCsvParser,
     private val syncEngine: SyncEngine,
     private val selectedBalanceStore: SelectedBalanceStore,
 ) {
-    suspend fun import(input: InputStream): BudgetImportResult {
-        val imported = parser.parse(input)
+    /**
+     * Разбирает файл без записи в базу: содержимое и счета файла нужны
+     * экрану остатков внешней таблицы. Формат распознаётся по заголовку —
+     * «ID» первой колонкой даёт внешнюю таблицу, остальное «Бюджет».
+     */
+    internal fun parse(input: InputStream): ImportPreview {
+        val content = input.bufferedReader(Charsets.UTF_8).use { it.readText() }.removePrefix("\uFEFF")
+        return when {
+            SheetCsvParser.canParse(content) -> ImportPreview(sheetCsvParser.parseText(content), sheetFormat = true)
+            else -> ImportPreview(parser.parseText(content), sheetFormat = false)
+        }
+    }
+
+    /** Разобранный файл: строки и признак внешней таблицы (у неё нет остатков в файле). */
+    internal data class ImportPreview(
+        val items: List<BudgetTransaction>,
+        val sheetFormat: Boolean,
+    )
+
+    /**
+     * Записывает разобранный файл в базу общим потоком (балансы, счета,
+     * категории, операции), как и импорт из потока. [openingOverrides] —
+     * остатки со экрана внешней таблицы «сколько на счете сейчас»: счет
+     * начнется с разницы введенного и нетто операций файла; значение перекрывает
+     * служебную строку остатка самого файла.
+     */
+    internal suspend fun importParsed(
+        items: List<BudgetTransaction>,
+        openingOverrides: Map<AccountKey, Long> = emptyMap(),
+    ): BudgetImportResult {
+        val imported = items
         val now = nowMillis()
-        val (openingByKey, operations) = splitOpeningRows(imported)
+        val (fileOpeningByKey, operations) = splitOpeningRows(imported)
+        // Остаток с экрана «сколько на счете сейчас» точнее строки файла:
+        // введенное значение перекрывает служебную строку остатка.
+        val openingByKey = fileOpeningByKey + openingOverrides
         // Импорт аддитивен: балансы и счета всегда создаются новыми, а текущие
         // не изменяются. Активные имена нужны лишь для нумерации копий балансов.
         val activeBalanceNames = database.balanceDao().observeAll().first()
@@ -82,8 +115,9 @@ class BudgetImportService @Inject constructor(
                     updatedAt = now,
                 ).also(newCategories::add)
             }
-            // Явные иконка и цвет в строке — признак файла экспорта Expeysi:
-            // его round-trip обязан вернуть оформление даже существующим категориям.
+            // Явные иконка и цвет в строке — признак файла экспорта Expeysi
+            // и внешней таблицы: его round-trip обязан вернуть оформление
+            // даже существующим категориям.
             restyledCategory(category, item, now)?.let { updated ->
                 categoryByName[categoryKey] = updated
                 recoloredCategories[updated.id] = updated
@@ -131,10 +165,10 @@ class BudgetImportService @Inject constructor(
 
 /**
  * Перекрашивает существующую категорию явными иконкой и цветом из строки файла.
- * Непустые значения есть только у файлов экспорта Expeysi: их round-trip обязан
- * вернуть оформление, в том числе сущностям, уже пришедшим из синхронизации.
- * Файлы внешнего «Бюджета» таких колонок не пишут — оформление не трогается.
- * null — менять нечего.
+ * Непустые значения есть только у файлов экспорта Expeysi и внешней таблицы:
+ * их импорт обязан вернуть оформление, в том числе сущностям, уже пришедшим
+ * из синхронизации. Файлы внешнего «Бюджета» таких колонок не пишут —
+ * оформление не трогается. null — менять нечего.
  */
 internal fun restyledCategory(
     existing: CategoryEntity,
@@ -234,6 +268,29 @@ internal fun splitOpeningRows(items: List<BudgetTransaction>): Pair<Map<AccountK
     return opening to operations
 }
 
+/**
+ * Нетто операций файла по счетам: приходы минус расходы, служебные строки
+ * начального остатка не считаются (они уходят в opening как есть). Для
+ * экрана остатков: введенный «сколько на счете сейчас» превращается в
+ * первоначальный остаток импорта формулой [openingFromCurrent].
+ */
+internal fun accountNets(items: List<BudgetTransaction>): Map<AccountKey, Long> {
+    val nets = mutableMapOf<AccountKey, Long>()
+    splitOpeningRows(items).second.forEach { item ->
+        val key = item.accountKey()
+        val sign = if (item.type == TxType.EXPENSE) -1L else 1L
+        nets[key] = (nets[key] ?: 0L) + sign * item.amountMinor
+    }
+    return nets
+}
+
+/**
+ * «Сколько на счете сейчас» → первоначальный остаток импорта: показывать
+ * сумму введенную означает начать счет с разницы между ней и нетто
+ * операций файла.
+ */
+internal fun openingFromCurrent(currentMinor: Long, netMinor: Long): Long = currentMinor - netMinor
+
 /** Ключ баланса CSV-файла: без названия — автосозданный «Бюджет (валюта)». */
 internal data class BalanceKey(val name: String?, val currency: String)
 
@@ -316,8 +373,8 @@ internal fun resolveBalances(
  * и не переиспользует существующие счета. Валюта резервируется из колонки
  * файла, а не из БД. Один счёт на тройку (имя, валюта, баланс): одноимённые
  * счета разных балансов не сливаются. Начальный остаток берётся из служебной
- * строки «Начальный остаток» (последняя побеждает), оформление — из первой
- * строки ключа.
+ * строки «Начальный остаток» (последняя побеждает); введенный на экране
+ * остатков импорта перекрывает строку файла. Оформление — из первой строки ключа.
  */
 internal fun resolveAccounts(
     items: List<BudgetTransaction>,
