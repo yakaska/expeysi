@@ -447,11 +447,18 @@ private fun TransactionList(
                             HistoryRow(
                                 item = entry.item,
                                 accountId = accountId,
-                                onClick = {
-                                    onItemClick(
-                                        entry.item.transaction.id,
-                                        TxType.fromWire(entry.item.transaction.type).isDebt,
-                                    )
+                                // Псевдо-строка учтённого списания не кликабельна:
+                                // записи в БД за ней нет, а маршрут правки
+                                // операции открыл бы несуществующую запись.
+                                onClick = if (entry.item.isWriteOffEntry) {
+                                    null
+                                } else {
+                                    {
+                                        onItemClick(
+                                            entry.item.transaction.id,
+                                            TxType.fromWire(entry.item.transaction.type).isDebt,
+                                        )
+                                    }
                                 },
                             )
                         }

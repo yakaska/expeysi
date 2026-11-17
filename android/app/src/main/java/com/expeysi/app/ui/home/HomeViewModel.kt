@@ -342,8 +342,12 @@ class HomeViewModel @Inject constructor(
                 // шапки дней учитывают их — число должно быть объяснимо.
                 refs.writeOffs.map { FeedEntries.writeOffItem(it, symbol) }
             // Единая хронология по убыванию даты: операции и строки списаний
-            // смешиваются в один поток ленты.
-            items.sortedByDescending { it.transaction.date } to (transactions.size >= limit)
+            // смешиваются в один поток ленты. При равной дате порядок задаёт
+            // updatedAt — не полагаемся на порядок DAO у добранных строк.
+            items.sortedWith(
+                compareByDescending<TransactionItem> { it.transaction.date }
+                    .thenByDescending { it.transaction.updatedAt },
+            ) to (transactions.size >= limit)
         }
     }
 

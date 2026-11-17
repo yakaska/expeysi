@@ -37,7 +37,7 @@ object ProfitAndLoss {
         todayStartMillis: Long,
         zone: ZoneId,
     ): Sums {
-        val scoped = transactions.filter { it.accountId in accountIds }
+        val scoped = transactions.filter { !it.deleted && it.accountId in accountIds }
         fun dayStart(millis: Long): Long = Periods.day(Instant.ofEpochMilli(millis).atZone(zone).toLocalDate(), zone).startMillis
 
         // Комиссия перевода — реальная потеря денег семьи: входит в окно
@@ -47,8 +47,16 @@ object ProfitAndLoss {
             .map { TxDayAmount(it.feeMinor, dayStart(it.date)) }
         // Списание «в отчётах» — безналичный плюс/минус: плюс — доход,
         // минус — расход того дня, когда корректировка сделана.
+        // Только списания: у начального остатка счётчик в отчётах всегда
+        // выключен формой, но синк мог принести запись и с ним — в доходы
+        // и расходы попадают лишь WRITE_OFF (как и в разрезках анализа).
         val writeOffAmounts = adjustments
-            .filter { !it.deleted && it.countInStats && it.currencyCode == balanceCurrencyCode }
+            .filter {
+                !it.deleted &&
+                    it.countInStats &&
+                    it.currencyCode == balanceCurrencyCode &&
+                    DebtAdjustmentKind.fromWire(it.kind) == DebtAdjustmentKind.WRITE_OFF
+            }
             .map { TxDayAmount(it.amountMinor, dayStart(it.date)) }
 
         return Sums(

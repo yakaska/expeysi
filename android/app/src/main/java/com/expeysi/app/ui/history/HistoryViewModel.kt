@@ -21,6 +21,7 @@ import com.expeysi.app.domain.AggEntry
 import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
 import com.expeysi.app.domain.DateRangeFilter
+import com.expeysi.app.domain.DebtAdjustmentKind
 import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.HistoryPeriod
@@ -157,7 +158,15 @@ class HistoryViewModel @Inject constructor(
                 !it.deleted && (it.type == TxType.EXPENSE.wire || it.type == TxType.INCOME.wire)
             },
             transactions = transactions,
-            writeOffs = adjustments.filter { !it.deleted && it.countInStats },
+            // В доходы/расходы и ленты попадают только списания: начальный
+            // остаток счётчик в отчётах не включает, но синк мог принести
+            // запись «начальный остаток + countInStats» — фильтруем по kind,
+            // как и разрезки анализа.
+            writeOffs = adjustments.filter {
+                !it.deleted &&
+                    it.countInStats &&
+                    DebtAdjustmentKind.fromWire(it.kind) == DebtAdjustmentKind.WRITE_OFF
+            },
             adjustments = adjustments,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BaseData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
@@ -340,8 +349,12 @@ class HistoryViewModel @Inject constructor(
                     )
             )
             // Единая хронология по убыванию даты: операции и строки списаний
-            // смешиваются в один поток ленты.
-            .sortedByDescending { it.transaction.date }
+            // смешиваются в один поток ленты. При равной дате порядок задаёт
+            // updatedAt — не полагаемся на порядок DAO.
+            .sortedWith(
+                compareByDescending<TransactionItem> { it.transaction.date }
+                    .thenByDescending { it.transaction.updatedAt },
+            )
 
         HistoryUiState(
             title = title,

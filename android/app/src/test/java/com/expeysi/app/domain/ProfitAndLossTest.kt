@@ -193,4 +193,41 @@ class ProfitAndLossTest {
 
         assertEquals(300L, window.income.dayMinor)
     }
+
+    @Test
+    fun `начальный остаток с счётчиком в отчётах не считается`() {
+        // Форма начальному остатку счётчик не включает, но синк мог принести
+        // такую запись: в P&L попадают только WRITE_OFF, как и в разрезках.
+        val opening = adjustment(amountMinor = 40_000L)
+            .copy(kind = DebtAdjustmentKind.OPENING_BALANCE.wire)
+
+        val window = ProfitAndLoss.windowSums(
+            transactions = emptyList(),
+            adjustments = listOf(opening),
+            accountIds = setOf("acc"),
+            balanceCurrencyCode = "RUB",
+            todayStartMillis = todayStart,
+            zone = zone,
+        )
+
+        assertEquals(0L, window.income.dayMinor)
+        assertEquals(0L, window.expense.dayMinor)
+    }
+
+    @Test
+    fun `удалённая операция в окна не попадает`() {
+        val window = ProfitAndLoss.windowSums(
+            transactions = listOf(
+                tx(TxType.INCOME, 300L),
+                tx(TxType.INCOME, 900L).copy(deleted = true),
+            ),
+            adjustments = emptyList(),
+            accountIds = setOf("acc"),
+            balanceCurrencyCode = "RUB",
+            todayStartMillis = todayStart,
+            zone = zone,
+        )
+
+        assertEquals(300L, window.income.dayMinor)
+    }
 }

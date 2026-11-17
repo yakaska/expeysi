@@ -9,6 +9,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 fun CategoryOperationsScreen(
     onBack: () -> Unit,
     onItemClick: (String) -> Unit = {},
+    /** Строка списания долга ведёт в редактор корректировки, а не транзакции. */
+    onWriteOffClick: (String) -> Unit = {},
     viewModel: CategoryOperationsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -16,7 +18,9 @@ fun CategoryOperationsScreen(
         state = state,
         actions = CategoryOperationsActions(
             onBack = onBack,
-            onOperationClick = { operation -> onItemClick(operation.id) },
+            onOperationClick = { operation ->
+                if (operation.isWriteOff) onWriteOffClick(operation.id) else onItemClick(operation.id)
+            },
             onRetry = viewModel::reload,
             onLoadNext = viewModel::loadNext,
         ),

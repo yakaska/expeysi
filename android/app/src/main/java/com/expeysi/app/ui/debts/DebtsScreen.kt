@@ -124,29 +124,33 @@ private fun DebtsContent(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { sortMenuOpen = true }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.Sort,
-                            contentDescription = stringResource(R.string.debts_sort_cd),
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = sortMenuOpen,
-                        onDismissRequest = { sortMenuOpen = false },
-                    ) {
-                        DebtsSort.entries.forEach { option ->
-                            DropdownMenuItem(
-                                text = { Text(stringResource(option.labelRes())) },
-                                onClick = {
-                                    onSelectSort(option)
-                                    sortMenuOpen = false
-                                },
-                                trailingIcon = {
-                                    if (option == state.sort) {
-                                        Icon(Icons.Filled.Check, contentDescription = null)
-                                    }
-                                },
+                    // Box — якорь выпадающего меню: иначе DropdownMenu
+                    // позиционируется от всей строки actions.
+                    Box {
+                        IconButton(onClick = { sortMenuOpen = true }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Sort,
+                                contentDescription = stringResource(R.string.debts_sort_cd),
                             )
+                        }
+                        DropdownMenu(
+                            expanded = sortMenuOpen,
+                            onDismissRequest = { sortMenuOpen = false },
+                        ) {
+                            DebtsSort.entries.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(option.labelRes())) },
+                                    onClick = {
+                                        onSelectSort(option)
+                                        sortMenuOpen = false
+                                    },
+                                    trailingIcon = {
+                                        if (option == state.sort) {
+                                            Icon(Icons.Filled.Check, contentDescription = null)
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 },
@@ -271,12 +275,15 @@ private fun SummaryCards(
             }
             // Итоги считают закрытых и архивных тоже: секции их строк скрывают,
             // но сам долг никуда не исчезает — сводка показывает его целиком.
-            Text(
-                text = stringResource(R.string.debts_totals_include_archived),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            // Подпись нужна, только когда такие строки реально есть.
+            if (state.settled.isNotEmpty() || state.archived.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.debts_totals_include_archived),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
     }
 }
@@ -442,7 +449,6 @@ private fun DebtsRowCard(
         ) {
             CounterpartyAvatar(
                 name = row.counterparty.name,
-                type = CounterpartyType.fromWire(row.counterparty.type),
                 tone = if (muted) DebtsTone.NEUTRAL else display.tone,
                 color = color,
             )
@@ -451,7 +457,26 @@ private fun DebtsRowCard(
                     .weight(1f)
                     .padding(start = 12.dp),
             ) {
+                // Тип контрагента — малой иконкой у имени: на аватаре он
+                // соседствовал с бейджем направления и слипался в тесноте.
+                val counterpartyType = CounterpartyType.fromWire(row.counterparty.type)
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        when (counterpartyType) {
+                            CounterpartyType.PERSON -> Icons.Filled.Person
+                            CounterpartyType.COMPANY -> Icons.Filled.Apartment
+                        },
+                        contentDescription = stringResource(
+                            when (counterpartyType) {
+                                CounterpartyType.PERSON -> R.string.counterparty_type_person
+                                CounterpartyType.COMPANY -> R.string.counterparty_type_company
+                            },
+                        ),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .padding(end = 6.dp)
+                            .size(16.dp),
+                    )
                     Text(
                         text = row.counterparty.name,
                         style = MaterialTheme.typography.bodyLarge,
@@ -505,13 +530,12 @@ private fun rowSubtitle(
 }
 
 /**
- * Круглый аватар с инициалами; два малого бейджа: тип контрагента сверху
- * (физлицо или компания) и направление долга снизу — стрелка цвета состояния.
+ * Круглый аватар с инициалами; бейдж со стрелкой в углу показывает
+ * направление долга. Тип контрагента рисуется иконкой у имени в строке.
  */
 @Composable
 private fun CounterpartyAvatar(
     name: String,
-    type: CounterpartyType,
     tone: DebtsTone,
     color: Color,
 ) {
@@ -526,30 +550,6 @@ private fun CounterpartyAvatar(
                 text = counterpartyInitials(name),
                 style = MaterialTheme.typography.labelLarge,
                 color = color,
-            )
-        }
-        // Значок типа: не у всех контрагентов очевидно, компания это
-        // или человек — подсказывает до открытия карточки.
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .size(18.dp)
-                .background(MaterialTheme.colorScheme.surface, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                when (type) {
-                    CounterpartyType.PERSON -> Icons.Filled.Person
-                    CounterpartyType.COMPANY -> Icons.Filled.Apartment
-                },
-                contentDescription = stringResource(
-                    when (type) {
-                        CounterpartyType.PERSON -> R.string.counterparty_type_person
-                        CounterpartyType.COMPANY -> R.string.counterparty_type_company
-                    },
-                ),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(13.dp),
             )
         }
         when (tone) {

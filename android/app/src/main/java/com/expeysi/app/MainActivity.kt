@@ -324,6 +324,7 @@ private fun AppNavigation() {
                 CategoryOperationsScreen(
                     onBack = { navigateBack() },
                     onItemClick = { id -> navController.navigate("edit/$id") },
+                    onWriteOffClick = { id -> navController.navigate("debts/adjustment/edit/$id") },
                 )
             }
             composable("data-export") {
