@@ -112,9 +112,11 @@ class HistoryViewModel @Inject constructor(
 
     private val _selectedTypes = MutableStateFlow(
         // «transfer» — псевдотип отчёта «Переводы»: обе ноги, реальное хранение TxType не знает.
+        // Долговые операции в обычной истории и разрезках не показываются: их место
+        // в разделе «Долгов», поэтому из выбора по умолчанию они выпадают.
         when (val wire = savedStateHandle.get<String>("type")) {
             TRANSFER_TYPES_WIRE -> setOf(TxType.TRANSFER_OUT, TxType.TRANSFER_IN)
-            null -> TxType.entries.toSet()
+            null -> TxType.entries.filterNot { it.isDebt }.toSet()
             else -> setOf(TxType.fromWire(wire))
         },
     )

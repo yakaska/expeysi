@@ -223,7 +223,10 @@ class HomeViewModel @Inject constructor(
     private val transactionFeed = feedAccountIds.flatMapLatest { accountIds ->
         combine(
             transactionLimit.flatMapLatest { limit ->
-                transactionDao.observeActiveForAccounts(accountIds, limit).map { it to limit }
+                transactionDao.observeActiveForAccounts(accountIds, limit)
+                    // Долговые операции в общую ленту не попадают: живут в разделе «Долги»,
+                    // здесь их исключают, чтобы не мешали пейджингу и строкам категории.
+                    .map { transactions -> transactions.filterNot { TxType.fromWire(it.type).isDebt } to limit }
             },
             accountDao.observeAll(),
             categoryDao.observeAll(),
