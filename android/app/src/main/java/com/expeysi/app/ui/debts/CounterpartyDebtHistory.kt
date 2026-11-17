@@ -29,7 +29,6 @@ object CounterpartyDebtHistory {
         REPAY_OUT,
         WRITE_OFF,
         OPENING_BALANCE,
-        ;
     }
 
     /** Из долгового типа транзакции: null — тип не долговая операция. */
@@ -157,8 +156,7 @@ object CounterpartyDebtHistory {
     }
 
     /** Дней между сроком и закрытием: минус — раньше срока, плюс — позже. */
-    fun closedDaysDelta(closingDate: LocalDate, dueDate: LocalDate): Int =
-        ChronoUnit.DAYS.between(dueDate, closingDate).toInt()
+    fun closedDaysDelta(closingDate: LocalDate, dueDate: LocalDate): Int = ChronoUnit.DAYS.between(dueDate, closingDate).toInt()
 
     /**
      * Статус срока строки: у закрытого долга — разница от даты закрытия,

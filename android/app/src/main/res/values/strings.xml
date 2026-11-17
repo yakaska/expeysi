@@ -135,6 +135,7 @@
     <string name="common_undo">Undo</string>
     <string name="common_on">On</string>
     <string name="common_off">Off</string>
+    <string name="common_all">All</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Reports</string>
     <string name="drawer_section_analytics">Analytics</string>
@@ -302,6 +303,9 @@
     <string name="common_edit">Edit</string>
     <string name="debts_title">Debts</string>
     <string name="debts_add_cd">Add debt operation</string>
+    <!-- Заголовки формы долговой операции (вместо общих add_title_*). -->
+    <string name="debts_operation_add_title">New debt operation</string>
+    <string name="debts_operation_edit_title">Edit debt operation</string>
     <string name="debts_empty_title">No debts yet</string>
     <string name="debts_empty_hint">Tap + to add the first debt</string>
     <string name="debts_total_owed_to_me">Owed to me</string>
@@ -314,6 +318,13 @@
     <string name="debts_section_settled">Settled (%1$d)</string>
     <!-- Нулевая сторона сводки: долга в эту сторону нет. -->
     <string name="debts_total_none">—</string>
+    <!-- Сортировка списка долгов. -->
+    <string name="debts_sort_name">By name</string>
+    <string name="debts_sort_balance">By balance</string>
+    <string name="debts_sort_overdue">Overdue first</string>
+    <string name="debts_sort_cd">Sort debts</string>
+    <!-- Подпись под итогами: закрытые и архивные строки секций скрыты, но в сумме есть. -->
+    <string name="debts_totals_include_archived">Totals include settled and archived counterparties</string>
     <string name="debts_section_archive">Archive</string>
     <string name="debts_overdue">Overdue</string>
     <!-- %1$s — дата возврата долга. -->
@@ -331,6 +342,8 @@
     <string name="debts_due_date">Repayment due</string>
     <string name="debts_due_empty">Not set</string>
     <string name="debts_due_clear_cd">Clear due date</string>
+    <!-- Не-блокирующее предупреждение на форме: срок уже в прошлом. -->
+    <string name="debts_due_past_warning">This due date is already in the past</string>
     <string name="debts_no_counterparties">No counterparties yet. Add a person or company first.</string>
     <string name="debts_kind_lend">Debt issued</string>
     <string name="debts_kind_borrow">Debt taken</string>
@@ -347,7 +360,8 @@
     <string name="debts_write_off_remaining">Remaining: %1$s</string>
     <string name="debts_write_off_error_over">The amount can’t exceed the remaining %1$s</string>
     <string name="debts_write_off_count_in_stats">Count in reports</string>
-    <string name="debts_write_off_count_hint">Positive write-off appears as income, negative as expense.</string>
+    <!-- Списание «в отчётах»: деньги никуда не идут, остаток не меняется. -->
+    <string name="debts_write_off_count_hint">No money moves and the balance stays the same. Positive write-off appears as income in reports, negative as expense.</string>
     <string name="counterparty_add_title">New counterparty</string>
     <string name="counterparty_edit_title">Edit counterparty</string>
     <string name="counterparty_type_person">Person</string>
@@ -359,7 +373,7 @@
     <string name="counterparty_history_title">History</string>
     <string name="counterparty_history_empty">No debt operations yet.</string>
     <string name="counterparty_delete_title">Delete counterparty?</string>
-    <string name="counterparty_delete_text">The counterparty will disappear from the list; the debt history will remain in the shared journal.</string>
+    <string name="counterparty_delete_text">The counterparty will be removed from the list.</string>
     <string name="counterparty_delete_blocked_text">Can’t delete: the counterparty has a non-zero balance or history. You can archive it instead.</string>
     <string name="counterparty_settled_paid">Settlements closed, debt fully repaid</string>
     <!-- %1$s — дата закрытия долга. -->

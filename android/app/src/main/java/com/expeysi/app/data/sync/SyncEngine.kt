@@ -504,6 +504,8 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun mergeCounterparty(document: DocumentSnapshot) {
+        // У контрагентов нет updatedBy в Firestore: слияние — только по updatedAt,
+        // равенство меток игнорируется (общее правило last-write-wins).
         val value = CounterpartyEntity(
             id = document.id,
             name = document.getString("name") ?: return,
@@ -521,6 +523,8 @@ class SyncEngine @Inject constructor(
     }
 
     private suspend fun mergeDebtAdjustment(document: DocumentSnapshot) {
+        // У корректировок нет updatedBy в Firestore: слияние — только по updatedAt,
+        // равенство меток игнорируется (общее правило last-write-wins).
         val value = DebtAdjustmentEntity(
             id = document.id,
             counterpartyId = document.getString("counterpartyId") ?: return,

@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
@@ -108,6 +109,7 @@ fun HomeNavigationDrawer(
     onExportClick: () -> Unit,
     onCategoriesClick: () -> Unit,
     onAccountsClick: () -> Unit,
+    onDebtsClick: () -> Unit,
     onInviteClick: () -> Unit,
     onLeaveFamilyClick: () -> Unit,
     familyCode: String? = null,
@@ -336,6 +338,13 @@ fun HomeNavigationDrawer(
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
                         DrawerSection(stringResource(R.string.drawer_section_misc))
+                        NavigationDrawerItem(
+                            label = { Text(stringResource(R.string.debts_title)) },
+                            selected = false,
+                            icon = { Icon(Icons.Filled.Handshake, contentDescription = null) },
+                            onClick = onDebtsClick,
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                        )
                         NavigationDrawerItem(
                             label = { Text(stringResource(R.string.history_mode_categories)) },
                             selected = false,

@@ -291,14 +291,24 @@ class DebtOperationViewModel @Inject constructor(
 
     /**
      * Kind записи к сохранению: правка без смены направления хранит
-     * исходный kind, иначе kind выводится из направления и знака остатка.
+     * исходный kind — частично погашенный долг не «переименовывается»
+     * в выданный долг из-за изменившегося знака остатка; новая запись
+     * и правка со сменой направления выводят kind заново из направления
+     * денег и знака остатка ([DebtCalculator.editKind]).
      */
     fun operationKind(liveBalanceMinor: Long): TxType {
         val original = original
-        if (isEdit && original != null && _direction.value == originalDirection) {
-            return TxType.fromWire(original.type)
-        }
-        return DebtCalculator.kindFor(_direction.value == DebtDirection.OUT, liveBalanceMinor)
+        // У новой записи исходного kind нет: оригинальный тип в editKind
+        // всегда игнорируется, потому что kind выводится заново.
+        val directionChanged = !isEdit ||
+            original == null ||
+            originalDirection != _direction.value
+        return DebtCalculator.editKind(
+            originalType = original?.let { TxType.fromWire(it.type) } ?: TxType.DEBT_LEND,
+            directionChanged = directionChanged,
+            outgoing = _direction.value == DebtDirection.OUT,
+            balanceMinor = liveBalanceMinor,
+        )
     }
 
     /** Строка «Срок возврата» видна: запись углубляет долг или правка с уже заданным сроком. */

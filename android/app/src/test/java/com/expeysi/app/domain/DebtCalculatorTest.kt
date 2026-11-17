@@ -202,6 +202,67 @@ class DebtCalculatorTest {
     }
 
     @Test
+    fun `списание при нулевом остатке ничего не меняет`() {
+        // Ноль без списания «перевернулся» бы в долг обратной стороны.
+        assertEquals(0L, DebtCalculator.writeOffDelta(0L, 30_000L))
+    }
+
+    @Test
+    fun `правка без смены направления хранит исходный kind`() {
+        // Частично погашенный долг не «переименовывается» в выданный долг
+        // из-за изменившегося знака остатка: направление денег не менялось.
+        assertEquals(
+            TxType.DEBT_BORROW,
+            DebtCalculator.editKind(
+                originalType = TxType.DEBT_BORROW,
+                directionChanged = false,
+                outgoing = true,
+                balanceMinor = -10_000L,
+            ),
+        )
+        assertEquals(
+            TxType.DEBT_REPAY_IN,
+            DebtCalculator.editKind(
+                originalType = TxType.DEBT_REPAY_IN,
+                directionChanged = false,
+                outgoing = false,
+                balanceMinor = 0L,
+            ),
+        )
+    }
+
+    @Test
+    fun `правка со сменой направления выводит kind заново`() {
+        assertEquals(
+            TxType.DEBT_REPAY_OUT,
+            DebtCalculator.editKind(
+                originalType = TxType.DEBT_LEND,
+                directionChanged = true,
+                outgoing = true,
+                balanceMinor = -100_00L,
+            ),
+        )
+        assertEquals(
+            TxType.DEBT_BORROW,
+            DebtCalculator.editKind(
+                originalType = TxType.DEBT_REPAY_IN,
+                directionChanged = true,
+                outgoing = false,
+                balanceMinor = -100_00L,
+            ),
+        )
+    }
+
+    @Test
+    fun `удалённая транзакция в остатки не попадает`() {
+        val rows = deltas(
+            transactions = listOf(tx(TxType.DEBT_LEND, amountMinor = 100_000L).copy(deleted = true)),
+        )
+
+        assertTrue(DebtCalculator.balances(rows).isEmpty())
+    }
+
+    @Test
     fun `начальный остаток задаёт базу до операций`() {
         val rows = deltas(
             adjustments = listOf(adjustment(amountMinor = 500_000L)),

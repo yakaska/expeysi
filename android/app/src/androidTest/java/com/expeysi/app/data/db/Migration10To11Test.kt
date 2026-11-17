@@ -34,6 +34,16 @@ class Migration10To11Test {
 
         val db = helper.runMigrationsAndValidate(DB_NAME, 11, true, MIGRATION_10_11)
 
+        // Сразу после миграции новые таблицы пусты: их наполняет только синк.
+        db.query("SELECT COUNT(*) FROM counterparties").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+        db.query("SELECT COUNT(*) FROM debt_adjustments").use { cursor ->
+            assertTrue(cursor.moveToFirst())
+            assertEquals(0, cursor.getInt(0))
+        }
+
         db.query("SELECT counterpartyId, dueDate FROM transactions WHERE id = 'old'").use { cursor ->
             assertTrue(cursor.moveToFirst())
             // Существующим записям миграция ставит дефолты: контрагента нет, срок неизвестен.

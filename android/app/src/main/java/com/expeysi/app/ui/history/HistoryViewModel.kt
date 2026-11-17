@@ -20,19 +20,20 @@ import com.expeysi.app.domain.AccountTotal
 import com.expeysi.app.domain.AggEntry
 import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
+import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.DebtWriteOffs
-import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.UiText
+import com.expeysi.app.ui.debts.currencyCodeOfAccount
+import com.expeysi.app.ui.home.FeedEntries
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.home.TransferAccount
 import com.expeysi.app.ui.home.TransferCard
 import com.expeysi.app.ui.home.TransferSide
-import com.expeysi.app.ui.debts.currencyCodeOfAccount
 import com.expeysi.app.ui.icons.CategoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -294,7 +295,7 @@ class HistoryViewModel @Inject constructor(
                 DebtCalculator.adjustmentDeltas(data.adjustments),
             data.adjustments,
         )
-        val items = scopedTransactions
+        val txItems = scopedTransactions
             .let(Transfers::collapse)
             .map { tx ->
                 val category = categoryById[tx.categoryId]
@@ -318,6 +319,29 @@ class HistoryViewModel @Inject constructor(
                         (tx.counterpartyId to currencyByAccount[tx.accountId].orEmpty()) in closedByWriteOff,
                 )
             }
+        // Списания «в отчётах» видят свои строки: итоги доходов/расходов
+        // уже включают их, и в списке число должно быть объяснимо. Условия
+        // те же, что у writeOffEntries выше: без фильтра категорий и при
+        // совпадении знака с выбранным типом; в детализации категории
+        // псевдо-строки не показываются — у неё нет операций.
+        val items = (
+            txItems +
+                (
+                    if (f.categoryIds == null && detail == null) {
+                        statWriteOffs
+                            .filter {
+                                (TxType.INCOME in f.types && it.amountMinor > 0L) ||
+                                    (TxType.EXPENSE in f.types && it.amountMinor < 0L)
+                            }
+                            .map { FeedEntries.writeOffItem(it, symbol) }
+                    } else {
+                        emptyList()
+                    }
+                    )
+            )
+            // Единая хронология по убыванию даты: операции и строки списаний
+            // смешиваются в один поток ленты.
+            .sortedByDescending { it.transaction.date }
 
         HistoryUiState(
             title = title,

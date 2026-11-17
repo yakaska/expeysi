@@ -9,13 +9,25 @@ import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.DebtAdjustmentDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.domain.DebtCalculator
+import com.expeysi.app.domain.ProfitAndLoss
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import java.time.ZoneId
 import javax.inject.Inject
 import kotlin.math.abs
+
+/**
+ * Состояние списков долгов: вклады операций и корректировок, идентификаторы
+ * просроченных контрагентов — считается в одном combine для лент и строк.
+ */
+private data class DebtLedger(
+    val deltas: List<DebtCalculator.Delta>,
+    val overdueCounterpartyIds: Set<String>,
+)
 
 @HiltViewModel
 class DebtsViewModel @Inject constructor(
@@ -27,11 +39,26 @@ class DebtsViewModel @Inject constructor(
     currencyDao: CurrencyDao,
 ) : ViewModel() {
 
+    private val zone: ZoneId = ZoneId.systemDefault()
+
+    private val _sort = MutableStateFlow(DebtsSort.NAME)
+    private val _sideFilter = MutableStateFlow(DebtsSideFilter.ALL)
+
+    fun selectSort(sort: DebtsSort) {
+        _sort.value = sort
+    }
+
+    fun selectSideFilter(filter: DebtsSideFilter) {
+        _sideFilter.value = filter
+    }
+
     /**
      * Вклады всех долговых операций и корректировок в остатки. Валюта
-     * операции резолвится по счёту, корректировка несёт валюту сама.
+     * операции резолвится по счёту, корректировка несёт валюту сама; здесь
+     * же считаются идентификаторы просроченных контрагентов — даты возврата
+     * живут на долговых операциях.
      */
-    private val deltas = combine(
+    private val ledger = combine(
         transactionDao.observeActive(),
         debtAdjustmentDao.observeAll(),
         accountDao.observeActive(),
@@ -39,16 +66,27 @@ class DebtsViewModel @Inject constructor(
     ) { transactions, adjustments, accounts, balances ->
         val balancesById = balances.associateBy { it.id }
         val currencyByAccount = accounts.associate { it.id to currencyCodeOfAccount(it, balancesById) }
-        DebtCalculator.transactionDeltas(transactions, { currencyByAccount[it].orEmpty() }) +
+        val deltas = DebtCalculator.transactionDeltas(transactions, { currencyByAccount[it].orEmpty() }) +
             DebtCalculator.adjustmentDeltas(adjustments)
+        DebtLedger(
+            deltas = deltas,
+            overdueCounterpartyIds = overdueCounterpartyIds(
+                transactions = transactions,
+                balances = DebtCalculator.balances(deltas),
+                todayStartMillis = ProfitAndLoss.todayStartMillis(zone),
+                currencyCodeOfAccount = { accountId -> currencyByAccount[accountId].orEmpty() },
+            ),
+        )
     }
 
     val uiState: StateFlow<DebtsUiState> = combine(
         counterpartyDao.observeAll(),
-        deltas,
+        ledger,
         currencyDao.observeAll(),
-    ) { counterparties, deltas, currencies ->
-        val balancesByCounterparty = DebtCalculator.balances(deltas).groupBy { it.counterpartyId }
+        _sort,
+        _sideFilter,
+    ) { counterparties, ledger, currencies, sort, sideFilter ->
+        val balancesByCounterparty = DebtCalculator.balances(ledger.deltas).groupBy { it.counterpartyId }
         val currencySymbols = currencies.associate { it.code to it.symbol }
         val rows = counterparties
             .filterNot { it.deleted }
@@ -57,21 +95,21 @@ class DebtsViewModel @Inject constructor(
                     counterparty = counterparty,
                     balances = balancesByCounterparty[counterparty.id].orEmpty()
                         .sortedByDescending { abs(it.balanceMinor) },
+                    overdue = counterparty.id in ledger.overdueCounterpartyIds,
                 )
             }
         val active = rows.filterNot { it.counterparty.archived }
         val (open, settled) = active.partition { !debtsRowDisplay(it.balances).settled }
-        // Всего по всем контрагентам, включая архивных и закрытых: секция
-        // скрывает строку, но не отменяет сам долг.
+        // Фильтр стороны применяется к открытым строкам: секции «Закрытые»
+        // и «Архив» остаются как есть. Сортировка — внутри каждой секции.
         DebtsUiState(
-            rows = open,
-            settled = settled,
-            archived = rows.filter { it.counterparty.archived },
-            totals = DebtsTotals(
-                owedToMe = totals(rows, positive = true),
-                owedByMe = totals(rows, positive = false),
-            ),
+            rows = sortDebtsRows(filterDebtsRows(open, sideFilter), sort),
+            settled = sortDebtsRows(settled, sort),
+            archived = sortDebtsRows(rows.filter { it.counterparty.archived }, sort),
+            totals = debtsTotals(rows),
             currencySymbols = currencySymbols,
+            sideFilter = sideFilter,
+            sort = sort,
         )
     }.stateIn(
         scope = viewModelScope,
@@ -84,11 +122,4 @@ class DebtsViewModel @Inject constructor(
             currencySymbols = emptyMap(),
         ),
     )
-
-    private fun totals(rows: List<DebtsRow>, positive: Boolean): Map<String, Long> = rows
-        .asSequence()
-        .flatMap { it.balances }
-        .filter { if (positive) it.balanceMinor > 0 else it.balanceMinor < 0 }
-        .groupBy { it.currencyCode }
-        .mapValues { (_, list) -> list.sumOf { abs(it.balanceMinor) } }
 }

@@ -132,6 +132,7 @@
     <string name="common_undo">Отменить</string>
     <string name="common_on">включено</string>
     <string name="common_off">выключено</string>
+    <string name="common_all">Все</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
     <string name="drawer_section_reports">Отчёты</string>
     <string name="drawer_section_analytics">Аналитика</string>
@@ -296,6 +297,9 @@
     <string name="common_edit">Редактировать</string>
     <string name="debts_title">Долги</string>
     <string name="debts_add_cd">Добавить долговую операцию</string>
+    <!-- Заголовки формы долговой операции (вместо общих add_title_*). -->
+    <string name="debts_operation_add_title">Новая долговая операция</string>
+    <string name="debts_operation_edit_title">Правка долговой операции</string>
     <string name="debts_empty_title">Долгов пока нет</string>
     <string name="debts_empty_hint">Нажмите +, чтобы добавить первый долг</string>
     <string name="debts_total_owed_to_me">Должны мне</string>
@@ -308,6 +312,13 @@
     <string name="debts_section_settled">Закрытые (%1$d)</string>
     <!-- Нулевая сторона сводки: долга в эту сторону нет. -->
     <string name="debts_total_none">—</string>
+    <!-- Сортировка списка долгов. -->
+    <string name="debts_sort_name">По имени</string>
+    <string name="debts_sort_balance">По остатку</string>
+    <string name="debts_sort_overdue">Сначала просроченные</string>
+    <string name="debts_sort_cd">Сортировка долгов</string>
+    <!-- Подпись под итогами: закрытые и архивные строки секций скрыты, но в сумме есть. -->
+    <string name="debts_totals_include_archived">В итогах учтены закрытые и архивные контрагенты</string>
     <string name="debts_section_archive">Архив</string>
     <string name="debts_overdue">Просрочено</string>
     <!-- %1$s — дата возврата долга. -->
@@ -325,6 +336,8 @@
     <string name="debts_due_date">Срок возврата</string>
     <string name="debts_due_empty">Не задан</string>
     <string name="debts_due_clear_cd">Убрать срок</string>
+    <!-- Не-блокирующее предупреждение на форме: срок уже в прошлом. -->
+    <string name="debts_due_past_warning">Срок уже прошёл</string>
     <string name="debts_no_counterparties">Пока нет контрагентов. Сначала добавьте человека или компанию.</string>
     <string name="debts_kind_lend">Долг выдан</string>
     <string name="debts_kind_borrow">Долг взят</string>
@@ -341,7 +354,8 @@
     <string name="debts_write_off_remaining">Остаток: %1$s</string>
     <string name="debts_write_off_error_over">Сумма не больше остатка %1$s</string>
     <string name="debts_write_off_count_in_stats">Учитывать в отчётах</string>
-    <string name="debts_write_off_count_hint">Списание с плюсом появится в отчётах как доход, с минусом — как расход.</string>
+    <!-- Списание «в отчётах»: деньги никуда не идут, остаток не меняется. -->
+    <string name="debts_write_off_count_hint">Деньги не переводятся, остаток остаётся прежним. Списание с плюсом появится в отчётах как доход, с минусом — как расход.</string>
     <string name="counterparty_add_title">Новый контрагент</string>
     <string name="counterparty_edit_title">Изменить контрагента</string>
     <string name="counterparty_type_person">Человек</string>
@@ -353,7 +367,7 @@
     <string name="counterparty_history_title">История</string>
     <string name="counterparty_history_empty">Долговых операций пока нет.</string>
     <string name="counterparty_delete_title">Удалить контрагента?</string>
-    <string name="counterparty_delete_text">Контрагент исчезнет из списка, история долгов останется в общем журнале.</string>
+    <string name="counterparty_delete_text">Контрагент исчезнет из списка.</string>
     <string name="counterparty_delete_blocked_text">Удалить нельзя: у контрагента остаток или история. Вместо удаления его можно заархивировать.</string>
     <string name="counterparty_settled_paid">Расчёты закрыты, долг полностью возвращён</string>
     <!-- %1$s — дата закрытия долга. -->

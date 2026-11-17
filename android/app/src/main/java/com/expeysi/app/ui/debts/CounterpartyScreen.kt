@@ -29,7 +29,9 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -39,6 +41,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +62,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
 import com.expeysi.app.data.db.CounterpartyEntity
+import com.expeysi.app.ui.balances.currencySubtitle
 import com.expeysi.app.ui.common.AmountFormat
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.DebtCurrencySummary
@@ -534,11 +538,17 @@ private fun summaryTotals(summary: DebtCurrencySummary, symbol: String): String?
     else -> null
 }
 
+/** Действие, для которого открывается выбор валюты. */
+private enum class ChooserAction { REPAY, WRITE_OFF }
+
 /**
  * Кнопки действий сеткой 2×2: «Дать» и «Взять» сверху, «Погасить» и
- * «Списание» снизу. Списания без остатка нет — «Погасить» забирает всю
- * ширину ряда. Начальный остаток живёт в меню «Ещё» верхней панели.
+ * «Списание» снизу. Долг закрыт — нижний ряд скрыт целиком: гасить и
+ * списывать нечего, фальшивая кнопка только путает. Валют с долгом
+ * несколько — нажатие открывает нижний лист с выбором валюты (остаток
+ * напротив каждой); валюта одна — кнопка действует сразу.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ActionButtons(
     state: CounterpartyUiState,
@@ -547,8 +557,18 @@ private fun ActionButtons(
     onWriteOffClick: (currency: String, remaining: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val nonZero = state.summaries.firstOrNull { it.balanceMinor != 0L }
-    val writeOffVisible = nonZero != null
+    val nonZero = state.summaries.filter { it.balanceMinor != 0L }
+    var chooserAction by remember { mutableStateOf<ChooserAction?>(null) }
+    fun act(summary: DebtCurrencySummary, action: ChooserAction) {
+        when (action) {
+            ChooserAction.REPAY -> onRepayClick(
+                if (summary.balanceMinor > 0) DebtDirection.IN else DebtDirection.OUT,
+                summary.currencyCode,
+                abs(summary.balanceMinor),
+            )
+            ChooserAction.WRITE_OFF -> onWriteOffClick(summary.currencyCode, abs(summary.balanceMinor))
+        }
+    }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = modifier) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
             FilledTonalButton(onClick = { onLendClick(true) }, modifier = Modifier.weight(1f)) {
@@ -558,15 +578,12 @@ private fun ActionButtons(
                 Text(stringResource(R.string.debts_action_borrow), maxLines = 1)
             }
         }
-        if (writeOffVisible) {
+        if (nonZero.isNotEmpty()) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                val direct = nonZero.singleOrNull()
                 FilledTonalButton(
                     onClick = {
-                        onRepayClick(
-                            if (nonZero.balanceMinor > 0) DebtDirection.IN else DebtDirection.OUT,
-                            nonZero.currencyCode,
-                            abs(nonZero.balanceMinor),
-                        )
+                        if (direct != null) act(direct, ChooserAction.REPAY) else chooserAction = ChooserAction.REPAY
                     },
                     modifier = Modifier.weight(1f),
                 ) {
@@ -574,18 +591,49 @@ private fun ActionButtons(
                 }
                 // Кнопка видна, только когда есть что списывать: всегда включена.
                 OutlinedButton(
-                    onClick = { onWriteOffClick(nonZero.currencyCode, abs(nonZero.balanceMinor)) },
+                    onClick = {
+                        if (direct != null) {
+                            act(direct, ChooserAction.WRITE_OFF)
+                        } else {
+                            chooserAction = ChooserAction.WRITE_OFF
+                        }
+                    },
                     modifier = Modifier.weight(1f),
                 ) {
                     Text(stringResource(R.string.debts_action_write_off), maxLines = 1)
                 }
             }
-        } else {
-            FilledTonalButton(
-                onClick = { onRepayClick(DebtDirection.OUT, "", 0L) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.debts_action_repay), maxLines = 1)
+        }
+    }
+    chooserAction?.let { action ->
+        ModalBottomSheet(
+            onDismissRequest = { chooserAction = null },
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        ) {
+            Text(
+                text = stringResource(R.string.balance_currency),
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 8.dp),
+            )
+            nonZero.forEach { summary ->
+                val symbol = state.currencySymbols[summary.currencyCode] ?: summary.currencyCode
+                ListItem(
+                    headlineContent = { Text(currencySubtitle(symbol, summary.currencyCode)) },
+                    supportingContent = {
+                        Text(
+                            stringResource(
+                                R.string.debts_write_off_remaining,
+                                AmountFormat.withCurrency(abs(summary.balanceMinor), symbol),
+                            ),
+                        )
+                    },
+                    modifier = Modifier.clickable {
+                        act(summary, action)
+                        chooserAction = null
+                    },
+                )
             }
         }
     }
@@ -731,17 +779,15 @@ private fun amountText(sign: DebtHistorySign?, minor: Long, symbol: String): Str
 } + AmountFormat.withCurrency(minor, symbol)
 
 /** Бегущий остаток: минус у долга «я должен», знак плюса опускается. */
-private fun balanceText(minor: Long): String =
-    if (minor < 0) "\u2212" + AmountFormat.amount(abs(minor)) else AmountFormat.amount(minor)
+private fun balanceText(minor: Long): String = if (minor < 0) "\u2212" + AmountFormat.amount(abs(minor)) else AmountFormat.amount(minor)
 
 /* ----------------------------------- Previews ----------------------------------- */
 
-private const val PreviewCurrency = "RUB"
-private val PreviewSymbols = mapOf(PreviewCurrency to "₽")
+private const val PREVIEW_CURRENCY = "RUB"
+private val PREVIEW_SYMBOLS = mapOf(PREVIEW_CURRENCY to "₽")
 
 /** Момент превью: daysAgo дней назад (отрицательное — в будущем) в час:минуту. */
-private fun previewInstant(daysAgo: Long, hour: Int, minute: Int): Long =
-    LocalDate.now().minusDays(daysAgo).atTime(hour, minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+private fun previewInstant(daysAgo: Long, hour: Int, minute: Int): Long = LocalDate.now().minusDays(daysAgo).atTime(hour, minute).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
 
 private fun previewOp(
     id: String,
@@ -755,7 +801,7 @@ private fun previewOp(
     isAdjustment = kind == DebtOpKind.WRITE_OFF || kind == DebtOpKind.OPENING_BALANCE,
     date = date,
     updatedAt = date,
-    currencyCode = PreviewCurrency,
+    currencyCode = PREVIEW_CURRENCY,
     kind = kind,
     deltaMinor = deltaMinor,
     note = note,
@@ -779,7 +825,7 @@ private fun previewState(
         counterparty = previewCounterparty(name),
         summaries = foldResult.summaries,
         history = foldResult.rows,
-        currencySymbols = PreviewSymbols,
+        currencySymbols = PREVIEW_SYMBOLS,
         firstDate = foldResult.firstDate,
         closingDate = foldResult.closingDate,
     )

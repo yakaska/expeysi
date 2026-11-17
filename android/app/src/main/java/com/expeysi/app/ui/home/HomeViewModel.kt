@@ -17,6 +17,7 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CounterpartyDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.DebtAdjustmentDao
+import com.expeysi.app.data.db.DebtAdjustmentEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.data.importer.AccountKey
@@ -29,12 +30,11 @@ import com.expeysi.app.data.importer.openingFromCurrent
 import com.expeysi.app.domain.BalanceCalculator
 import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Periods
+import com.expeysi.app.domain.ProfitAndLoss
 import com.expeysi.app.domain.Transfers
-import com.expeysi.app.domain.TxDayAmount
 import com.expeysi.app.domain.TxSum
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
-import com.expeysi.app.domain.Windows
 import com.expeysi.app.ui.common.UiText
 import com.expeysi.app.ui.debts.currencyCodeOfAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -55,7 +55,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.InputStream
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
@@ -91,6 +90,13 @@ data class TransactionItem(
      * как открытый долг. У не-долговых строк всегда false.
      */
     val isDebtWrittenOff: Boolean = false,
+    /**
+     * Псевдо-строка учтённого списания долга (FeedEntries.writeOffItem):
+     * записи в БД за ней нет, строка некликабельна и открывается подписью
+     * псевдо-категории [com.expeysi.app.domain.DebtWriteOffs]. У остальных
+     * строк всегда false.
+     */
+    val isWriteOffEntry: Boolean = false,
 )
 
 /** Счёт на стороне развёрнутой карточки перевода: имя, иконка и цвет аватара. */
@@ -254,6 +260,19 @@ class HomeViewModel @Inject constructor(
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
+    /**
+     * Списания «в отчётах» (countInStats) в валюте выбранного баланса:
+     * их строки FeedEntries.writeOffItem встраиваются в ленту, чтобы итоги
+     * сводок и шапок дней были объяснимы — числа из отчётов видят свои строки.
+     */
+    private val feedWriteOffs: StateFlow<List<DebtAdjustmentEntity>> = combine(
+        debtAdjustmentDao.observeAll(),
+        selection,
+    ) { adjustments, (balances, selected) ->
+        val currencyCode = selected?.currencyCode
+        adjustments.filter { !it.deleted && it.countInStats && it.currencyCode == currencyCode }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
     private val transactionFeed = feedAccountIds.flatMapLatest { accountIds ->
         combine(
             transactionLimit.flatMapLatest { limit ->
@@ -264,28 +283,28 @@ class HomeViewModel @Inject constructor(
             },
             accountDao.observeAll(),
             categoryDao.observeAll(),
-            // Символы валют, имена контрагентов и помеченные списания — один
-            // слот: у combine лимит в пять потоков, а строкам долгов нужен
-            // второй справочник.
+            // Символы валют, имена контрагентов, помеченные списания и строки
+            // учтённых списаний — один слот: у combine лимит в пять потоков.
             combine(
                 currencyDao.observeAll(),
                 counterpartyDao.observeActive(),
                 debtsClosedByWriteOff,
-            ) { currencies, counterparties, closedByWriteOff ->
-                Triple(
-                    currencies.associate { it.code to it.symbol },
-                    counterparties.associate { it.id to it.name },
-                    closedByWriteOff,
+                feedWriteOffs,
+            ) { currencies, counterparties, closedByWriteOff, writeOffs ->
+                FeedRefs(
+                    symbolsByName = currencies.associate { it.code to it.symbol },
+                    counterpartyNames = counterparties.associate { it.id to it.name },
+                    closedByWriteOff = closedByWriteOff,
+                    writeOffs = writeOffs,
                 )
             },
             selection,
-        ) { (transactions, limit), accounts, categories, (symbolsByName, counterpartyNames, closedByWriteOff), (balances, selected) ->
-            val symbol = selected?.let { symbolsByName[it.currencyCode] ?: it.currencyCode } ?: ""
+        ) { (transactions, limit), accounts, categories, refs, (balances, selected) ->
+            val symbol = selected?.let { refs.symbolsByName[it.currencyCode] ?: it.currencyCode } ?: ""
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
             val balancesById = balances.associateBy { it.id }
-            fun currencyOf(accountId: String): String =
-                accountById[accountId]?.let { currencyCodeOfAccount(it, balancesById) }.orEmpty()
+            fun currencyOf(accountId: String): String = accountById[accountId]?.let { currencyCodeOfAccount(it, balancesById) }.orEmpty()
             // Пары переводов внутри одного баланса показываются одной строкой.
             // Нога, чей партнёр отрезан границей страницы, подтягивает его по
             // связке: на стыке страниц пара не разваливается на две строки.
@@ -299,7 +318,7 @@ class HomeViewModel @Inject constructor(
                 val category = categoryById[tx.categoryId]
                 val txType = TxType.fromWire(tx.type)
                 val counterpartyName = if (txType.isDebt) {
-                    counterpartyNames[tx.counterpartyId].orEmpty()
+                    refs.counterpartyNames[tx.counterpartyId].orEmpty()
                 } else {
                     ""
                 }
@@ -316,14 +335,25 @@ class HomeViewModel @Inject constructor(
                     isTransferPair = Transfers.isCollapsedPair(tx, page),
                     isDebtWrittenOff = txType.isDebt &&
                         tx.counterpartyId.isNotEmpty() &&
-                        (tx.counterpartyId to currencyOf(tx.accountId)) in closedByWriteOff,
+                        (tx.counterpartyId to currencyOf(tx.accountId)) in refs.closedByWriteOff,
                 )
-            }
-            // Признак следующей страницы считается по сырой странице: добранный
-            // партнёр в лимит не входит и новую страницу не открывает.
-            items to (transactions.size >= limit)
+            } +
+                // Списания «в отчётах» видят свои строки в ленте: сводка и
+                // шапки дней учитывают их — число должно быть объяснимо.
+                refs.writeOffs.map { FeedEntries.writeOffItem(it, symbol) }
+            // Единая хронология по убыванию даты: операции и строки списаний
+            // смешиваются в один поток ленты.
+            items.sortedByDescending { it.transaction.date } to (transactions.size >= limit)
         }
     }
+
+    /** Справочники для сборки строк ленты: передаются одним слотом combine. */
+    private data class FeedRefs(
+        val symbolsByName: Map<String, String>,
+        val counterpartyNames: Map<String, String>,
+        val closedByWriteOff: Set<Pair<String, String>>,
+        val writeOffs: List<DebtAdjustmentEntity>,
+    )
 
     private val summaryState = combine(
         selection,
@@ -346,46 +376,17 @@ class HomeViewModel @Inject constructor(
             AccountBalance(account, BalanceCalculator.balanceMinor(account.openingBalanceMinor, sums), symbol)
         }
 
-        val todayStart = Periods.day(LocalDate.now(zone), zone).startMillis
-        fun txDayAmount(tx: TransactionEntity, amountMinor: Long) = TxDayAmount(
-            amountMinor,
-            Periods.day(Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate(), zone).startMillis,
-        )
-        // Списание долга «в отчётах» — безналичный плюс/минус: у корректировки
-        // нет счёта, в сводку баланса попадает по валюте выбранного баланса;
-        // плюс — как доход, минус — как расход.
-        val statWriteOffs = adjustments
-            .filter {
-                !it.deleted && it.countInStats &&
-                    selected != null && it.currencyCode == selected.currencyCode
-            }
-            .map { adjustment ->
-                TxDayAmount(
-                    adjustment.amountMinor,
-                    Periods.day(
-                        Instant.ofEpochMilli(adjustment.date).atZone(zone).toLocalDate(),
-                        zone,
-                    ).startMillis,
-                )
-            }
-        fun windowSums(type: TxType, extra: List<TxDayAmount> = emptyList()) = Windows.sums(
-            balanceTxs
-                .filter { TxType.fromWire(it.type) == type }
-                .map { txDayAmount(it, it.amountMinor) } +
-                // Комиссия перевода — реальный расход дня: с ног-списаний
-                // комиссия входит в окно расходов сверх обычных расходов;
-                // у ноги зачисления комиссии нет.
-                (
-                    if (type == TxType.EXPENSE) {
-                        balanceTxs
-                            .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT }
-                            .map { txDayAmount(it, it.feeMinor) }
-                    } else {
-                        emptyList()
-                    }
-                    ) +
-                extra,
-            todayStart,
+        // Доходы и расходы сводки — P&L по начислению (ProfitAndLoss):
+        // обычные операции, комиссии переводов и учтённые списания; долги и
+        // переводы не доход и не расход. Тот же расчёт применяют шапки дней
+        // лент (FeedEntries.daySums): «сегодня» в шапке = «сегодня» в сводке.
+        val pnl = ProfitAndLoss.windowSums(
+            transactions = transactions,
+            adjustments = adjustments,
+            accountIds = accountIds,
+            balanceCurrencyCode = selected?.currencyCode,
+            todayStartMillis = ProfitAndLoss.todayStartMillis(zone),
+            zone = zone,
         )
 
         HomeUiState(
@@ -396,14 +397,8 @@ class HomeViewModel @Inject constructor(
             totalBalanceMinor = accountBalances.sumOf { it.balanceMinor },
             balanceTotals = balanceTotals(balances, accounts, transactions),
             balanceSymbols = balances.associate { it.id to (symbolByCode[it.currencyCode] ?: it.currencyCode) },
-            expense = windowSums(
-                TxType.EXPENSE,
-                statWriteOffs.filter { it.amountMinor < 0L }.map { TxDayAmount(-it.amountMinor, it.dayStartMillis) },
-            ),
-            income = windowSums(
-                TxType.INCOME,
-                statWriteOffs.filter { it.amountMinor > 0L },
-            ),
+            expense = pnl.expense,
+            income = pnl.income,
             familyId = familyStore.familyId.value,
         )
     }

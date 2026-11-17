@@ -24,8 +24,7 @@ class CounterpartyDebtHistoryTest {
     private val today: LocalDate = LocalDate.of(2026, 11, 17)
 
     /** Дата в millis: «день N от 2026-11-17 (минус — раньше) в час:минуту». */
-    private fun at(day: Long, hour: Int = 12, minute: Int = 0): Long =
-        today.plusDays(day).atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
+    private fun at(day: Long, hour: Int = 12, minute: Int = 0): Long = today.plusDays(day).atTime(hour, minute).atZone(zone).toInstant().toEpochMilli()
 
     /** Локальная дата операции из millis — так статус срока получает дату из записи. */
     private fun dateOf(millis: Long): LocalDate = Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
@@ -161,6 +160,40 @@ class CounterpartyDebtHistoryTest {
     }
 
     /* ------------------------------ Дата закрытия ----------------------------- */
+
+    @Test
+    fun `операции с одним моментом выстраиваются детерминированно`() {
+        // Порядок свёртки закреплён (дата, updatedAt, id): как бы операции
+        // ни въехали из синка в разном порядке, история и бегущий остаток
+        // получаются одни. Здесь updatedAt различает, кто был раньше.
+        val sameMoment = at(0, 12)
+        val opening = op("opening", sameMoment, DebtOpKind.OPENING_BALANCE, 50_000)
+        val writeOff = op("write-off", sameMoment, DebtOpKind.WRITE_OFF, -20_000)
+            .copy(updatedAt = sameMoment + 1)
+
+        assertEquals(
+            fold(listOf(writeOff, opening), today, zone).rows.map { it.op.id },
+            fold(listOf(opening, writeOff), today, zone).rows.map { it.op.id },
+        )
+        // От нового к старому: списание (позже по updatedAt) — первым.
+        val rows = fold(listOf(writeOff, opening), today, zone).rows
+        assertEquals(listOf("write-off", "opening"), rows.map { it.op.id })
+        assertEquals(listOf(30_000L, 50_000L), rows.map { it.runningBalanceMinor })
+    }
+
+    @Test
+    fun `при равном времени и равном updatedAt порядок решает id`() {
+        // Одна и та же дата и метка правки: запасной ключ — идентификатор.
+        val sameMoment = at(1, 9)
+        val first = op("adjust-a", sameMoment, DebtOpKind.WRITE_OFF, 30_000)
+        val second = op("adjust-b", sameMoment, DebtOpKind.WRITE_OFF, 10_000)
+
+        assertEquals(
+            fold(listOf(second, first), today, zone).rows.map { it.op.id },
+            fold(listOf(first, second), today, zone).rows.map { it.op.id },
+        )
+        assertEquals(listOf("adjust-b", "adjust-a"), fold(listOf(second, first), today, zone).rows.map { it.op.id })
+    }
 
     @Test
     fun `полное погашение задаёт дату закрытия`() {

@@ -6,6 +6,10 @@ import androidx.room.PrimaryKey
 /**
  * Контрагент по долгам: физлицо или компания, с которыми считают долги
  * отдельно от доходов и расходов по счетам.
+ *
+ * Слияние версий в синхронизации — last-write-wins по [updatedAt] без
+ * `updatedBy`: как и у корректировок долга, поле автора правки для этой
+ * коллекции не хранится ни в Room, ни в Firestore (см. SyncEngine).
  */
 @Entity(tableName = "counterparties")
 data class CounterpartyEntity(

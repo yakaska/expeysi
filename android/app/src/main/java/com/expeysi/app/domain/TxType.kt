@@ -5,12 +5,16 @@ enum class TxType(val wire: String) {
     EXPENSE("expense"),
     TRANSFER_OUT("transfer_out"),
     TRANSFER_IN("transfer_in"),
+
     /** Долг выдан контрагенту: деньги со счёта контрагенту, контрагент должен. */
     DEBT_LEND("debt_lend"),
+
     /** Долг взят от контрагента: деньги от контрагента на счёт, должен контрагенту. */
     DEBT_BORROW("debt_borrow"),
+
     /** Получено погашение от контрагента: деньги контрагенту на счёт. */
     DEBT_REPAY_IN("debt_repay_in"),
+
     /** Отправлено погашение контрагенту: деньги со счёта контрагенту. */
     DEBT_REPAY_OUT("debt_repay_out"),
     ;

@@ -13,7 +13,6 @@ import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.sync.SyncEngine
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.DebtCurrencySummary
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.DebtHistoryRow
-import com.expeysi.app.ui.debts.CounterpartyDebtHistory.DebtOp
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.DebtOpKind
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.adjustmentOp
 import com.expeysi.app.ui.debts.CounterpartyDebtHistory.fold

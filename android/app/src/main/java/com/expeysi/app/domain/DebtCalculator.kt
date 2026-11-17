@@ -8,6 +8,13 @@ import kotlin.math.abs
  * Чистая математика долгов: знаки операций, вывод kind из направления денег
  * и знака остатка, списание и перепогашение. Остаток нигде не хранится и
  * каждый раз выводится из операций и корректировок ([balances]).
+ *
+ * Ограничение модели: погашения не привязаны к конкретному выданному долгу —
+ * история плоская, а kind выводится из направления и знака остатка
+ * ([kindFor]). Сколько из выданного погашено и что именно списано, модель не
+ * различает: смешение сторон долга в одной валюте отражается общим остатком
+ * пары. Привязка «погашение → долг» здесь не строится сознательно: приложению
+ * достаточно остатка отношений с контрагентом, а не учёта по каждому займу.
  */
 object DebtCalculator {
 
@@ -52,11 +59,29 @@ object DebtCalculator {
     }
 
     /**
+     * Kind записи при правке. Пока направление денег не переведено, запись
+     * остаётся прежним kind — частично погашенный долг не «переименовывается»
+     * в выданный долг из-за изменившегося знака остатка. При смене направления
+     * kind выводится заново из направления и знака остатка ([kindFor]).
+     */
+    fun editKind(
+        originalType: TxType,
+        directionChanged: Boolean,
+        outgoing: Boolean,
+        balanceMinor: Long,
+    ): TxType = if (!directionChanged) originalType else kindFor(outgoing, balanceMinor)
+
+    /**
      * Знаковая дельта списания: модуль задаёт сумма из формы, знак
      * противоположен остатку. Полное списание обнуляет остаток, частичное —
-     * уменьшает модуль.
+     * уменьшает модуль. Списание при нулевом остатке долга не меняет ничего:
+     * возвращаем 0, иначе ноль «перевернулся» бы в долг обратной стороны.
      */
-    fun writeOffDelta(balanceMinor: Long, amountMinor: Long): Long = if (balanceMinor < 0) amountMinor else -amountMinor
+    fun writeOffDelta(balanceMinor: Long, amountMinor: Long): Long = when {
+        balanceMinor == 0L -> 0L
+        balanceMinor < 0 -> amountMinor
+        else -> -amountMinor
+    }
 
     /**
      * Перепогашение меняет знак: был должником — стал кредитором. Ноль до или
@@ -84,21 +109,25 @@ object DebtCalculator {
         .sumOf { it.deltaMinor }
 
     /**
-     * Вклады транзакций в остатки долга: не-долговые операции пропускаются.
-     * Валюта берётся у счёта операции — резолвер получает код по id счёта.
+     * Вклады транзакций в остатки долга: не-долговые операции пропускаются,
+     * мягко удалённые записи фильтруются здесь же (DAO тоже фильтрует, но
+     * расчёт не доверяет вызывающему). Валюта берётся у счёта операции —
+     * резолвер получает код по id счёта.
      */
     fun transactionDeltas(
         transactions: List<TransactionEntity>,
         currencyCodeOfAccount: (String) -> String,
-    ): List<Delta> = transactions.mapNotNull { transaction ->
-        val type = TxType.fromWire(transaction.type)
-        val delta = transactionDelta(type, transaction.amountMinor) ?: return@mapNotNull null
-        val counterpartyId = transaction.counterpartyId
-        if (counterpartyId.isEmpty()) {
-            return@mapNotNull null
+    ): List<Delta> = transactions
+        .filterNot { it.deleted }
+        .mapNotNull { transaction ->
+            val type = TxType.fromWire(transaction.type)
+            val delta = transactionDelta(type, transaction.amountMinor) ?: return@mapNotNull null
+            val counterpartyId = transaction.counterpartyId
+            if (counterpartyId.isEmpty()) {
+                return@mapNotNull null
+            }
+            Delta(counterpartyId, currencyCodeOfAccount(transaction.accountId), delta)
         }
-        Delta(counterpartyId, currencyCodeOfAccount(transaction.accountId), delta)
-    }
 
     /** Вклады корректировок в остатки долга: знаковая сумма и валюта — внутри записи. */
     fun adjustmentDeltas(adjustments: List<DebtAdjustmentEntity>): List<Delta> = adjustments

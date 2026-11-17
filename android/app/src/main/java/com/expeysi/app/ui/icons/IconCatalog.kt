@@ -3,8 +3,8 @@ package com.expeysi.app.ui.icons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.Celebration

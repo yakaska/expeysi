@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -65,19 +66,18 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material.icons.filled.Handshake
 import com.expeysi.app.R
 import com.expeysi.app.domain.DebtCalculator
-import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.DebtWriteOffs
+import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TransferFees
-import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.debts.DebtIcon
 import com.expeysi.app.ui.debts.debtKindLabelRes
+import com.expeysi.app.ui.home.FeedEntries
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -406,28 +406,16 @@ private fun TransactionList(
                     else -> date.format(dayHeaderFormatter)
                 }
                 if (!transferOnly) {
-                    // Переводы нейтральны, но их комиссия — реальная потеря
-                    // денег: входит в расходы дня. Долговая операция — тоже
-                    // реальное движение денег счёта: взятое и полученное
-                    // погашение — приход, выданный долг и отправленное
-                    // погашение — расход.
-                    val feeMinor = Transfers.feesMinor(dayItems.map { it.transaction })
+                    // Шапка дня — тот же P&L по начислению, что и в сводке
+                    // и шапке главной ленты: доходы и расходы, комиссии
+                    // переводов и учтённые списания (псевдо-строки). Переводы
+                    // и долговые потоки денег нейтральны: это движение
+                    // наличных, не доход и не расход.
+                    val daySums = FeedEntries.daySums(dayItems)
                     DayGroupHeader(
                         dateLabel = dateLabel,
-                        incomeMinor = dayItems
-                            .filter { item ->
-                                val type = TxType.fromWire(item.transaction.type)
-                                type == TxType.INCOME ||
-                                    type.isDebt && !DebtCalculator.isOutgoing(type)
-                            }
-                            .sumOf { it.transaction.amountMinor },
-                        expenseMinor = dayItems
-                            .filter { item ->
-                                val type = TxType.fromWire(item.transaction.type)
-                                type == TxType.EXPENSE ||
-                                    type.isDebt && DebtCalculator.isOutgoing(type)
-                            }
-                            .sumOf { it.transaction.amountMinor } + feeMinor,
+                        incomeMinor = daySums.incomeMinor,
+                        expenseMinor = daySums.expenseMinor,
                         currencySymbol = dayItems.first().currencySymbol,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -519,7 +507,7 @@ private fun TransactionList(
 private fun HistoryRow(
     item: TransactionItem,
     accountId: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     // Перевод рисуется карточкой с обеими сторонами и суммами ног; строка ниже —
     // обычные доходы и расходы и фолбэк для переводов без карточки (ноги без связки).
@@ -530,26 +518,44 @@ private fun HistoryRow(
             TransferCardRow(
                 card = card,
                 signed = accountId != null && !item.isTransferPair,
-                onClick = onClick,
+                // Псевдо-строки списания в карточки переводов не попадают:
+                // у передачи всегда есть реальная запись в БД.
+                onClick = onClick ?: {},
             )
             return
         }
     }
     val txType = TxType.fromWire(item.transaction.type)
-    // Счётная сторона: доход и долговое поступление денег — приход, остальное — расход.
+    // Счётная сторона: доход — приход; долговая операция сохраняет знак
+    // движения денег счёта (+/−), но цвет у неё нейтральный: долг не доход
+    // и не расход (см. ProfitAndLoss). Псевдо-строка учтённого списания —
+    // часть P&L с обычной раскраской знака.
     val isIncome = txType == TxType.INCOME ||
-        txType.isDebt && !DebtCalculator.isOutgoing(txType)
+        txType.isDebt &&
+        !DebtCalculator.isOutgoing(txType)
+    // Долговые потоки денег и свёрнутые пары нейтральны по цвету.
+    val neutralAmount = item.isTransferPair ||
+        txType.isDebt &&
+        !item.isWriteOffEntry
     val debtLabel = debtKindLabelRes(txType)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Псевдо-строка списания не кликабельна: записи в БД за ней нет.
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (txType.isDebt) {
             DebtIcon(Icons.Filled.Handshake, MaterialTheme.colorScheme.primaryContainer)
         } else {
+            // У псевдо-строки списания ключ иконки — DebtWriteOffs.ICON_KEY.
             CategoryIcon(item.categoryIconKey, item.categoryColorKey)
         }
         Column(
@@ -559,6 +565,7 @@ private fun HistoryRow(
         ) {
             Text(
                 when {
+                    item.isWriteOffEntry -> stringResource(R.string.debts_write_off_category)
                     debtLabel != null -> stringResource(debtLabel)
                     else -> item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
                 },
@@ -586,7 +593,9 @@ private fun HistoryRow(
             text = (if (isIncome) "+" else "−") +
                 "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
             style = MaterialTheme.typography.titleMedium,
-            color = if (isIncome) {
+            // Долговые потоки нейтральны по цвету, но со своим знаком;
+            // учтённые списания — обычная раскраска P&L.
+            color = if (!neutralAmount && isIncome) {
                 LocalFinanceColors.current.income
             } else {
                 MaterialTheme.colorScheme.onSurface

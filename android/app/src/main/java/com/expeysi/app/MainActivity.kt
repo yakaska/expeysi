@@ -40,9 +40,9 @@ import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.debts.CounterpartyScreen
 import com.expeysi.app.ui.debts.DEBTS_PICKED_COUNTERPARTY_ID
 import com.expeysi.app.ui.debts.DebtAdjustmentScreen
+import com.expeysi.app.ui.debts.DebtDirection
 import com.expeysi.app.ui.debts.DebtOperationScreen
 import com.expeysi.app.ui.debts.DebtOperationViewModel
-import com.expeysi.app.ui.debts.DebtDirection
 import com.expeysi.app.ui.debts.DebtsScreen
 import com.expeysi.app.ui.debts.EditCounterpartyScreen
 import com.expeysi.app.ui.export.ExportScreen
@@ -199,6 +199,12 @@ private fun AppNavigation() {
             scope.launch {
                 drawerState.close()
                 navController.navigate("accounts")
+            }
+        },
+        onDebtsClick = {
+            scope.launch {
+                drawerState.close()
+                navController.navigate("debts")
             }
         },
         onInviteClick = {

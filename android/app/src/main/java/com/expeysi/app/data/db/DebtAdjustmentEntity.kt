@@ -9,6 +9,10 @@ import androidx.room.PrimaryKey
  *
  * @param amountMinor знаковый вклад в остаток: плюс — контрагент должен,
  *   минус — должен он; списание хранит дельту, уменьшающую модуль остатка.
+ *
+ * Слияние версий в синхронизации — last-write-wins по [updatedAt] без
+ * `updatedBy`: как и у контрагентов, поле автора правки для этой коллекции
+ * не хранится ни в Room, ни в Firestore (см. SyncEngine).
  */
 @Entity(tableName = "debt_adjustments")
 data class DebtAdjustmentEntity(

@@ -134,8 +134,15 @@ fun DebtOperationScreen(
             TopAppBar(
                 title = {
                     Text(
+                        // Заголовок отражает суть экрана: новая долговая
+                        // операция или правка существующей; общий
+                        // add_title_* здесь не читается.
                         stringResource(
-                            if (viewModel.isEdit) R.string.add_title_edit else R.string.add_title_new,
+                            if (viewModel.isEdit) {
+                                R.string.debts_operation_edit_title
+                            } else {
+                                R.string.debts_operation_add_title
+                            },
                         ),
                     )
                 },
@@ -264,6 +271,18 @@ fun DebtOperationScreen(
                         onClick = { showDueDatePicker = true },
                         onClear = viewModel::clearDueDate,
                     )
+                    // Срок уже прошёл: предупреждение, а не блокировка —
+                    // возвращать долг задним числом законно, но просрочку
+                    // полезно заметить прямо на форме.
+                    val chosenDue = dueDate
+                    if (chosenDue != null && chosenDue < LocalDate.now(java.time.ZoneId.systemDefault())) {
+                        Text(
+                            text = stringResource(R.string.debts_due_past_warning),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                    }
                 }
                 OutlinedTextField(
                     value = note,
@@ -491,12 +510,11 @@ fun DebtOperationScreen(
 }
 
 /** Остаток со знаком: минус у отрицательного, плюс опускается. */
-private fun signedAmountText(minor: Long, symbol: String): String =
-    if (minor >= 0) {
-        AmountFormat.withCurrency(minor, symbol)
-    } else {
-        "\u2212" + AmountFormat.withCurrency(abs(minor), symbol)
-    }
+private fun signedAmountText(minor: Long, symbol: String): String = if (minor >= 0) {
+    AmountFormat.withCurrency(minor, symbol)
+} else {
+    "\u2212" + AmountFormat.withCurrency(abs(minor), symbol)
+}
 
 /** Дата и время операции: два центральных кликабельных столбца. */
 @Composable
