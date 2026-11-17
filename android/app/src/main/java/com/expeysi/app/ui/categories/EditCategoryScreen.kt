@@ -136,12 +136,13 @@ fun EditCategoryScreen(
             EntityPreview(name = name) {
                 CategoryIcon(iconKey = iconKey, colorKey = colorKey, size = 48.dp)
             }
+            val categoryTypes = listOf(TxType.INCOME, TxType.EXPENSE)
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                TxType.entries.forEachIndexed { index, txType ->
+                categoryTypes.forEachIndexed { index, txType ->
                     SegmentedButton(
                         selected = type == txType,
                         onClick = { viewModel.onTypeChange(txType) },
-                        shape = SegmentedButtonDefaults.itemShape(index = index, count = TxType.entries.size),
+                        shape = SegmentedButtonDefaults.itemShape(index = index, count = categoryTypes.size),
                     ) {
                         Text(
                             if (txType == TxType.EXPENSE) {
