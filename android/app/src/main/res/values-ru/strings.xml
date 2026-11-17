@@ -262,6 +262,8 @@
     <string name="transfer_title">Перевод</string>
     <!-- Псевдо-категория комиссий переводов в разрезках (донаты, итоги). -->
     <string name="transfer_fees_category">Комиссии переводов</string>
+    <!-- Псевдо-категория списаний долга «в отчётах» в разрезках (донаты, итоги). -->
+    <string name="debts_write_off_category">Списание долга</string>
     <!-- %1$s — начальный остаток, %2$s — символ валюты. -->
     <string name="accounts_opening_balance">Начальный остаток: %1$s %2$s</string>
     <string name="account_delete_title">Удалить счёт?</string>

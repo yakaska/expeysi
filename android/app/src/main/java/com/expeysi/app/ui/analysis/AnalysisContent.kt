@@ -46,6 +46,7 @@ import com.expeysi.app.R
 import com.expeysi.app.data.analysis.AnalysisAccount
 import com.expeysi.app.data.analysis.CategoryStat
 import com.expeysi.app.data.analysis.CategorySummary
+import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.TxType
@@ -437,13 +438,15 @@ private fun CategoryRow(
     currencySymbol: String,
     onClick: () -> Unit,
 ) {
-    // Псевдо-категория комиссий никуда не ведёт: за ней нет записи в БД.
-    val isFee = category.categoryId == TransferFees.CATEGORY_ID
+    // Псевдо-категории комиссий и списаний никуда не ведут: за ними нет
+    // записей в БД.
+    val isPseudo = category.categoryId == TransferFees.CATEGORY_ID ||
+        category.categoryId == DebtWriteOffs.CATEGORY_ID
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 72.dp)
-            .clickable(enabled = !isFee, onClick = onClick)
+            .clickable(enabled = !isPseudo, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

@@ -12,12 +12,15 @@ import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
 import com.expeysi.app.data.db.CounterpartyDao
 import com.expeysi.app.data.db.CurrencyDao
+import com.expeysi.app.data.db.DebtAdjustmentDao
+import com.expeysi.app.data.db.DebtAdjustmentEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.AccountTotal
 import com.expeysi.app.domain.AggEntry
 import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
+import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
 import com.expeysi.app.domain.TransferFees
@@ -42,6 +45,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import javax.inject.Inject
+import kotlin.math.abs
 
 /** Псевдотип «перевод» в аргументе type: обе ноги перевода, {transfer_out, transfer_in}. */
 private const val TRANSFER_TYPES_WIRE = "transfer"
@@ -75,6 +79,8 @@ private data class BaseData(
     val accounts: List<AccountEntity>,
     val categories: List<CategoryEntity>,
     val transactions: List<TransactionEntity>,
+    /** Списания «в отчётах» (countInStats): входят в итоги доходов/расходов. */
+    val writeOffs: List<DebtAdjustmentEntity> = emptyList(),
 )
 
 private data class Filters(
@@ -92,6 +98,7 @@ class HistoryViewModel @Inject constructor(
     categoryDao: CategoryDao,
     counterpartyDao: CounterpartyDao,
     currencyDao: CurrencyDao,
+    debtAdjustmentDao: DebtAdjustmentDao,
     transactionDao: TransactionDao,
 ) : ViewModel() {
 
@@ -134,17 +141,20 @@ class HistoryViewModel @Inject constructor(
     private val base: StateFlow<BaseData> = combine(
         balanceDao.observeActive(),
         accountDao.observeActive(),
-        categoryDao.observeActive(TxType.EXPENSE.wire),
-        categoryDao.observeActive(TxType.INCOME.wire),
+        categoryDao.observeAll(),
         transactionDao.observeActive(),
-    ) { balances, accounts, expenseCategories, incomeCategories, transactions ->
+        debtAdjustmentDao.observeAll(),
+    ) { balances, accounts, allCategories, transactions, adjustments ->
         BaseData(
             balances = balances,
             accounts = accounts,
-            categories = expenseCategories + incomeCategories,
+            categories = allCategories.filter {
+                !it.deleted && (it.type == TxType.EXPENSE.wire || it.type == TxType.INCOME.wire)
+            },
             transactions = transactions,
+            writeOffs = adjustments.filter { !it.deleted && it.countInStats },
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BaseData(emptyList(), emptyList(), emptyList(), emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BaseData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
 
     private val currencies: StateFlow<Map<String, String>> = currencyDao.observeAll()
         .map { list -> list.associate { it.code to it.symbol } }
@@ -200,16 +210,16 @@ class HistoryViewModel @Inject constructor(
         val accountById = data.accounts.associateBy { it.id }
         val periodStart = f.period.startMillis(ZonedDateTime.now(zone))
 
+        // Дата в фильтр-окне отчёта: у списаний то же окно, что у транзакций.
+        val windowRange = f.customRange
+        fun inWindow(date: Long): Boolean = when {
+            windowRange != null -> date >= windowRange.startMillis && date < windowRange.endMillisExclusive
+            periodStart != null -> date >= periodStart
+            else -> true
+        }
         val filtered = data.transactions
             .filter { it.accountId in scopeIds }
-            .filter { tx ->
-                val range = f.customRange
-                when {
-                    range != null -> tx.date >= range.startMillis && tx.date < range.endMillisExclusive
-                    periodStart != null -> tx.date >= periodStart
-                    else -> true
-                }
-            }
+            .filter { inWindow(it.date) }
             .filter { TxType.fromWire(it.type) in f.types }
             .filter { f.categoryIds == null || it.categoryId in f.categoryIds }
 
@@ -217,6 +227,8 @@ class HistoryViewModel @Inject constructor(
         // в донышках анализов и в итогах доходов/расходов не участвуют.
         // Исключение — комиссия перевода: реальная потеря денег, входит в
         // расходы как псевдо-категория TransferFees.CATEGORY_ID на счёте-источнике.
+        // Долговые операции тоже не входят: долг не доход и не расход, а своего
+        // «псевдо-итога» в разрезках у долгов нет — их место в разделе «Долгов».
         val feeEntries = if (TxType.EXPENSE in f.types && f.categoryIds == null) {
             filtered
                 .filter { TxType.fromWire(it.type) == TxType.TRANSFER_OUT && it.feeMinor > 0 }
@@ -224,12 +236,38 @@ class HistoryViewModel @Inject constructor(
         } else {
             emptyList()
         }
+
+        // Списание «в отчётах» — безналичный плюс/минус долга: у корректировки
+        // нет ни счёта, ни категории, поэтому в разрезках и итогах оно живёт
+        // строкой DebtWriteOffs.CATEGORY_ID (и псевдо-«счётом» там же) по валюте
+        // скоупа. Плюс — как доход, минус — как расход (переключатель формы),
+        // фильтр категорий к списанию неприменим — при нём списания не добавляются.
+        val statWriteOffs = data.writeOffs
+            .filter { it.currencyCode == balance?.currencyCode && inWindow(it.date) }
+        val writeOffEntries = if (f.categoryIds == null) {
+            statWriteOffs
+                .filter {
+                    (TxType.INCOME in f.types && it.amountMinor > 0L) ||
+                        (TxType.EXPENSE in f.types && it.amountMinor < 0L)
+                }
+                .map {
+                    AggEntry(
+                        categoryId = DebtWriteOffs.CATEGORY_ID,
+                        accountId = DebtWriteOffs.CATEGORY_ID,
+                        type = if (it.amountMinor > 0L) TxType.INCOME else TxType.EXPENSE,
+                        amountMinor = abs(it.amountMinor),
+                    )
+                }
+        } else {
+            emptyList()
+        }
+
         val entries = filtered
             .filterNot { TxType.fromWire(it.type).isTransfer }
             .filterNot { TxType.fromWire(it.type).isDebt }
             .map {
                 AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
-            } + feeEntries
+            } + feeEntries + writeOffEntries
 
         val scopedTransactions = filtered
             .filter { detail == null || it.categoryId == detail.categoryId }
@@ -326,8 +364,9 @@ class HistoryViewModel @Inject constructor(
     }
 
     fun openDetail(categoryId: String, accountId: String? = null) {
-        // Псевдо-категория комиссий не открывается: за ней нет записи в БД.
-        if (categoryId == TransferFees.CATEGORY_ID) return
+        // Псевдо-категории комиссий и списаний не открываются: за ними нет
+        // записей в БД.
+        if (categoryId == TransferFees.CATEGORY_ID || categoryId == DebtWriteOffs.CATEGORY_ID) return
         _detail.value = HistoryDetail(categoryId, accountId)
     }
 

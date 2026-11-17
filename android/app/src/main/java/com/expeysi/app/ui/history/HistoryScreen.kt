@@ -11,10 +11,12 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -67,6 +69,7 @@ import androidx.compose.material.icons.filled.Handshake
 import com.expeysi.app.R
 import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Money
+import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
@@ -628,28 +631,30 @@ private fun CategoriesView(
         }
         items(state.categoryTotals, key = { it.categoryId }) { total ->
             val category = categoryById[total.categoryId]
+            // Псевдо-категории комиссий и списаний никуда не ведут: за ними
+            // нет записей в БД.
+            val isFee = total.categoryId == TransferFees.CATEGORY_ID
+            val isWriteOff = total.categoryId == DebtWriteOffs.CATEGORY_ID
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 64.dp)
                     .clickable(
-                        // Псевдо-категория комиссий никуда не ведёт: за ней
-                        // нет записи в БД.
-                        enabled = total.categoryId != TransferFees.CATEGORY_ID,
+                        enabled = !isFee && !isWriteOff,
                     ) { onCategoryClick(total.categoryId) }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CategoryIcon(
-                    if (total.categoryId == TransferFees.CATEGORY_ID) {
-                        TransferFees.ICON_KEY
-                    } else {
-                        category?.iconKey ?: ""
+                    when (total.categoryId) {
+                        TransferFees.CATEGORY_ID -> TransferFees.ICON_KEY
+                        DebtWriteOffs.CATEGORY_ID -> DebtWriteOffs.ICON_KEY
+                        else -> category?.iconKey ?: ""
                     },
-                    if (total.categoryId == TransferFees.CATEGORY_ID) {
-                        TransferFees.COLOR_KEY
-                    } else {
-                        category?.colorKey ?: "default"
+                    when (total.categoryId) {
+                        TransferFees.CATEGORY_ID -> TransferFees.COLOR_KEY
+                        DebtWriteOffs.CATEGORY_ID -> DebtWriteOffs.COLOR_KEY
+                        else -> category?.colorKey ?: "default"
                     },
                 )
                 Text(
@@ -659,8 +664,15 @@ private fun CategoriesView(
                         .weight(1f)
                         .padding(start = 16.dp),
                 )
+                // У списания в смешанном виде показываем непустую сторону
+                // (обычно у списания одна сторона), как у строк счетов.
+                val rowAmountMinor = when {
+                    !isWriteOff -> if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor
+                    state.isIncomeOnly || total.expenseMinor == 0L -> total.incomeMinor
+                    else -> total.expenseMinor
+                }
                 Text(
-                    text = "${Money.formatAuto(if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
+                    text = "${Money.formatAuto(rowAmountMinor)} ${state.currencySymbol}",
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -688,13 +700,16 @@ private fun AccountsView(
     ) {
         items(state.accountTotals, key = { it.accountId }) { total ->
             val account = accountById[total.accountId]
-            val expanded = total.accountId in expandedAccounts
+            // Псевдо-«счёт» списаний долга: у корректировки нет счёта,
+            // в разрезке счетов она своя строка без вложенной расшифровки.
+            val isWriteOff = total.accountId == DebtWriteOffs.CATEGORY_ID
+            val expanded = !isWriteOff && total.accountId in expandedAccounts
             Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 64.dp)
-                        .clickable {
+                        .clickable(enabled = !isWriteOff) {
                             expandedAccounts = if (expanded) {
                                 expandedAccounts - total.accountId
                             } else {
@@ -704,24 +719,39 @@ private fun AccountsView(
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CategoryIcon(account?.iconKey ?: "", account?.colorKey ?: "default")
-                    Text(
-                        text = account?.name.orEmpty(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 16.dp),
-                    )
+                    if (isWriteOff) {
+                        CategoryIcon(DebtWriteOffs.ICON_KEY, DebtWriteOffs.COLOR_KEY)
+                        Text(
+                            text = categoryDisplayName(DebtWriteOffs.CATEGORY_ID, ""),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 16.dp),
+                        )
+                    } else {
+                        CategoryIcon(account?.iconKey ?: "", account?.colorKey ?: "default")
+                        Text(
+                            text = account?.name.orEmpty(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 16.dp),
+                        )
+                    }
                     Text(
                         text = "${Money.formatAuto(if (total.expenseMinor == 0L) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = stringResource(
-                            if (expanded) R.string.analysis_collapse else R.string.history_expand_cd,
-                        ),
-                    )
+                    if (isWriteOff) {
+                        Spacer(modifier = Modifier.width(24.dp))
+                    } else {
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = stringResource(
+                                if (expanded) R.string.analysis_collapse else R.string.history_expand_cd,
+                            ),
+                        )
+                    }
                 }
                 if (expanded) {
                     total.categories.forEach { categoryTotal ->

@@ -4,7 +4,9 @@ import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CurrencyDao
+import com.expeysi.app.data.db.DebtAdjustmentDao
 import com.expeysi.app.data.db.TransactionDao
+import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.TxType
 import javax.inject.Inject
@@ -17,6 +19,7 @@ class RoomAnalysisRepository @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val currencyDao: CurrencyDao,
+    private val debtAdjustmentDao: DebtAdjustmentDao,
 ) : AnalysisRepository {
 
     override suspend fun accounts(balanceId: String?): List<AnalysisAccount> {
@@ -55,7 +58,8 @@ class RoomAnalysisRepository @Inject constructor(
             // псевдо-сектором (см. TransferFees), чтобы итог и донат
             // оставались равны сумме категорий. totalMinor по-прежнему
             // считается суммой категорий.
-            feeStats(type, startMillis, endMillisExclusive, resolvedIds)
+            feeStats(type, startMillis, endMillisExclusive, resolvedIds) +
+            writeOffStats(balanceId, type, startMillis, endMillisExclusive)
         val sorted = stats.sortedByDescending { it.amountMinor }
         return CategorySummary(
             totalMinor = sorted.sumOf { it.amountMinor },
@@ -84,6 +88,39 @@ class RoomAnalysisRepository @Inject constructor(
                 colorKey = TransferFees.COLOR_KEY,
                 amountMinor = feeLegs.sumOf { it.feeMinor },
                 operationCount = feeLegs.size,
+            ),
+        )
+    }
+
+    /**
+     * Псевдо-сектор списаний долга «в отчётах»; пусто у баланса без валюты и
+     * когда списаний нужного знака за период нет. У корректировки нет счёта,
+     * поэтому фильтр счетов её не отсекает — отбор по валюте отчёта: плюс
+     * идёт в доходы (INCOME), минус в расходы (EXPENSE), как на форме.
+     */
+    private suspend fun writeOffStats(
+        balanceId: String?,
+        type: TxType,
+        startMillis: Long?,
+        endMillisExclusive: Long?,
+    ): List<CategoryStat> {
+        if (balanceId == null) return emptyList()
+        val currencyCode = balanceDao.byId(balanceId)?.currencyCode ?: return emptyList()
+        val rows = debtAdjustmentDao.listStatWriteOffs(currencyCode, startMillis, endMillisExclusive)
+        val matching = rows.filter { if (type == TxType.EXPENSE) it.amountMinor < 0 else it.amountMinor > 0 }
+        if (matching.isEmpty()) return emptyList()
+        return listOf(
+            CategoryStat(
+                categoryId = DebtWriteOffs.CATEGORY_ID,
+                name = "",
+                iconKey = DebtWriteOffs.ICON_KEY,
+                colorKey = DebtWriteOffs.COLOR_KEY,
+                amountMinor = if (type == TxType.EXPENSE) {
+                    -matching.sumOf { it.amountMinor }
+                } else {
+                    matching.sumOf { it.amountMinor }
+                },
+                operationCount = matching.size,
             ),
         )
     }

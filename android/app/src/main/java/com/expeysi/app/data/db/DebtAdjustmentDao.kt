@@ -23,6 +23,22 @@ interface DebtAdjustmentDao {
     @Query("SELECT * FROM debt_adjustments")
     fun observeAll(): Flow<List<DebtAdjustmentEntity>>
 
+    /**
+     * Списания «в отчётах» за отчётный период в одной валюте: разрезки и
+     * «Анализ финансов» берут их одним списком, знак — минус/плюс.
+     */
+    @Query(
+        "SELECT * FROM debt_adjustments " +
+            "WHERE deleted = 0 AND countInStats = 1 AND kind = 'write_off' AND currencyCode = :currencyCode " +
+            "AND (:startMillis IS NULL OR date >= :startMillis) " +
+            "AND (:endMillis IS NULL OR date < :endMillis)",
+    )
+    suspend fun listStatWriteOffs(
+        currencyCode: String,
+        startMillis: Long?,
+        endMillis: Long?,
+    ): List<DebtAdjustmentEntity>
+
     @Query("SELECT * FROM debt_adjustments WHERE id = :id")
     suspend fun byId(id: String): DebtAdjustmentEntity?
 
