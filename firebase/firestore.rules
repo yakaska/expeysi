@@ -46,6 +46,14 @@ service cloud.firestore {
       match /transactions/{transactionId} {
         allow read, write: if isMember(familyId);
       }
+
+      match /counterparties/{counterpartyId} {
+        allow read, write: if isMember(familyId);
+      }
+
+      match /debt_adjustments/{debtAdjustmentId} {
+        allow read, write: if isMember(familyId);
+      }
     }
   }
 }

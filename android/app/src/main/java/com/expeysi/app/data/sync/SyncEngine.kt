@@ -10,6 +10,10 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.data.db.CounterpartyDao
+import com.expeysi.app.data.db.CounterpartyEntity
+import com.expeysi.app.data.db.DebtAdjustmentDao
+import com.expeysi.app.data.db.DebtAdjustmentEntity
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.google.firebase.firestore.CollectionReference
@@ -54,6 +58,8 @@ class SyncEngine @Inject constructor(
     private val accountDao: AccountDao,
     private val categoryDao: CategoryDao,
     private val transactionDao: TransactionDao,
+    private val counterpartyDao: CounterpartyDao,
+    private val debtAdjustmentDao: DebtAdjustmentDao,
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var started = false
@@ -80,11 +86,13 @@ class SyncEngine @Inject constructor(
                 if (familyId != null) {
                     coroutineScope {
                         remote.reset()
-                        val initialized = List(4) { CompletableDeferred<Unit>() }
+                        val initialized = List(6) { CompletableDeferred<Unit>() }
                         launch { listen(familyId, COLLECTION_BALANCES, initialized[0], ::mergeBalance) }
                         launch { listen(familyId, COLLECTION_ACCOUNTS, initialized[1], ::mergeAccount) }
                         launch { listen(familyId, COLLECTION_CATEGORIES, initialized[2], ::mergeCategory) }
                         launch { listen(familyId, COLLECTION_TRANSACTIONS, initialized[3], ::mergeTransaction) }
+                        launch { listen(familyId, COLLECTION_COUNTERPARTIES, initialized[4], ::mergeCounterparty) }
+                        launch { listen(familyId, COLLECTION_DEBT_ADJUSTMENTS, initialized[5], ::mergeDebtAdjustment) }
                         initialized.awaitAll()
                         uploadMissingLocal()
                     }
@@ -98,6 +106,10 @@ class SyncEngine @Inject constructor(
         val accounts = accountDao.observeAll().first { it.isNotEmpty() }
         val categories = categoryDao.observeAll().first { it.isNotEmpty() }
         val transactions = transactionDao.observeAll().first()
+        // Долговых таблиц нет сида: у семьи без долгов они остаются пустыми,
+        // и ожидание первой строки подвесило бы синхронизацию.
+        val counterparties = counterpartyDao.observeAll().first()
+        val debtAdjustments = debtAdjustmentDao.observeAll().first()
         val writes = mutableListOf<Pair<DocumentReference, Map<String, Any?>>>()
         var wrote = 0
         var unchanged = 0
@@ -124,8 +136,19 @@ class SyncEngine @Inject constructor(
                 stage(COLLECTION_TRANSACTIONS, it.id, transactionFields(it))
             }
         }
+        counterparties.forEach {
+            if (needsUpload(it.updatedAt, remote.updatedAt(COLLECTION_COUNTERPARTIES, it.id))) {
+                stage(COLLECTION_COUNTERPARTIES, it.id, counterpartyFields(it))
+            }
+        }
+        debtAdjustments.forEach {
+            if (needsUpload(it.updatedAt, remote.updatedAt(COLLECTION_DEBT_ADJUSTMENTS, it.id))) {
+                stage(COLLECTION_DEBT_ADJUSTMENTS, it.id, debtAdjustmentFields(it))
+            }
+        }
         commitInBatches(writes)
-        val total = balances.size + accounts.size + categories.size + transactions.size
+        val total = balances.size + accounts.size + categories.size + transactions.size +
+            counterparties.size + debtAdjustments.size
         Log.d(TAG, "startup upload wrote=$wrote unchanged=$unchanged skipped=${total - wrote - unchanged}")
     }
 
@@ -143,6 +166,14 @@ class SyncEngine @Inject constructor(
 
     fun uploadTransaction(value: TransactionEntity) {
         writeEntity(COLLECTION_TRANSACTIONS, value.id, transactionFields(value))
+    }
+
+    fun uploadCounterparty(value: CounterpartyEntity) {
+        writeEntity(COLLECTION_COUNTERPARTIES, value.id, counterpartyFields(value))
+    }
+
+    fun uploadDebtAdjustment(value: DebtAdjustmentEntity) {
+        writeEntity(COLLECTION_DEBT_ADJUSTMENTS, value.id, debtAdjustmentFields(value))
     }
 
     /**
@@ -256,10 +287,34 @@ class SyncEngine @Inject constructor(
         // Комиссия пишется только ненулевая: документы до фичи без ключа,
         // иначе сравнение «неизменившееся» пере-заливало бы старые записи.
         if (value.feeMinor != 0L) put("feeMinor", value.feeMinor)
+        // Поля долга — по той же схеме: только непустой контрагент и непустой срок.
+        if (value.counterpartyId.isNotEmpty()) put("counterpartyId", value.counterpartyId)
+        if (value.dueDate != null) put("dueDate", value.dueDate)
         put("deleted", value.deleted)
         put("updatedAt", value.updatedAt)
         put("updatedBy", authRepository.userId ?: value.updatedBy)
     }
+
+    private fun counterpartyFields(value: CounterpartyEntity) = mapOf(
+        "name" to value.name,
+        "type" to value.type,
+        "note" to value.note,
+        "archived" to value.archived,
+        "deleted" to value.deleted,
+        "updatedAt" to value.updatedAt,
+    )
+
+    private fun debtAdjustmentFields(value: DebtAdjustmentEntity) = mapOf(
+        "counterpartyId" to value.counterpartyId,
+        "kind" to value.kind,
+        "amountMinor" to value.amountMinor,
+        "currencyCode" to value.currencyCode,
+        "date" to value.date,
+        "note" to value.note,
+        "countInStats" to value.countInStats,
+        "deleted" to value.deleted,
+        "updatedAt" to value.updatedAt,
+    )
 
     /** Неизменившееся содержимое не пишется: без снимка удалённой стороны запись не пропускается. */
     private fun isUnchanged(name: String, id: String, fields: Map<String, Any?>): Boolean {
@@ -420,6 +475,9 @@ class SyncEngine @Inject constructor(
             linkedId = document.getString("linkedId") ?: "",
             counterpartyAccountId = document.getString("counterpartyAccountId") ?: "",
             feeMinor = document.getLong("feeMinor") ?: 0,
+            // Поля долга: пустой контрагент и NULL-срок у документов до фичи.
+            counterpartyId = document.getString("counterpartyId") ?: "",
+            dueDate = document.getLong("dueDate"),
             deleted = document.getBoolean("deleted") ?: false,
             updatedAt = document.getLong("updatedAt") ?: 0,
             updatedBy = document.getString("updatedBy") ?: "",
@@ -442,6 +500,43 @@ class SyncEngine @Inject constructor(
                 }
             }
             value.updatedAt < local.updatedAt -> uploadTransaction(local)
+        }
+    }
+
+    private suspend fun mergeCounterparty(document: DocumentSnapshot) {
+        val value = CounterpartyEntity(
+            id = document.id,
+            name = document.getString("name") ?: return,
+            type = document.getString("type") ?: return,
+            note = document.getString("note") ?: "",
+            archived = document.getBoolean("archived") ?: false,
+            deleted = document.getBoolean("deleted") ?: false,
+            updatedAt = document.getLong("updatedAt") ?: 0,
+        )
+        val local = counterpartyDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> counterpartyDao.upsert(value)
+            value.updatedAt < local.updatedAt -> uploadCounterparty(local)
+        }
+    }
+
+    private suspend fun mergeDebtAdjustment(document: DocumentSnapshot) {
+        val value = DebtAdjustmentEntity(
+            id = document.id,
+            counterpartyId = document.getString("counterpartyId") ?: return,
+            kind = document.getString("kind") ?: return,
+            amountMinor = document.getLong("amountMinor") ?: return,
+            currencyCode = document.getString("currencyCode") ?: return,
+            date = document.getLong("date") ?: return,
+            note = document.getString("note") ?: "",
+            countInStats = document.getBoolean("countInStats") ?: false,
+            deleted = document.getBoolean("deleted") ?: false,
+            updatedAt = document.getLong("updatedAt") ?: 0,
+        )
+        val local = debtAdjustmentDao.byId(value.id)
+        when {
+            local == null || value.updatedAt > local.updatedAt -> debtAdjustmentDao.upsert(value)
+            value.updatedAt < local.updatedAt -> uploadDebtAdjustment(local)
         }
     }
 }
@@ -563,3 +658,7 @@ private const val COLLECTION_ACCOUNTS = "accounts"
 private const val COLLECTION_CATEGORIES = "categories"
 
 private const val COLLECTION_TRANSACTIONS = "transactions"
+
+private const val COLLECTION_COUNTERPARTIES = "counterparties"
+
+private const val COLLECTION_DEBT_ADJUSTMENTS = "debt_adjustments"
