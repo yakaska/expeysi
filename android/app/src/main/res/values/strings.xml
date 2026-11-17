@@ -296,6 +296,61 @@
     <string name="categoryreport_select_categories">Select categories</string>
     <string name="categoryreport_show_operations">Show transactions</string>
     <string name="categoryreport_edit_categories_cd">Edit categories</string>
+    <string name="common_edit">Edit</string>
+    <string name="debts_title">Debts</string>
+    <string name="debts_add_cd">Add debt operation</string>
+    <string name="debts_empty_title">No debts here yet</string>
+    <string name="debts_empty_hint">Tap “+” to record the first debt or write-off.</string>
+    <string name="debts_total_owed_to_me">Owed to me</string>
+    <string name="debts_total_owed_by_me">I owe</string>
+    <!-- %1$s — сумма с символом валюты. -->
+    <string name="debts_row_owed_to_me">Owes you %1$s</string>
+    <string name="debts_row_owed_by_me">You owe %1$s</string>
+    <string name="debts_row_settled">Settled</string>
+    <string name="debts_section_archive">Archive</string>
+    <string name="debts_overdue">Overdue</string>
+    <!-- %1$s — дата возврата долга. -->
+    <string name="debts_due_label">Due %1$s</string>
+    <string name="debts_action_lend">Lend</string>
+    <string name="debts_action_borrow">Borrow</string>
+    <string name="debts_action_repay">Repay</string>
+    <string name="debts_action_write_off">Write off</string>
+    <string name="debts_action_opening_balance">Opening balance</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="debts_opening_amount_label">Opening balance, %1$s</string>
+    <string name="debts_counterparty_label">Counterparty</string>
+    <string name="debts_direction_out">Paying out</string>
+    <string name="debts_direction_in">Receiving</string>
+    <string name="debts_due_date">Repayment due</string>
+    <string name="debts_due_clear_cd">Clear due date</string>
+    <string name="debts_no_counterparties">No counterparties yet. Add a person or company first.</string>
+    <string name="debts_kind_lend">Debt issued</string>
+    <string name="debts_kind_borrow">Debt taken</string>
+    <string name="debts_kind_repay_in">Repayment received</string>
+    <string name="debts_kind_repay_out">Repayment sent</string>
+    <string name="debts_kind_write_off">Write-off</string>
+    <!-- %1$s и %2$s — остатки до и после операции, %3$s — символ валюты. -->
+    <string name="debts_flip_title">The balance will change direction</string>
+    <string name="debts_flip_text">The balance changes direction: %1$s will become %2$s. Save anyway?</string>
+    <string name="debts_write_off_title">Write off debt</string>
+    <!-- %1$s — остаток этой валюты. -->
+    <string name="debts_write_off_remaining">Remaining: %1$s</string>
+    <string name="debts_write_off_error_over">The amount can’t exceed the remaining %1$s</string>
+    <string name="debts_write_off_count_in_stats">Count in reports</string>
+    <string name="debts_write_off_count_hint">Positive write-off appears as income, negative as expense.</string>
+    <string name="counterparty_add_title">New counterparty</string>
+    <string name="counterparty_edit_title">Edit counterparty</string>
+    <string name="counterparty_type_person">Person</string>
+    <string name="counterparty_type_company">Company</string>
+    <string name="counterparty_menu_archive">Archive</string>
+    <string name="counterparty_menu_unarchive">Unarchive</string>
+    <string name="counterparty_menu_cd">More options</string>
+    <string name="counterparty_archived_hint">Archived — hidden from the debts list.</string>
+    <string name="counterparty_history_title">History</string>
+    <string name="counterparty_history_empty">No debt operations yet.</string>
+    <string name="counterparty_delete_title">Delete counterparty?</string>
+    <string name="counterparty_delete_text">The counterparty will disappear from the list; the debt history will remain in the shared journal.</string>
+    <string name="counterparty_delete_blocked_text">Can’t delete: the counterparty has a non-zero balance or history. You can archive it instead.</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d operation</item>
         <item quantity="other">%1$d operations</item>

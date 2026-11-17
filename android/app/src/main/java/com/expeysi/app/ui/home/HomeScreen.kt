@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Receipt
@@ -124,6 +125,7 @@ private const val VISIBLE_ACCOUNT_CHIPS = 3
 data class HomeActions(
     val onMenuClick: () -> Unit,
     val onAddClick: () -> Unit,
+    val onDebtsClick: () -> Unit = {},
     val onItemClick: (String) -> Unit,
     val onAddBalanceClick: () -> Unit,
     val onEditBalanceClick: (String) -> Unit,
@@ -141,6 +143,7 @@ data class HomeActions(
 fun HomeScreen(
     onMenuClick: () -> Unit,
     onAddClick: () -> Unit,
+    onDebtsClick: () -> Unit = {},
     onItemClick: (String) -> Unit,
     onAddBalanceClick: () -> Unit,
     onEditBalanceClick: (String) -> Unit,
@@ -157,6 +160,7 @@ fun HomeScreen(
         actions = HomeActions(
             onMenuClick = onMenuClick,
             onAddClick = onAddClick,
+            onDebtsClick = onDebtsClick,
             onItemClick = onItemClick,
             onAddBalanceClick = onAddBalanceClick,
             onEditBalanceClick = onEditBalanceClick,
@@ -249,6 +253,12 @@ fun HomeContent(
                         Icon(
                             Icons.Filled.History,
                             contentDescription = stringResource(R.string.home_transaction_history),
+                        )
+                    }
+                    IconButton(onClick = actions.onDebtsClick) {
+                        Icon(
+                            Icons.Filled.Handshake,
+                            contentDescription = stringResource(R.string.debts_title),
                         )
                     }
                 },

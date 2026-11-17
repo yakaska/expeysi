@@ -37,6 +37,12 @@ import com.expeysi.app.ui.categories.EditCategoryScreen
 import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.common.asString
+import com.expeysi.app.ui.debts.CounterpartyScreen
+import com.expeysi.app.ui.debts.DebtAdjustmentScreen
+import com.expeysi.app.ui.debts.DebtOperationScreen
+import com.expeysi.app.ui.debts.DebtDirection
+import com.expeysi.app.ui.debts.DebtsScreen
+import com.expeysi.app.ui.debts.EditCounterpartyScreen
 import com.expeysi.app.ui.export.ExportScreen
 import com.expeysi.app.ui.family.FamilyScreen
 import com.expeysi.app.ui.family.InviteScreen
@@ -214,6 +220,7 @@ private fun AppNavigation() {
                 HomeScreen(
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onAddClick = { navController.navigate("add") },
+                    onDebtsClick = { navController.navigate("debts") },
                     onItemClick = { id -> navController.navigate("edit/$id") },
                     onAddBalanceClick = { navController.navigate("balances/add") },
                     onEditBalanceClick = { id -> navController.navigate("balances/edit/$id") },
@@ -305,6 +312,124 @@ private fun AppNavigation() {
             }
             composable("data-export") {
                 ExportScreen(onBack = { navigateBack() })
+            }
+            composable("debts") {
+                DebtsScreen(
+                    onBack = { navigateBack() },
+                    onCounterpartyClick = { id -> navController.navigate("debts/counterparty/$id") },
+                    onEditCounterpartyClick = { id -> navController.navigate("counterparties/edit/$id") },
+                    onAddOperationClick = { navController.navigate("debts/operation/add") },
+                )
+            }
+            composable(
+                route = "debts/counterparty/{counterpartyId}",
+                arguments = listOf(navArgument("counterpartyId") { type = NavType.StringType }),
+            ) { entry ->
+                val counterpartyId = entry.arguments?.getString("counterpartyId").orEmpty()
+                CounterpartyScreen(
+                    onBack = { navigateBack() },
+                    onEditClick = { id -> navController.navigate("counterparties/edit/$id") },
+                    onOperationClick = { id -> navController.navigate("debts/operation/edit/$id") },
+                    onAdjustmentClick = { id -> navController.navigate("debts/adjustment/edit/$id") },
+                    onLendClick = { lend ->
+                        navController.navigate(
+                            "debts/operation/add?counterpartyId=$counterpartyId&" +
+                                "direction=${if (lend) DebtDirection.OUT.wire else DebtDirection.IN.wire}",
+                        )
+                    },
+                    onRepayClick = { direction, currency, amount ->
+                        navController.navigate(
+                            "debts/operation/add?counterpartyId=$counterpartyId&" +
+                                "direction=${direction.wire}&currency=$currency&amount=$amount",
+                        )
+                    },
+                    onWriteOffClick = { currency, remaining ->
+                        navController.navigate(
+                            "debts/adjustment/add?counterpartyId=$counterpartyId&" +
+                                "kind=write_off&currency=$currency&remaining=$remaining",
+                        )
+                    },
+                    onOpeningBalanceClick = {
+                        navController.navigate(
+                            "debts/adjustment/add?counterpartyId=$counterpartyId&kind=opening_balance",
+                        )
+                    },
+                )
+            }
+            composable("counterparties/add") {
+                EditCounterpartyScreen(onClose = { navigateBack() })
+            }
+            composable(
+                route = "counterparties/edit/{counterpartyId}",
+                arguments = listOf(navArgument("counterpartyId") { type = NavType.StringType }),
+            ) {
+                EditCounterpartyScreen(onClose = { navigateBack() })
+            }
+            composable(
+                route = "debts/operation/add?counterpartyId={counterpartyId}&direction={direction}" +
+                    "&currency={currency}&amount={amount}",
+                arguments = listOf(
+                    navArgument("counterpartyId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("direction") {
+                        type = NavType.StringType
+                        defaultValue = DebtDirection.OUT.wire
+                    },
+                    navArgument("currency") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("amount") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
+                DebtOperationScreen(
+                    onClose = { navigateBack() },
+                    onCreateCounterpartyClick = { navController.navigate("counterparties/add") },
+                )
+            }
+            composable(
+                route = "debts/operation/edit/{transactionId}",
+                arguments = listOf(navArgument("transactionId") { type = NavType.StringType }),
+            ) {
+                DebtOperationScreen(
+                    onClose = { navigateBack() },
+                    onCreateCounterpartyClick = { navController.navigate("counterparties/add") },
+                )
+            }
+            composable(
+                route = "debts/adjustment/add?counterpartyId={counterpartyId}&kind={kind}" +
+                    "&currency={currency}&remaining={remaining}",
+                arguments = listOf(
+                    navArgument("counterpartyId") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("kind") {
+                        type = NavType.StringType
+                        defaultValue = "opening_balance"
+                    },
+                    navArgument("currency") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                    navArgument("remaining") {
+                        type = NavType.StringType
+                        defaultValue = ""
+                    },
+                ),
+            ) {
+                DebtAdjustmentScreen(onClose = { navigateBack() })
+            }
+            composable(
+                route = "debts/adjustment/edit/{adjustmentId}",
+                arguments = listOf(navArgument("adjustmentId") { type = NavType.StringType }),
+            ) {
+                DebtAdjustmentScreen(onClose = { navigateBack() })
             }
             composable("family-invite") {
                 InviteScreen(

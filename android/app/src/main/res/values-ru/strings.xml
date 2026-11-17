@@ -290,6 +290,61 @@
     <string name="categoryreport_select_categories">Выберите категории</string>
     <string name="categoryreport_show_operations">Показать операции</string>
     <string name="categoryreport_edit_categories_cd">Изменить категории</string>
+    <string name="common_edit">Редактировать</string>
+    <string name="debts_title">Долги</string>
+    <string name="debts_add_cd">Добавить долговую операцию</string>
+    <string name="debts_empty_title">Здесь пока нет долгов</string>
+    <string name="debts_empty_hint">Нажмите «+», чтобы записать первый долг или списание.</string>
+    <string name="debts_total_owed_to_me">Должны мне</string>
+    <string name="debts_total_owed_by_me">Должен я</string>
+    <!-- %1$s — сумма с символом валюты. -->
+    <string name="debts_row_owed_to_me">Должен вам %1$s</string>
+    <string name="debts_row_owed_by_me">Вы должны %1$s</string>
+    <string name="debts_row_settled">Расчёты закрыты</string>
+    <string name="debts_section_archive">Архив</string>
+    <string name="debts_overdue">Просрочено</string>
+    <!-- %1$s — дата возврата долга. -->
+    <string name="debts_due_label">Срок: %1$s</string>
+    <string name="debts_action_lend">Дать в долг</string>
+    <string name="debts_action_borrow">Взять в долг</string>
+    <string name="debts_action_repay">Погасить</string>
+    <string name="debts_action_write_off">Списать</string>
+    <string name="debts_action_opening_balance">Начальный остаток</string>
+    <!-- %1$s — символ валюты. -->
+    <string name="debts_opening_amount_label">Начальный остаток, %1$s</string>
+    <string name="debts_counterparty_label">Контрагент</string>
+    <string name="debts_direction_out">Отдаю</string>
+    <string name="debts_direction_in">Получаю</string>
+    <string name="debts_due_date">Срок возврата</string>
+    <string name="debts_due_clear_cd">Убрать срок</string>
+    <string name="debts_no_counterparties">Пока нет контрагентов. Сначала добавьте человека или компанию.</string>
+    <string name="debts_kind_lend">Долг выдан</string>
+    <string name="debts_kind_borrow">Долг взят</string>
+    <string name="debts_kind_repay_in">Погашение получено</string>
+    <string name="debts_kind_repay_out">Погашение отправлено</string>
+    <string name="debts_kind_write_off">Списание</string>
+    <!-- %1$s и %2$s — остатки до и после операции. -->
+    <string name="debts_flip_title">Остаток сменит направление</string>
+    <string name="debts_flip_text">Остаток изменит направление: %1$s станет %2$s. Всё равно сохранить?</string>
+    <string name="debts_write_off_title">Списание долга</string>
+    <!-- %1$s — остаток этой валюты. -->
+    <string name="debts_write_off_remaining">Остаток: %1$s</string>
+    <string name="debts_write_off_error_over">Сумма не больше остатка %1$s</string>
+    <string name="debts_write_off_count_in_stats">Учитывать в отчётах</string>
+    <string name="debts_write_off_count_hint">Списание с плюсом появится в отчётах как доход, с минусом — как расход.</string>
+    <string name="counterparty_add_title">Новый контрагент</string>
+    <string name="counterparty_edit_title">Изменить контрагента</string>
+    <string name="counterparty_type_person">Человек</string>
+    <string name="counterparty_type_company">Компания</string>
+    <string name="counterparty_menu_archive">Архивировать</string>
+    <string name="counterparty_menu_unarchive">Разархивировать</string>
+    <string name="counterparty_menu_cd">Ещё</string>
+    <string name="counterparty_archived_hint">Контрагент заархивирован и скрыт из списка долгов.</string>
+    <string name="counterparty_history_title">История</string>
+    <string name="counterparty_history_empty">Долговых операций пока нет.</string>
+    <string name="counterparty_delete_title">Удалить контрагента?</string>
+    <string name="counterparty_delete_text">Контрагент исчезнет из списка, история долгов останется в общем журнале.</string>
+    <string name="counterparty_delete_blocked_text">Удалить нельзя: у контрагента остаток или история. Вместо удаления его можно заархивировать.</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d операция</item>
         <item quantity="few">%1$d операции</item>
