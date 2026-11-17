@@ -34,8 +34,9 @@ class EditCounterpartyViewModel @Inject constructor(
     private val _note = MutableStateFlow("")
     val note: StateFlow<String> = _note.asStateFlow()
 
-    private val _saved = MutableStateFlow(false)
-    val saved: StateFlow<Boolean> = _saved.asStateFlow()
+    /** Созданный или изменённый контрагент после сохранения: null — ещё не сохранён. */
+    private val _savedCounterpartyId = MutableStateFlow<String?>(null)
+    val savedCounterpartyId: StateFlow<String?> = _savedCounterpartyId.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -79,7 +80,7 @@ class EditCounterpartyViewModel @Inject constructor(
             )
             counterpartyDao.upsert(counterparty)
             syncEngine.uploadCounterparty(counterparty)
-            _saved.value = true
+            _savedCounterpartyId.value = counterparty.id
         }
     }
 }

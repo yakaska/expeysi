@@ -1,19 +1,29 @@
 package com.expeysi.app.ui.debts
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -27,16 +37,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.data.db.CounterpartyEntity
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.ui.common.AmountFormat
+import com.expeysi.app.ui.theme.ExpeysiTheme
+import com.expeysi.app.ui.theme.FinanceColors
 import com.expeysi.app.ui.theme.LocalFinanceColors
 import kotlin.math.abs
 
@@ -50,6 +70,25 @@ fun DebtsScreen(
     viewModel: DebtsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    DebtsContent(
+        state = state,
+        onBack = onBack,
+        onCounterpartyClick = onCounterpartyClick,
+        onEditCounterpartyClick = onEditCounterpartyClick,
+        onAddOperationClick = onAddOperationClick,
+    )
+}
+
+/** Содержимое экрана без ViewModel: то же рисуется в превью. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DebtsContent(
+    state: DebtsUiState,
+    onBack: () -> Unit,
+    onCounterpartyClick: (String) -> Unit,
+    onEditCounterpartyClick: (String) -> Unit,
+    onAddOperationClick: () -> Unit,
+) {
     val financeColors = LocalFinanceColors.current
 
     Scaffold(
@@ -85,30 +124,25 @@ fun DebtsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TotalCard(
-                    label = stringResource(R.string.debts_total_owed_to_me),
-                    totals = state.totals.owedToMe,
-                    currencySymbols = state.currencySymbols,
-                    amountColor = financeColors.income,
-                    modifier = Modifier.weight(1f),
-                )
-                TotalCard(
-                    label = stringResource(R.string.debts_total_owed_by_me),
-                    totals = state.totals.owedByMe,
-                    currencySymbols = state.currencySymbols,
-                    amountColor = financeColors.expense,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            SummaryCards(state = state, financeColors = financeColors)
 
             state.rows.forEach { row ->
                 DebtsRowCard(
                     row = row,
                     currencySymbols = state.currencySymbols,
+                    financeColors = financeColors,
+                    muted = false,
                     onClick = { onCounterpartyClick(row.counterparty.id) },
                     onEditClick = { onEditCounterpartyClick(row.counterparty.id) },
-                    tint = financeColors.income,
+                )
+            }
+
+            if (state.settled.isNotEmpty()) {
+                SettledSection(
+                    state = state,
+                    financeColors = financeColors,
+                    onCounterpartyClick = onCounterpartyClick,
+                    onEditCounterpartyClick = onEditCounterpartyClick,
                 )
             }
 
@@ -125,39 +159,68 @@ fun DebtsScreen(
                     DebtsRowCard(
                         row = row,
                         currencySymbols = state.currencySymbols,
+                        financeColors = financeColors,
+                        muted = true,
                         onClick = { onCounterpartyClick(row.counterparty.id) },
                         onEditClick = { onEditCounterpartyClick(row.counterparty.id) },
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
 
-            if (state.rows.isEmpty() && state.archived.isEmpty()) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 48.dp)
-                        .widthIn(max = 320.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.debts_empty_title),
-                        style = MaterialTheme.typography.titleMedium,
-                    )
-                    Text(
-                        stringResource(R.string.debts_empty_hint),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
+            if (state.rows.isEmpty() && state.settled.isEmpty() && state.archived.isEmpty()) {
+                EmptyDebtsState()
             }
         }
     }
 }
 
-/** Карточка сводки: «Должны мне» / «Должен я» со строками по валютам. */
+/** Итоговые карточки: одна широкая «Расчёты закрыты» или две карточки сторон. */
+@Composable
+private fun SummaryCards(
+    state: DebtsUiState,
+    financeColors: FinanceColors,
+) {
+    val bothSettled = state.totals.owedToMe.isEmpty() && state.totals.owedByMe.isEmpty()
+    if (bothSettled) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainer,
+            ),
+        ) {
+            Text(
+                text = stringResource(R.string.debts_row_settled),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            )
+        }
+    } else {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .widthIn(max = 600.dp)
+                .fillMaxWidth(),
+        ) {
+            TotalCard(
+                label = stringResource(R.string.debts_total_owed_to_me),
+                totals = state.totals.owedToMe,
+                currencySymbols = state.currencySymbols,
+                amountColor = financeColors.income,
+                modifier = Modifier.weight(1f),
+            )
+            TotalCard(
+                label = stringResource(R.string.debts_total_owed_by_me),
+                totals = state.totals.owedByMe,
+                currencySymbols = state.currencySymbols,
+                amountColor = financeColors.expense,
+                modifier = Modifier.weight(1f),
+            )
+        }
+    }
+}
+
+/** Карточка сводки: «Должны мне» / «Должен я» со строками по валютам; нулевая — «—». */
 @Composable
 private fun TotalCard(
     label: String,
@@ -183,8 +246,9 @@ private fun TotalCard(
             )
             if (totals.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.debts_row_settled),
+                    text = stringResource(R.string.debts_total_none),
                     style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
                 totals.forEach { (code, minor) ->
@@ -199,28 +263,97 @@ private fun TotalCard(
     }
 }
 
-/** Строка контрагента в списке: имя и его остатки по валютам. */
+/** Свёрнутая секция «Закрытые»: контрагенты с нулём во всех валютах. */
+@Composable
+private fun SettledSection(
+    state: DebtsUiState,
+    financeColors: FinanceColors,
+    onCounterpartyClick: (String) -> Unit,
+    onEditCounterpartyClick: (String) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val rotation by animateFloatAsState(
+        targetValue = if (expanded) 180f else 0f,
+        label = "settledChevron",
+    )
+    Column {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { expanded = !expanded }
+                .padding(vertical = 4.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.debts_section_settled, state.settled.size),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            Icon(
+                Icons.Filled.ExpandMore,
+                contentDescription = stringResource(
+                    if (expanded) R.string.analysis_collapse else R.string.history_expand_cd,
+                ),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.rotate(rotation),
+            )
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.settled.forEach { row ->
+                    DebtsRowCard(
+                        row = row,
+                        currencySymbols = state.currencySymbols,
+                        financeColors = financeColors,
+                        muted = false,
+                        onClick = { onCounterpartyClick(row.counterparty.id) },
+                        onEditClick = { onEditCounterpartyClick(row.counterparty.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Строка контрагента: аватар с инициалами, имя и непустые остатки по валютам. */
 @Composable
 private fun DebtsRowCard(
     row: DebtsRow,
     currencySymbols: Map<String, String>,
+    financeColors: FinanceColors,
+    muted: Boolean,
     onClick: () -> Unit,
     onEditClick: () -> Unit,
-    tint: Color,
 ) {
+    val display = debtsRowDisplay(row.balances)
+    val toneColor = when (display.tone) {
+        DebtsTone.POSITIVE -> financeColors.income
+        DebtsTone.NEGATIVE -> financeColors.expense
+        DebtsTone.NEUTRAL -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    // Архивные строки остаются серыми: секция уже сообщает, что контрагент в архиве.
+    val color = if (muted) MaterialTheme.colorScheme.onSurfaceVariant else toneColor
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .widthIn(max = 600.dp),
+            .widthIn(max = 600.dp)
+            .fillMaxWidth(),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
         ),
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.clickable(onClick = onClick).padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 12.dp),
         ) {
-            DebtIcon(Icons.Filled.Handshake, tint = tint)
+            CounterpartyAvatar(
+                name = row.counterparty.name,
+                tone = if (muted) DebtsTone.NEUTRAL else display.tone,
+                color = color,
+            )
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -230,34 +363,10 @@ private fun DebtsRowCard(
                     text = row.counterparty.name,
                     style = MaterialTheme.typography.bodyLarge,
                 )
-                val subtitle = if (row.balances.isEmpty()) {
-                    stringResource(R.string.debts_row_settled)
-                } else {
-                    row.balances
-                        .map { balance ->
-                            val amount = AmountFormat.withCurrency(
-                                abs(balance.balanceMinor),
-                                currencySymbols[balance.currencyCode] ?: balance.currencyCode,
-                            )
-                            stringResource(
-                                if (balance.balanceMinor > 0) {
-                                    R.string.debts_row_owed_to_me
-                                } else {
-                                    R.string.debts_row_owed_by_me
-                                },
-                                amount,
-                            )
-                        }
-                        .joinToString(separator = " · ")
-                }
                 Text(
-                    text = subtitle,
+                    text = rowSubtitle(display = display, currencySymbols = currencySymbols),
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (row.balances.isEmpty()) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        tint
-                    },
+                    color = if (display.settled) MaterialTheme.colorScheme.onSurfaceVariant else color,
                 )
             }
             IconButton(onClick = onEditClick) {
@@ -269,4 +378,186 @@ private fun DebtsRowCard(
             }
         }
     }
+}
+
+/** Подпись строки: «вам должны/вы должны» через «·» или одна строка о закрытии. */
+@Composable
+private fun rowSubtitle(
+    display: DebtsRowDisplay,
+    currencySymbols: Map<String, String>,
+): String = if (display.settled) {
+    stringResource(R.string.debts_row_settled)
+} else {
+    display.parts
+        .map { part ->
+            stringResource(
+                part.textRes,
+                AmountFormat.withCurrency(part.amountMinor, currencySymbols[part.currencyCode] ?: part.currencyCode),
+            )
+        }
+        .joinToString(separator = " · ")
+}
+
+/** Круглый аватар с инициалами; бейдж со стрелкой показывает направление долга. */
+@Composable
+private fun CounterpartyAvatar(
+    name: String,
+    tone: DebtsTone,
+    color: Color,
+) {
+    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(color.copy(alpha = 0.18f), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = counterpartyInitials(name),
+                style = MaterialTheme.typography.labelLarge,
+                color = color,
+            )
+        }
+        when (tone) {
+            // Стрелка вниз — деньги придут (должны мне), вверх — уйдут (должен я).
+            DebtsTone.POSITIVE -> DirectionBadge(Icons.Filled.ArrowDownward, color)
+            DebtsTone.NEGATIVE -> DirectionBadge(Icons.Filled.ArrowUpward, color)
+            DebtsTone.NEUTRAL -> Unit
+        }
+    }
+}
+
+/** Малый бейдж направления в углу аватара: стрелка цвета состояния долга. */
+@Composable
+private fun BoxScope.DirectionBadge(
+    icon: ImageVector,
+    color: Color,
+) {
+    Box(
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .size(18.dp)
+            .background(MaterialTheme.colorScheme.surface, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(14.dp),
+        )
+    }
+}
+
+/** Пустой список долгов: иконка, заголовок и подсказка по центру. */
+@Composable
+private fun EmptyDebtsState() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 48.dp)
+            .widthIn(max = 320.dp),
+    ) {
+        Icon(
+            Icons.Filled.Handshake,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(56.dp),
+        )
+        Text(
+            text = stringResource(R.string.debts_empty_title),
+            style = MaterialTheme.typography.titleMedium,
+            modifier = Modifier.padding(top = 16.dp),
+        )
+        Text(
+            text = stringResource(R.string.debts_empty_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+}
+
+/* ----------------------------------- Previews ----------------------------------- */
+
+private val PreviewSymbols = mapOf("RUB" to "₽", "VND" to "₫")
+
+private fun previewCounterparty(id: String, name: String): CounterpartyEntity =
+    CounterpartyEntity(id = id, name = name, type = "person", updatedAt = 0L)
+
+private fun previewRow(id: String, name: String, vararg balances: Pair<String, Long>): DebtsRow =
+    DebtsRow(
+        counterparty = previewCounterparty(id, name),
+        balances = balances.map { (code, minor) -> DebtCalculator.Balance(id, code, minor) },
+    )
+
+/** Состояние из трех секций строк; итоги считаются по всем, как в модели. */
+private fun previewState(
+    open: List<DebtsRow> = emptyList(),
+    settled: List<DebtsRow> = emptyList(),
+    archived: List<DebtsRow> = emptyList(),
+): DebtsUiState {
+    val all = open + settled + archived
+    return DebtsUiState(
+        rows = open,
+        settled = settled,
+        archived = archived,
+        totals = DebtsTotals(
+            owedToMe = all.asSequence()
+                .flatMap { it.balances }
+                .filter { it.balanceMinor > 0 }
+                .groupBy { it.currencyCode }
+                .mapValues { (_, list) -> list.sumOf { it.balanceMinor } },
+            owedByMe = all.asSequence()
+                .flatMap { it.balances }
+                .filter { it.balanceMinor < 0 }
+                .groupBy { it.currencyCode }
+                .mapValues { (_, list) -> list.sumOf { abs(it.balanceMinor) } },
+        ),
+        currencySymbols = PreviewSymbols,
+    )
+}
+
+@Composable
+private fun PreviewDebtsContent(state: DebtsUiState) {
+    DebtsContent(
+        state = state,
+        onBack = {},
+        onCounterpartyClick = {},
+        onEditCounterpartyClick = {},
+        onAddOperationClick = {},
+    )
+}
+
+@Preview(name = "Смешанные остатки / light", showBackground = true)
+@Composable
+private fun PreviewMixedBalances() {
+    val state = previewState(
+        open = listOf(
+            previewRow("1", "Аня Петрова", "RUB" to 100_000_00, "VND" to 500_000_00),
+            previewRow("2", "ООО Ромашка", "RUB" to -30_000_00),
+        ),
+        settled = listOf(previewRow("3", "Борис Смирнов", "RUB" to 0)),
+    )
+    ExpeysiTheme { PreviewDebtsContent(state) }
+}
+
+@Preview(name = "Всё закрыто / light", showBackground = true)
+@Composable
+private fun PreviewAllSettled() {
+    val state = previewState(
+        settled = listOf(
+            previewRow("1", "Аня Петрова", "RUB" to 0),
+            previewRow("2", "ООО Ромашка", "VND" to 0),
+        ),
+    )
+    ExpeysiTheme { PreviewDebtsContent(state) }
+}
+
+@Preview(name = "Пусто / light", showBackground = true)
+@Composable
+private fun PreviewEmptyState() {
+    ExpeysiTheme { PreviewDebtsContent(state = previewState()) }
 }

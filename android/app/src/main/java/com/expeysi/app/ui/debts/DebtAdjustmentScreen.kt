@@ -86,8 +86,8 @@ fun DebtAdjustmentScreen(
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
     val symbol = currencySymbols[currencyCode] ?: currencyCode
-    val overLimit = viewModel.amountOverLimit(remaining)
-    val canSave = viewModel.canSave(remaining) && !overLimit
+    val overLimit by viewModel.overLimit.collectAsStateWithLifecycle()
+    val canSave by viewModel.canSave.collectAsStateWithLifecycle()
 
     LaunchedEffect(saved) {
         if (saved) onClose()
@@ -134,7 +134,7 @@ fun DebtAdjustmentScreen(
             Surface(color = MaterialTheme.colorScheme.background) {
                 Button(
                     onClick = { viewModel.save(remaining) },
-                    enabled = canSave,
+                    enabled = canSave && !overLimit,
                     colors = ButtonDefaults.buttonColors(
                         disabledContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     ),
@@ -192,6 +192,7 @@ fun DebtAdjustmentScreen(
                 MoneyTextField(
                     value = amountText,
                     onValueChange = viewModel::onAmountChange,
+                    modifier = Modifier.fillMaxWidth(),
                     // %1$s — символ валюты.
                     label = {
                         Text(

@@ -129,6 +129,7 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">Нет операций за период</string>
     <string name="common_retry">Повторить</string>
+    <string name="common_undo">Отменить</string>
     <string name="common_on">включено</string>
     <string name="common_off">выключено</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
@@ -293,20 +294,24 @@
     <string name="common_edit">Редактировать</string>
     <string name="debts_title">Долги</string>
     <string name="debts_add_cd">Добавить долговую операцию</string>
-    <string name="debts_empty_title">Здесь пока нет долгов</string>
-    <string name="debts_empty_hint">Нажмите «+», чтобы записать первый долг или списание.</string>
+    <string name="debts_empty_title">Долгов пока нет</string>
+    <string name="debts_empty_hint">Нажмите +, чтобы добавить первый долг</string>
     <string name="debts_total_owed_to_me">Должны мне</string>
     <string name="debts_total_owed_by_me">Должен я</string>
     <!-- %1$s — сумма с символом валюты. -->
-    <string name="debts_row_owed_to_me">Должен вам %1$s</string>
+    <string name="debts_row_owed_to_me">Вам должны %1$s</string>
     <string name="debts_row_owed_by_me">Вы должны %1$s</string>
     <string name="debts_row_settled">Расчёты закрыты</string>
+    <!-- %1$d — число закрытых контрагентов. -->
+    <string name="debts_section_settled">Закрытые (%1$d)</string>
+    <!-- Нулевая сторона сводки: долга в эту сторону нет. -->
+    <string name="debts_total_none">—</string>
     <string name="debts_section_archive">Архив</string>
     <string name="debts_overdue">Просрочено</string>
     <!-- %1$s — дата возврата долга. -->
     <string name="debts_due_label">Срок: %1$s</string>
-    <string name="debts_action_lend">Дать в долг</string>
-    <string name="debts_action_borrow">Взять в долг</string>
+    <string name="debts_action_lend">Дать</string>
+    <string name="debts_action_borrow">Взять</string>
     <string name="debts_action_repay">Погасить</string>
     <string name="debts_action_write_off">Списать</string>
     <string name="debts_action_opening_balance">Начальный остаток</string>
@@ -316,6 +321,7 @@
     <string name="debts_direction_out">Отдаю</string>
     <string name="debts_direction_in">Получаю</string>
     <string name="debts_due_date">Срок возврата</string>
+    <string name="debts_due_empty">Не задан</string>
     <string name="debts_due_clear_cd">Убрать срок</string>
     <string name="debts_no_counterparties">Пока нет контрагентов. Сначала добавьте человека или компанию.</string>
     <string name="debts_kind_lend">Долг выдан</string>
@@ -345,6 +351,44 @@
     <string name="counterparty_delete_title">Удалить контрагента?</string>
     <string name="counterparty_delete_text">Контрагент исчезнет из списка, история долгов останется в общем журнале.</string>
     <string name="counterparty_delete_blocked_text">Удалить нельзя: у контрагента остаток или история. Вместо удаления его можно заархивировать.</string>
+    <string name="counterparty_settled_paid">Расчёты закрыты, долг полностью возвращён</string>
+    <!-- %1$s — дата закрытия долга. -->
+    <string name="counterparty_settled_date">Закрыт %1$s</string>
+    <string name="counterparty_closed_on_time">Закрыт вовремя</string>
+    <!-- %1$d — на сколько дней раньше срока закрыт долг. -->
+    <plurals name="counterparty_closed_early">
+        <item quantity="one">Закрыт на %1$d день раньше</item>
+        <item quantity="few">Закрыт на %1$d дня раньше</item>
+        <item quantity="many">Закрыт на %1$d дней раньше</item>
+        <item quantity="other">Закрыт на %1$d дня раньше</item>
+    </plurals>
+    <!-- %1$d — на сколько дней позже срока закрыт долг. -->
+    <plurals name="counterparty_closed_late">
+        <item quantity="one">Закрыт на %1$d день позже</item>
+        <item quantity="few">Закрыт на %1$d дня позже</item>
+        <item quantity="many">Закрыт на %1$d дней позже</item>
+        <item quantity="other">Закрыт на %1$d дня позже</item>
+    </plurals>
+    <!-- %1$d — на сколько дней просрочен возврат. -->
+    <plurals name="counterparty_overdue_days">
+        <item quantity="one">Просрочено на %1$d день</item>
+        <item quantity="few">Просрочено на %1$d дня</item>
+        <item quantity="many">Просрочено на %1$d дней</item>
+        <item quantity="other">Просрочено на %1$d дня</item>
+    </plurals>
+    <!-- %1$s и %2$s — суммы с символом валюты: выдано и получено погашений. -->
+    <string name="counterparty_summary_given_repaid">Выдано %1$s · Погашено %2$s</string>
+    <!-- %1$s и %2$s — суммы с символом валюты: взято и отправлено погашений. -->
+    <string name="counterparty_summary_taken_repaid">Взято %1$s · Погашено %2$s</string>
+    <!-- %1$s и %2$s — суммы с символом валюты: выдано и возвращено. -->
+    <string name="counterparty_summary_given_returned">Выдано %1$s · Возвращено %2$s</string>
+    <!-- %1$s — бегущий остаток долга после операции. -->
+    <string name="counterparty_balance_label">Остаток: %1$s</string>
+    <!-- %1$s — дата первой долговой операции. -->
+    <string name="counterparty_subtitle_since">Долг с %1$s</string>
+    <!-- %1$s — дата первой операции, %2$s — дата закрытия долга. -->
+    <string name="counterparty_subtitle_closed">Долг с %1$s, закрыт %2$s</string>
+    <string name="counterparty_debt_closed">Долг закрыт</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d операция</item>
         <item quantity="few">%1$d операции</item>

@@ -48,7 +48,7 @@ import javax.inject.Inject
  */
 @HiltViewModel
 class DebtOperationViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
+    private val savedStateHandle: SavedStateHandle,
     private val accountDao: AccountDao,
     private val balanceDao: BalanceDao,
     currencyDao: CurrencyDao,
@@ -72,8 +72,12 @@ class DebtOperationViewModel @Inject constructor(
     /** Фиксированная валюта («Погасить»): счета правятся только в ней. */
     private val fixedCurrency: String = savedStateHandle.get<String>("currency").orEmpty()
 
-    /** Сумма маршрута: префил погашения или пустая строка. */
-    private val routeAmount: String = savedStateHandle.get<String>("amount").orEmpty()
+    /**
+     * Сумма маршрута: префил погашения в минорных единицах (как и remaining
+     * у корректировок) или пустая строка.
+     */
+    private val routeAmountMinor: Long =
+        savedStateHandle.get<String>("amount").orEmpty().toLongOrNull() ?: 0L
 
     private val userId: String = authRepository.userId ?: "local"
 
@@ -223,9 +227,8 @@ class DebtOperationViewModel @Inject constructor(
         } else {
             _direction.value = routeDirection
             _counterpartyId.value = routeCounterpartyId.ifEmpty { null }
-            val amount = Money.parseToMinor(routeAmount)
-            if (amount != null && amount > 0) {
-                _amountText.value = Money.formatInput(Money.formatAuto(amount))
+            if (routeAmountMinor > 0) {
+                _amountText.value = Money.formatInput(Money.formatAuto(routeAmountMinor))
             }
             viewModelScope.launch {
                 // Счёт: фиксированная валюта сужает выбор; «последний
@@ -307,24 +310,30 @@ class DebtOperationViewModel @Inject constructor(
     }
 
     /** Разрешено сохранение: сумма, счёт и контрагент заданы, валюта не нарушена. */
-    fun canSave(liveBalanceMinor: Long): Boolean {
-        val amount = Money.parseToMinor(_amountText.value) ?: return false
-        if (amount <= 0) return false
-        val account = accounts.value.firstOrNull { it.id == _selectedAccountId.value } ?: return false
-        if (_counterpartyId.value.isNullOrEmpty()) return false
-        if (fixedCurrency.isNotEmpty() && currencyCodeOfAccount(account, balances.value) != fixedCurrency) return false
-        // kind и видимость срока считаются той же функцией, что и сохранение.
-        operationKind(liveBalanceMinor)
-        return true
-    }
+    val canSave: StateFlow<Boolean> = combine(
+        _amountText,
+        accounts,
+        _selectedAccountId,
+        _counterpartyId,
+        balances,
+    ) { amountText, accountsList, selectedAccountId, counterpartyId, balancesById ->
+        val amount = Money.parseToMinor(amountText) ?: return@combine false
+        if (amount <= 0) return@combine false
+        val account = accountsList.firstOrNull { it.id == selectedAccountId } ?: return@combine false
+        if (counterpartyId.isNullOrEmpty()) return@combine false
+        if (fixedCurrency.isNotEmpty() && currencyCodeOfAccount(account, balancesById) != fixedCurrency) {
+            return@combine false
+        }
+        true
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     /**
      * Проверка перепогашения перед записью: после операции остаток уходит
      * через ноль в другую сторону — сначала предупреждение.
      */
     fun save() {
+        if (!canSave.value) return
         val before = liveBalance.value
-        if (!canSave(before)) return
         val amount = Money.parseToMinor(_amountText.value) ?: return
         val counterpartyId = _counterpartyId.value ?: return
         val accountId = _selectedAccountId.value ?: return

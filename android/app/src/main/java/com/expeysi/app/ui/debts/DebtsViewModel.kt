@@ -59,10 +59,13 @@ class DebtsViewModel @Inject constructor(
                         .sortedByDescending { abs(it.balanceMinor) },
                 )
             }
-        // Всего по всем контрагентам, включая архивных: архив скрывает строку,
-        // но не отменяет сам долг.
+        val active = rows.filterNot { it.counterparty.archived }
+        val (open, settled) = active.partition { !debtsRowDisplay(it.balances).settled }
+        // Всего по всем контрагентам, включая архивных и закрытых: секция
+        // скрывает строку, но не отменяет сам долг.
         DebtsUiState(
-            rows = rows.filterNot { it.counterparty.archived },
+            rows = open,
+            settled = settled,
             archived = rows.filter { it.counterparty.archived },
             totals = DebtsTotals(
                 owedToMe = totals(rows, positive = true),
@@ -73,7 +76,13 @@ class DebtsViewModel @Inject constructor(
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5_000),
-        initialValue = DebtsUiState(emptyList(), emptyList(), DebtsTotals(emptyMap(), emptyMap()), emptyMap()),
+        initialValue = DebtsUiState(
+            rows = emptyList(),
+            settled = emptyList(),
+            archived = emptyList(),
+            totals = DebtsTotals(emptyMap(), emptyMap()),
+            currencySymbols = emptyMap(),
+        ),
     )
 
     private fun totals(rows: List<DebtsRow>, positive: Boolean): Map<String, Long> = rows

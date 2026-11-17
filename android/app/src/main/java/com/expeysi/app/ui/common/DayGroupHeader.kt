@@ -19,7 +19,11 @@ private fun dayNetTotal(incomeMinor: Long, expenseMinor: Long, currencySymbol: S
     }
 }
 
-/** Стик-заголовок дня в списках операций: «9 ноября · − 1 200 ₽». */
+/**
+ * Стик-заголовок дня в списках операций: «9 ноября · − 1 200 ₽».
+ * Без [totalText] итог считается из доходов и расходов дня; пустая строка
+ * оставляет в заголовке только дату — итога нет вовсе.
+ */
 @Composable
 fun DayGroupHeader(
     dateLabel: String,
@@ -27,13 +31,17 @@ fun DayGroupHeader(
     expenseMinor: Long,
     currencySymbol: String,
     modifier: Modifier = Modifier,
+    totalText: String? = null,
 ) {
+    val total = when {
+        totalText == null -> dayNetTotal(incomeMinor, expenseMinor, currencySymbol)
+        totalText.isEmpty() -> null
+        else -> totalText
+    }
     Text(
-        text = stringResource(
-            R.string.common_day_header_total,
-            dateLabel,
-            dayNetTotal(incomeMinor, expenseMinor, currencySymbol),
-        ),
+        text = total
+            ?.let { stringResource(R.string.common_day_header_total, dateLabel, it) }
+            ?: dateLabel,
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         // Отступы (modifier) применяются после фона: плашка закрывает их,

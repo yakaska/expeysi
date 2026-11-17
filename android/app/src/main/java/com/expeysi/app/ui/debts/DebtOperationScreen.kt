@@ -122,7 +122,7 @@ fun DebtOperationScreen(
         ?.let { balances[it.balanceId]?.currencyCode ?: it.currencyCode }
         ?: Currency.DEFAULT
     val amountSymbol = currencySymbols[selectedCode] ?: selectedCode
-    val canSave = viewModel.canSave(liveBalance)
+    val canSave by viewModel.canSave.collectAsStateWithLifecycle()
 
     LaunchedEffect(saved) {
         if (saved) onClose()
@@ -243,6 +243,7 @@ fun DebtOperationScreen(
                 MoneyTextField(
                     value = amountText,
                     onValueChange = viewModel::onAmountChange,
+                    modifier = Modifier.fillMaxWidth(),
                     // %1$s — символ валюты.
                     label = { Text(stringResource(R.string.add_amount_label, amountSymbol), maxLines = 1) },
                     colors = debtFieldColors(),
@@ -563,7 +564,7 @@ private fun DueDateRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Text(
-                text = dueDate?.format(dateFormatter) ?: stringResource(R.string.common_select),
+                text = dueDate?.format(dateFormatter) ?: stringResource(R.string.debts_due_empty),
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (dueDate == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
             )

@@ -132,6 +132,7 @@
     <string name="categoryops_subtitle">%1$s · %2$s</string>
     <string name="categoryops_empty">No transactions in this period</string>
     <string name="common_retry">Retry</string>
+    <string name="common_undo">Undo</string>
     <string name="common_on">On</string>
     <string name="common_off">Off</string>
     <string name="common_day_header_total">%1$s · %2$s</string>
@@ -299,14 +300,18 @@
     <string name="common_edit">Edit</string>
     <string name="debts_title">Debts</string>
     <string name="debts_add_cd">Add debt operation</string>
-    <string name="debts_empty_title">No debts here yet</string>
-    <string name="debts_empty_hint">Tap “+” to record the first debt or write-off.</string>
+    <string name="debts_empty_title">No debts yet</string>
+    <string name="debts_empty_hint">Tap + to add the first debt</string>
     <string name="debts_total_owed_to_me">Owed to me</string>
     <string name="debts_total_owed_by_me">I owe</string>
     <!-- %1$s — сумма с символом валюты. -->
     <string name="debts_row_owed_to_me">Owes you %1$s</string>
     <string name="debts_row_owed_by_me">You owe %1$s</string>
     <string name="debts_row_settled">Settled</string>
+    <!-- %1$d — число закрытых контрагентов. -->
+    <string name="debts_section_settled">Settled (%1$d)</string>
+    <!-- Нулевая сторона сводки: долга в эту сторону нет. -->
+    <string name="debts_total_none">—</string>
     <string name="debts_section_archive">Archive</string>
     <string name="debts_overdue">Overdue</string>
     <!-- %1$s — дата возврата долга. -->
@@ -322,6 +327,7 @@
     <string name="debts_direction_out">Paying out</string>
     <string name="debts_direction_in">Receiving</string>
     <string name="debts_due_date">Repayment due</string>
+    <string name="debts_due_empty">Not set</string>
     <string name="debts_due_clear_cd">Clear due date</string>
     <string name="debts_no_counterparties">No counterparties yet. Add a person or company first.</string>
     <string name="debts_kind_lend">Debt issued</string>
@@ -351,6 +357,38 @@
     <string name="counterparty_delete_title">Delete counterparty?</string>
     <string name="counterparty_delete_text">The counterparty will disappear from the list; the debt history will remain in the shared journal.</string>
     <string name="counterparty_delete_blocked_text">Can’t delete: the counterparty has a non-zero balance or history. You can archive it instead.</string>
+    <string name="counterparty_settled_paid">Settlements closed, debt fully repaid</string>
+    <!-- %1$s — дата закрытия долга. -->
+    <string name="counterparty_settled_date">Closed %1$s</string>
+    <string name="counterparty_closed_on_time">Closed on time</string>
+    <!-- %1$d — на сколько дней раньше срока закрыт долг. -->
+    <plurals name="counterparty_closed_early">
+        <item quantity="one">Closed %1$d day early</item>
+        <item quantity="other">Closed %1$d days early</item>
+    </plurals>
+    <!-- %1$d — на сколько дней позже срока закрыт долг. -->
+    <plurals name="counterparty_closed_late">
+        <item quantity="one">Closed %1$d day late</item>
+        <item quantity="other">Closed %1$d days late</item>
+    </plurals>
+    <!-- %1$d — на сколько дней просрочен возврат. -->
+    <plurals name="counterparty_overdue_days">
+        <item quantity="one">Overdue by %1$d day</item>
+        <item quantity="other">Overdue by %1$d days</item>
+    </plurals>
+    <!-- %1$s и %2$s — суммы с символом валюты: выдано и получено погашений. -->
+    <string name="counterparty_summary_given_repaid">Given %1$s · Repaid %2$s</string>
+    <!-- %1$s и %2$s — суммы с символом валюты: взято и отправлено погашений. -->
+    <string name="counterparty_summary_taken_repaid">Taken %1$s · Repaid %2$s</string>
+    <!-- %1$s и %2$s — суммы с символом валюты: выдано и возвращено. -->
+    <string name="counterparty_summary_given_returned">Given %1$s · Returned %2$s</string>
+    <!-- %1$s — бегущий остаток долга после операции. -->
+    <string name="counterparty_balance_label">Balance: %1$s</string>
+    <!-- %1$s — дата первой долговой операции. -->
+    <string name="counterparty_subtitle_since">Debt since %1$s</string>
+    <!-- %1$s — дата первой операции, %2$s — дата закрытия долга. -->
+    <string name="counterparty_subtitle_closed">Debt since %1$s, closed %2$s</string>
+    <string name="counterparty_debt_closed">Debt closed</string>
     <plurals name="common_operations">
         <item quantity="one">%1$d operation</item>
         <item quantity="other">%1$d operations</item>

@@ -40,15 +40,19 @@ import com.expeysi.app.ui.common.SaveButton
 @Composable
 fun EditCounterpartyScreen(
     onClose: () -> Unit,
+    onSaved: (String) -> Unit = {},
     viewModel: EditCounterpartyViewModel = hiltViewModel(),
 ) {
     val name by viewModel.name.collectAsStateWithLifecycle()
     val type by viewModel.type.collectAsStateWithLifecycle()
     val note by viewModel.note.collectAsStateWithLifecycle()
-    val saved by viewModel.saved.collectAsStateWithLifecycle()
+    val savedId by viewModel.savedCounterpartyId.collectAsStateWithLifecycle()
 
-    LaunchedEffect(saved) {
-        if (saved) onClose()
+    LaunchedEffect(savedId) {
+        // Результат отдаётся до закрытия, иначе вызывающий экран уже не виден.
+        val id = savedId ?: return@LaunchedEffect
+        onSaved(id)
+        onClose()
     }
 
     Scaffold(

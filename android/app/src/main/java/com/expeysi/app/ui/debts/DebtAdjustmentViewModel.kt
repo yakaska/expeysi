@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalTime
 import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
@@ -147,6 +148,13 @@ class DebtAdjustmentViewModel @Inject constructor(
     private val _note = MutableStateFlow("")
     val note: StateFlow<String> = _note.asStateFlow()
 
+    /**
+     * Время исходной корректировки при правке: список историй сортирует
+     * записи по точному времени, полночь выбранного дня утопила бы новую
+     * корректировку под операциями того же дня. null — создание.
+     */
+    private var timeOfDay: LocalTime? = null
+
     /** Показывать списание в отчётах как доход или расход; у начального остатка всегда выкл. */
     val countInStatsAllowed: Boolean
         get() = writeOff
@@ -185,6 +193,7 @@ class DebtAdjustmentViewModel @Inject constructor(
                 )
                 _currencyCode.value = loaded.currencyCode
                 _date.value = Instant.ofEpochMilli(loaded.date).atZone(zone).toLocalDate()
+                timeOfDay = Instant.ofEpochMilli(loaded.date).atZone(zone).toLocalTime().withSecond(0).withNano(0)
                 _note.value = loaded.note
                 _countInStats.value = loaded.countInStats
             }
@@ -227,24 +236,37 @@ class DebtAdjustmentViewModel @Inject constructor(
     }
 
     /** Сумма больше модуля остатка: списывать нечего, переписать нельзя. */
-    fun amountOverLimit(liveRemaining: Long): Boolean {
-        val amount = Money.parseToMinor(_amountText.value) ?: return false
-        return amount > abs(liveRemaining)
-    }
+    val overLimit: StateFlow<Boolean> = combine(
+        _amountText,
+        remaining,
+    ) { amountText, liveRemaining ->
+        val amount = Money.parseToMinor(amountText)
+        amount != null && amount > abs(liveRemaining)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
-    fun canSave(liveRemaining: Long): Boolean {
-        val amount = Money.parseToMinor(_amountText.value) ?: return false
-        if (_currencyCode.value.isEmpty()) return false
-        if (counterpartyId.value.isEmpty()) return false
+    /**
+     * Разрешено сохранение: сумма валидна и по правилам вида корректировки —
+     * у списания она положительна и не превышает остаток.
+     */
+    val canSave: StateFlow<Boolean> = combine(
+        _amountText,
+        _currencyCode,
+        counterpartyId,
+        remaining,
+    ) { amountText, currencyCode, counterpartyId, liveRemaining ->
+        val amount = Money.parseToMinor(amountText) ?: return@combine false
+        if (currencyCode.isEmpty()) return@combine false
+        if (counterpartyId.isEmpty()) return@combine false
         if (writeOff) {
-            return amount > 0 && amount <= abs(liveRemaining)
+            amount > 0 && amount <= abs(liveRemaining)
+        } else {
+            // Начальный остаток: минус — мой долг; ноль корректировку не создаёт.
+            amount != 0L
         }
-        // Начальный остаток: минус — мой долг; ноль корректировку не создаёт.
-        return amount != 0L
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
 
     fun save(liveRemaining: Long) {
-        if (!canSave(liveRemaining)) return
+        if (!canSave.value) return
         val parsed = Money.parseToMinor(_amountText.value) ?: return
         viewModelScope.launch {
             val deltaMinor = if (writeOff) {
@@ -259,7 +281,11 @@ class DebtAdjustmentViewModel @Inject constructor(
                 kind = kind.value.wire,
                 amountMinor = deltaMinor,
                 currencyCode = _currencyCode.value,
-                date = _date.value.atStartOfDay(zone).toInstant().toEpochMilli(),
+                date = _date.value
+                    .atTime(timeOfDay ?: LocalTime.now(zone))
+                    .atZone(zone)
+                    .toInstant()
+                    .toEpochMilli(),
                 note = _note.value.trim(),
                 // Начальный остаток в отчётах не отражается никогда.
                 countInStats = if (writeOff) _countInStats.value else false,
