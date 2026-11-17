@@ -140,6 +140,29 @@ val MIGRATION_9_10 = object : Migration(9, 10) {
     }
 }
 
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Долги: вторая сторона операции — контрагент вместо счёта-получателя,
+        // срок возврата у долга выданного и взятого. Существующим записям
+        // миграция ставит пустого контрагента и NULL-срок, новые таблицы пустые.
+        db.execSQL("ALTER TABLE transactions ADD COLUMN counterpartyId TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN dueDate INTEGER")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS counterparties (" +
+                "id TEXT NOT NULL PRIMARY KEY, name TEXT NOT NULL, type TEXT NOT NULL, " +
+                "note TEXT NOT NULL DEFAULT '', archived INTEGER NOT NULL DEFAULT 0, " +
+                "deleted INTEGER NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL)",
+        )
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS debt_adjustments (" +
+                "id TEXT NOT NULL PRIMARY KEY, counterpartyId TEXT NOT NULL, kind TEXT NOT NULL, " +
+                "amountMinor INTEGER NOT NULL, currencyCode TEXT NOT NULL, date INTEGER NOT NULL, " +
+                "note TEXT NOT NULL DEFAULT '', countInStats INTEGER NOT NULL DEFAULT 0, " +
+                "deleted INTEGER NOT NULL DEFAULT 0, updatedAt INTEGER NOT NULL)",
+        )
+    }
+}
+
 /** Все миграции в порядке возрастания версий: регистрирует DataModule, гоняют миграционные тесты. */
 val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_1_2,
@@ -151,6 +174,7 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
     MIGRATION_7_8,
     MIGRATION_8_9,
     MIGRATION_9_10,
+    MIGRATION_10_11,
 )
 
 @Database(
@@ -160,8 +184,10 @@ val ALL_MIGRATIONS: Array<Migration> = arrayOf(
         TransactionEntity::class,
         CurrencyEntity::class,
         BalanceEntity::class,
+        CounterpartyEntity::class,
+        DebtAdjustmentEntity::class,
     ],
-    version = 10,
+    version = 11,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -170,4 +196,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun currencyDao(): CurrencyDao
     abstract fun balanceDao(): BalanceDao
+    abstract fun counterpartyDao(): CounterpartyDao
+    abstract fun debtAdjustmentDao(): DebtAdjustmentDao
 }

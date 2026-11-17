@@ -209,12 +209,14 @@ private fun transactionRow(
  * Доход пишется положительной суммой, расход — отрицательной, как в формате
  * «Бюджета». Ноги перевода идут в ту же знаковую логику: списание — минус,
  * зачисление — плюс, поэтому остатки счетов после реимпорта совпадают.
+ * Долговые операции — по направлению денег: выданный долг и отправленное
+ * погашение минусом, взятый долг и полученное погашение плюсом.
  * Комиссия выписана отдельной колонкой [CsvFormat.FEE_COLUMN]: в «Сумму»
  * ноги списания идёт чистое отправление, комиссия в неё не запекается.
  */
 private fun signedMinor(tx: TransactionEntity): Long = when (TxType.fromWire(tx.type)) {
-    TxType.INCOME, TxType.TRANSFER_IN -> tx.amountMinor
-    TxType.EXPENSE, TxType.TRANSFER_OUT -> -(tx.amountMinor - tx.feeMinor)
+    TxType.INCOME, TxType.TRANSFER_IN, TxType.DEBT_BORROW, TxType.DEBT_REPAY_IN -> tx.amountMinor
+    TxType.EXPENSE, TxType.TRANSFER_OUT, TxType.DEBT_LEND, TxType.DEBT_REPAY_OUT -> -(tx.amountMinor - tx.feeMinor)
 }
 
 /** Колонка комиссии: только у ноги списания с ненулевой комиссией, у прочих строк пустая. */

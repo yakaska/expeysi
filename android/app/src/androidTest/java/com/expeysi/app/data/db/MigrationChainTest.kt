@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Полный путь 2→10: база собирается из самой старой коммитнутой схемы (2.json)
+ * Полный путь 2→11: база собирается из самой старой коммитнутой схемы (2.json)
  * и открывается через databaseBuilder со всем списком ALL_MIGRATIONS — тем же,
  * что регистрирует DataModule. 1→2 пути не входит: `1.json` не коммитился.
  */
@@ -73,6 +73,9 @@ class MigrationChainTest {
             assertEquals("", transaction.counterpartyAccountId)
             // 9→10 добавил комиссию переводов; у обычных операций ноль.
             assertEquals(0L, transaction.feeMinor)
+            // 10→11 добавил долгам контрагента и срок: у обычных операций их нет.
+            assertEquals("", transaction.counterpartyId)
+            assertEquals(null, transaction.dueDate)
 
             val category = db.categoryDao().byId(CC_CATEGORY_ID)
             assertNotNull(category)
