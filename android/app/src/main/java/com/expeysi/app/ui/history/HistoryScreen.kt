@@ -567,6 +567,13 @@ private fun HistoryRow(
             Text(
                 listOfNotNull(
                     item.counterpartyName.ifBlank { null },
+                    // Долг закрыт списанием: денег в ленте за ним не
+                    // придёт, показываем это.
+                    if (item.isDebtWrittenOff) {
+                        stringResource(R.string.debts_feed_written_off)
+                    } else {
+                        null
+                    },
                     item.accountName.ifBlank { null },
                     dateTextOf(item.transaction.date),
                     item.transaction.note.ifBlank { null },

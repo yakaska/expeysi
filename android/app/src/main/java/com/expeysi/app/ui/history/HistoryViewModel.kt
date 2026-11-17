@@ -20,6 +20,7 @@ import com.expeysi.app.domain.AccountTotal
 import com.expeysi.app.domain.AggEntry
 import com.expeysi.app.domain.Aggregates
 import com.expeysi.app.domain.CategoryTotal
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.DateRangeFilter
 import com.expeysi.app.domain.HistoryPeriod
@@ -31,6 +32,7 @@ import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.home.TransferAccount
 import com.expeysi.app.ui.home.TransferCard
 import com.expeysi.app.ui.home.TransferSide
+import com.expeysi.app.ui.debts.currencyCodeOfAccount
 import com.expeysi.app.ui.icons.CategoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -81,6 +83,8 @@ private data class BaseData(
     val transactions: List<TransactionEntity>,
     /** Списания «в отчётах» (countInStats): входят в итоги доходов/расходов. */
     val writeOffs: List<DebtAdjustmentEntity> = emptyList(),
+    /** Все корректировки: списания закрывают долг и вне учёта в отчётах. */
+    val adjustments: List<DebtAdjustmentEntity> = emptyList(),
 )
 
 private data class Filters(
@@ -153,8 +157,9 @@ class HistoryViewModel @Inject constructor(
             },
             transactions = transactions,
             writeOffs = adjustments.filter { !it.deleted && it.countInStats },
+            adjustments = adjustments,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BaseData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), BaseData(emptyList(), emptyList(), emptyList(), emptyList(), emptyList(), emptyList()))
 
     private val currencies: StateFlow<Map<String, String>> = currencyDao.observeAll()
         .map { list -> list.associate { it.code to it.symbol } }
@@ -217,6 +222,7 @@ class HistoryViewModel @Inject constructor(
             periodStart != null -> date >= periodStart
             else -> true
         }
+
         val filtered = data.transactions
             .filter { it.accountId in scopeIds }
             .filter { inWindow(it.date) }
@@ -278,6 +284,16 @@ class HistoryViewModel @Inject constructor(
         val legsByLinkedId = data.transactions
             .filter { !it.deleted && it.linkedId.isNotEmpty() }
             .groupBy { it.linkedId }
+        // Пары «контрагент × валюта», закрытые списанием, — по всему хранилищу:
+        // остаток долга глобален, а не по скоупу экрана. Строки этих пар
+        // помечаются «долг списан».
+        val balancesById = data.balances.associateBy { it.id }
+        val currencyByAccount = data.accounts.associate { it.id to currencyCodeOfAccount(it, balancesById) }
+        val closedByWriteOff = DebtCalculator.pairsClosedByWriteOff(
+            DebtCalculator.transactionDeltas(data.transactions, { currencyByAccount[it].orEmpty() }) +
+                DebtCalculator.adjustmentDeltas(data.adjustments),
+            data.adjustments,
+        )
         val items = scopedTransactions
             .let(Transfers::collapse)
             .map { tx ->
@@ -297,6 +313,9 @@ class HistoryViewModel @Inject constructor(
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
                     isTransferPair = Transfers.isCollapsedPair(tx, scopedTransactions),
                     transferCard = buildTransferCard(tx, legsByLinkedId, accountById, symbols),
+                    isDebtWrittenOff = txType.isDebt &&
+                        tx.counterpartyId.isNotEmpty() &&
+                        (tx.counterpartyId to currencyByAccount[tx.accountId].orEmpty()) in closedByWriteOff,
                 )
             }
 

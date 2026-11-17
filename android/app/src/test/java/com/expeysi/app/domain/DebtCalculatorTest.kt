@@ -131,6 +131,71 @@ class DebtCalculatorTest {
     }
 
     @Test
+    fun `долг, закрытый списанием, помечается в ленте`() {
+        val writeOff = adjustment(amountMinor = -300_000L, kind = WRITE_OFF)
+        val rows = deltas(
+            transactions = listOf(tx(TxType.DEBT_LEND, amountMinor = 300_000L)),
+            adjustments = listOf(writeOff),
+        )
+
+        assertEquals(setOf("c1" to "RUB"), DebtCalculator.pairsClosedByWriteOff(rows, listOf(writeOff)))
+    }
+
+    @Test
+    fun `долг, закрытый деньгами с участием списания, тоже помечается`() {
+        // Вернули 60 000 деньгами, остальные 40 000 списали — в закрытии
+        // участвовала корректировка, помечаем.
+        val writeOff = adjustment(amountMinor = -40_000L, kind = WRITE_OFF)
+        val rows = deltas(
+            transactions = listOf(
+                tx(TxType.DEBT_LEND, amountMinor = 100_000L),
+                tx(TxType.DEBT_REPAY_IN, amountMinor = 60_000L),
+            ),
+            adjustments = listOf(writeOff),
+        )
+
+        assertEquals(setOf("c1" to "RUB"), DebtCalculator.pairsClosedByWriteOff(rows, listOf(writeOff)))
+    }
+
+    @Test
+    fun `пара, закрытая деньгами без списаний, пометки не получает`() {
+        val rows = deltas(
+            transactions = listOf(
+                tx(TxType.DEBT_LEND, amountMinor = 200_000L),
+                tx(TxType.DEBT_REPAY_IN, amountMinor = 200_000L),
+            ),
+        )
+
+        assertEquals(emptySet<Pair<String, String>>(), DebtCalculator.pairsClosedByWriteOff(rows, emptyList()))
+    }
+
+    @Test
+    fun `переоткрытый после списания долг пометки не получает`() {
+        // Списание закрыло 100 000, но затем выдали ещё 50 000 — долг открыт.
+        val writeOff = adjustment(amountMinor = -100_000L, kind = WRITE_OFF)
+        val rows = deltas(
+            transactions = listOf(
+                tx(TxType.DEBT_LEND, amountMinor = 100_000L),
+                tx(TxType.DEBT_LEND, amountMinor = 50_000L, date = 1L),
+            ),
+            adjustments = listOf(writeOff),
+        )
+
+        assertEquals(emptySet<Pair<String, String>>(), DebtCalculator.pairsClosedByWriteOff(rows, listOf(writeOff)))
+    }
+
+    @Test
+    fun `удалённое списание пометки не даёт`() {
+        val adjustments = listOf(adjustment(amountMinor = -100_000L, kind = WRITE_OFF).copy(deleted = true))
+        val rows = deltas(
+            transactions = listOf(tx(TxType.DEBT_LEND, amountMinor = 100_000L)),
+            adjustments = adjustments,
+        )
+
+        assertEquals(emptySet<Pair<String, String>>(), DebtCalculator.pairsClosedByWriteOff(rows, adjustments))
+    }
+
+    @Test
     fun `знак дельты списания противоположен остатку`() {
         assertEquals(-30_000L, DebtCalculator.writeOffDelta(30_000L, 30_000L))
         assertEquals(50_000L, DebtCalculator.writeOffDelta(-50_000L, 50_000L))

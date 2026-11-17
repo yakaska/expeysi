@@ -331,6 +331,8 @@
     <string name="debts_kind_repay_in">Погашение получено</string>
     <string name="debts_kind_repay_out">Погашение отправлено</string>
     <string name="debts_kind_write_off">Списание</string>
+    <!-- Пометка долговой операции в лентах операций: её долг закрыт списанием. -->
+    <string name="debts_feed_written_off">долг списан</string>
     <!-- %1$s и %2$s — остатки до и после операции. -->
     <string name="debts_flip_title">Остаток сменит направление</string>
     <string name="debts_flip_text">Остаток изменит направление: %1$s станет %2$s. Всё равно сохранить?</string>

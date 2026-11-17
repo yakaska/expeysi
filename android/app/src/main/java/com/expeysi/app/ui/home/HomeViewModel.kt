@@ -27,6 +27,7 @@ import com.expeysi.app.data.importer.BudgetTransaction
 import com.expeysi.app.data.importer.accountNets
 import com.expeysi.app.data.importer.openingFromCurrent
 import com.expeysi.app.domain.BalanceCalculator
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Periods
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxDayAmount
@@ -35,6 +36,7 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.domain.WindowSums
 import com.expeysi.app.domain.Windows
 import com.expeysi.app.ui.common.UiText
+import com.expeysi.app.ui.debts.currencyCodeOfAccount
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -83,6 +85,12 @@ data class TransactionItem(
     val isTransferPair: Boolean = false,
     /** Развёрнутые данные перевода для карточек истории; null у доходов и расходов. */
     val transferCard: TransferCard? = null,
+    /**
+     * Долговая операция, чей долг «контрагент × валюта» закрыт списанием:
+     * в подписи строки ставится пометка «долг списан», иначе заём выглядит
+     * как открытый долг. У не-долговых строк всегда false.
+     */
+    val isDebtWrittenOff: Boolean = false,
 )
 
 /** Счёт на стороне развёрнутой карточки перевода: имя, иконка и цвет аватара. */
@@ -226,6 +234,26 @@ class HomeViewModel @Inject constructor(
         transactionLimit.value = TRANSACTION_PAGE_SIZE
     }
 
+    /**
+     * Пары «контрагент × валюта», чей долг закрыт списанием: пометка «долг
+     * списан» в ленте. Считается по всем долговым операциям и корректировкам
+     * хранилища — расчёт долга глобален, а не по скоупу ленты.
+     */
+    private val debtsClosedByWriteOff: StateFlow<Set<Pair<String, String>>> = combine(
+        transactionDao.observeActive(),
+        debtAdjustmentDao.observeAll(),
+        accountDao.observeActive(),
+        balanceDao.observeAll(),
+    ) { transactions, adjustments, accounts, balances ->
+        val balancesById = balances.associateBy { it.id }
+        val currencyByAccount = accounts.associate { it.id to currencyCodeOfAccount(it, balancesById) }
+        DebtCalculator.pairsClosedByWriteOff(
+            DebtCalculator.transactionDeltas(transactions, { currencyByAccount[it].orEmpty() }) +
+                DebtCalculator.adjustmentDeltas(adjustments),
+            adjustments,
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
+
     private val transactionFeed = feedAccountIds.flatMapLatest { accountIds ->
         combine(
             transactionLimit.flatMapLatest { limit ->
@@ -236,20 +264,28 @@ class HomeViewModel @Inject constructor(
             },
             accountDao.observeAll(),
             categoryDao.observeAll(),
-            // Символы валют и имена контрагентов — один слот: у combine лимит
-            // в пять потоков, а строкам долгов нужен второй справочник.
+            // Символы валют, имена контрагентов и помеченные списания — один
+            // слот: у combine лимит в пять потоков, а строкам долгов нужен
+            // второй справочник.
             combine(
                 currencyDao.observeAll(),
                 counterpartyDao.observeActive(),
-            ) { currencies, counterparties ->
-                currencies.associate { it.code to it.symbol } to
-                    counterparties.associate { it.id to it.name }
+                debtsClosedByWriteOff,
+            ) { currencies, counterparties, closedByWriteOff ->
+                Triple(
+                    currencies.associate { it.code to it.symbol },
+                    counterparties.associate { it.id to it.name },
+                    closedByWriteOff,
+                )
             },
             selection,
-        ) { (transactions, limit), accounts, categories, (symbolsByName, counterpartyNames), (_, selected) ->
+        ) { (transactions, limit), accounts, categories, (symbolsByName, counterpartyNames, closedByWriteOff), (balances, selected) ->
             val symbol = selected?.let { symbolsByName[it.currencyCode] ?: it.currencyCode } ?: ""
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
+            val balancesById = balances.associateBy { it.id }
+            fun currencyOf(accountId: String): String =
+                accountById[accountId]?.let { currencyCodeOfAccount(it, balancesById) }.orEmpty()
             // Пары переводов внутри одного баланса показываются одной строкой.
             // Нога, чей партнёр отрезан границей страницы, подтягивает его по
             // связке: на стыке страниц пара не разваливается на две строки.
@@ -278,6 +314,9 @@ class HomeViewModel @Inject constructor(
                     isTransfer = txType.isTransfer,
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
                     isTransferPair = Transfers.isCollapsedPair(tx, page),
+                    isDebtWrittenOff = txType.isDebt &&
+                        tx.counterpartyId.isNotEmpty() &&
+                        (tx.counterpartyId to currencyOf(tx.accountId)) in closedByWriteOff,
                 )
             }
             // Признак следующей страницы считается по сырой странице: добранный

@@ -104,4 +104,27 @@ object DebtCalculator {
     fun adjustmentDeltas(adjustments: List<DebtAdjustmentEntity>): List<Delta> = adjustments
         .filterNot { it.deleted }
         .map { Delta(it.counterpartyId, it.currencyCode, it.amountMinor) }
+
+    /**
+     * Пары «контрагент × валюта», чей долг закрыт списанием: суммарный вклад
+     * пары ноль (расчёты закрыты) и среди её корректировок есть живое
+     * списание. Учёт списания в отчётах (countInStats) роли не играет —
+     * долг списан независимо от того, попадает ли оно в отчёты. Пары,
+     * закрытые деньгами, пометки не требуют: погашение видно в ленте.
+     */
+    fun pairsClosedByWriteOff(
+        deltas: List<Delta>,
+        adjustments: List<DebtAdjustmentEntity>,
+    ): Set<Pair<String, String>> {
+        val settledPairs = deltas
+            .groupBy(keySelector = { it.counterpartyId to it.currencyCode }) { it.deltaMinor }
+            .filterValues { rows -> rows.sum() == 0L }
+            .keys
+        val writeOffPairs = adjustments
+            .filterNot { it.deleted }
+            .filter { DebtAdjustmentKind.fromWire(it.kind) == DebtAdjustmentKind.WRITE_OFF }
+            .map { it.counterpartyId to it.currencyCode }
+            .toSet()
+        return settledPairs intersect writeOffPairs
+    }
 }

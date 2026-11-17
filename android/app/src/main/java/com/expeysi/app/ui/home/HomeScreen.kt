@@ -471,6 +471,13 @@ fun HomeContent(
                                         Text(
                                             listOfNotNull(
                                                 item.counterpartyName.ifBlank { null },
+                                                // Долг закрыт списанием: денег в ленте
+                                                // за ним не придёт, показываем это.
+                                                if (item.isDebtWrittenOff) {
+                                                    stringResource(R.string.debts_feed_written_off)
+                                                } else {
+                                                    null
+                                                },
                                                 if (item.isTransfer) {
                                                     Transfers.directionLabel(
                                                         item.transaction,

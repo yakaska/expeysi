@@ -337,6 +337,8 @@
     <string name="debts_kind_repay_in">Repayment received</string>
     <string name="debts_kind_repay_out">Repayment sent</string>
     <string name="debts_kind_write_off">Write-off</string>
+    <!-- Пометка долговой операции в лентах операций: её долг закрыт списанием. -->
+    <string name="debts_feed_written_off">Debt written off</string>
     <!-- %1$s и %2$s — остатки до и после операции, %3$s — символ валюты. -->
     <string name="debts_flip_title">The balance will change direction</string>
     <string name="debts_flip_text">The balance changes direction: %1$s will become %2$s. Save anyway?</string>
