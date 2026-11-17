@@ -372,4 +372,8 @@ private fun CurrencyRow(
     )
 }
 
-private fun currencySubtitle(symbol: String, code: String): String = if (symbol.equals(code, ignoreCase = true)) code else "$code · $symbol"
+/**
+ * Подпись валюты в списках выбора: «RUB · ₽»; если символ неотличим от кода,
+ * остаётся только код.
+ */
+internal fun currencySubtitle(symbol: String, code: String): String = if (symbol.equals(code, ignoreCase = true)) code else "$code · $symbol"

@@ -3,6 +3,7 @@ package com.expeysi.app.ui.icons
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AttachMoney
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.CardGiftcard
 import androidx.compose.material.icons.filled.Category
@@ -117,6 +118,8 @@ object IconCatalog {
         "star" to Icons.Filled.Star,
         DEFAULT_KEY to Icons.Filled.Category,
         "more_horiz" to Icons.Filled.MoreHoriz,
+        // Псевдо-категория списаний долга (DebtWriteOffs.ICON_KEY).
+        "block" to Icons.Filled.Block,
     )
 
     val availableKeys: List<String> = icons.keys.toList()

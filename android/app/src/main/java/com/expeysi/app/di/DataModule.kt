@@ -12,8 +12,10 @@ import com.expeysi.app.data.db.AccountDao
 import com.expeysi.app.data.db.AppDatabase
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.CategoryDao
+import com.expeysi.app.data.db.CounterpartyDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.CurrencyEntity
+import com.expeysi.app.data.db.DebtAdjustmentDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.seed.CurrencySeed
 import com.expeysi.app.data.seed.PresetData
@@ -75,6 +77,12 @@ object DataModule {
 
     @Provides
     fun provideBalanceDao(db: AppDatabase): BalanceDao = db.balanceDao()
+
+    @Provides
+    fun provideCounterpartyDao(db: AppDatabase): CounterpartyDao = db.counterpartyDao()
+
+    @Provides
+    fun provideDebtAdjustmentDao(db: AppDatabase): DebtAdjustmentDao = db.debtAdjustmentDao()
 
     @Provides
     @Singleton

@@ -29,6 +29,8 @@ data class OperationDateGroup(
 
 /** Готовое состояние экрана операций категории. */
 data class CategoryOperationsUiState(
+    /** id категории: по нему UI подписывает псевдо-категории (комиссии, списания). */
+    val categoryId: String = "",
     val categoryName: String = "",
     /** Метка периода из отчёта, например «Апрель 2026» или «Неделя». */
     val periodLabel: String = "",
@@ -65,7 +67,9 @@ class CategoryOperationsViewModel @Inject constructor(
     private var job: Job? = null
     private val loaded = mutableListOf<Operation>()
 
-    private val _uiState = MutableStateFlow(CategoryOperationsUiState(periodLabel = periodLabel))
+    private val _uiState = MutableStateFlow(
+        CategoryOperationsUiState(categoryId = categoryId, periodLabel = periodLabel),
+    )
     val uiState: StateFlow<CategoryOperationsUiState> = _uiState.asStateFlow()
 
     init {

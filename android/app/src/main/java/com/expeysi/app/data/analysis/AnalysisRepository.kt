@@ -39,6 +39,12 @@ data class Operation(
     val iconKey: String,
     val colorKey: String,
     val isIncome: Boolean,
+    /**
+     * Строка псевдо-категории списаний долга: [id] — идентификатор
+     * корректировки ([com.expeysi.app.data.db.DebtAdjustmentEntity]), а не
+     * транзакции, поэтому тап ведёт в редактор корректировки.
+     */
+    val isWriteOff: Boolean = false,
 )
 
 /** Страница списка: операции по убыванию даты, сумма за весь период и признак продолжения. */

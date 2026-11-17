@@ -26,6 +26,20 @@ interface TransactionDao {
     )
     fun observeActiveForAccounts(accountIds: List<String>, limit: Int): Flow<List<TransactionEntity>>
 
+    /** Долговые операции контрагента: счёт и контрагент на двух сторонах записи. */
+    @Query(
+        "SELECT * FROM transactions WHERE deleted = 0 AND counterpartyId = :counterpartyId " +
+            "ORDER BY date DESC, updatedAt DESC",
+    )
+    fun observeActiveForCounterparty(counterpartyId: String): Flow<List<TransactionEntity>>
+
+    @Query("SELECT * FROM transactions WHERE deleted = 0 AND counterpartyId = :counterpartyId")
+    suspend fun listActiveForCounterparty(counterpartyId: String): List<TransactionEntity>
+
+    /** Есть ли живые долговые операции у контрагента: запрет удаления при истории. */
+    @Query("SELECT EXISTS(SELECT 1 FROM transactions WHERE counterpartyId = :counterpartyId AND deleted = 0)")
+    suspend fun hasActiveForCounterparty(counterpartyId: String): Boolean
+
     @Query(
         "SELECT * FROM transactions WHERE deleted = 0 AND type = :type " +
             "AND date >= :startMillis AND date < :endMillis",

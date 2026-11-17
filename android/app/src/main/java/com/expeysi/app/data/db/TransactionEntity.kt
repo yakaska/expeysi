@@ -32,6 +32,13 @@ data class TransactionEntity(
      * балансы и лента.
      */
     val feeMinor: Long = 0,
+    /**
+     * Контрагент по долгу — вторая сторона операции вместо счёта-получателя;
+     * заполнен только у долговых операций (см. [com.expeysi.app.domain.TxType.isDebt]).
+     */
+    val counterpartyId: String = "",
+    /** Срок возврата долга, epoch millis; заполнен только у DEBT_LEND и DEBT_BORROW. */
+    val dueDate: Long? = null,
     val deleted: Boolean = false,
     val updatedAt: Long,
     val updatedBy: String = "",

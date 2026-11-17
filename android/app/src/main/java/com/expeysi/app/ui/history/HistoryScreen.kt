@@ -11,10 +11,12 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
@@ -28,6 +30,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -64,13 +67,17 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.expeysi.app.R
+import com.expeysi.app.domain.DebtCalculator
+import com.expeysi.app.domain.DebtWriteOffs
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TransferFees
-import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.common.categoryDisplayName
+import com.expeysi.app.ui.debts.DebtIcon
+import com.expeysi.app.ui.debts.debtKindLabelRes
+import com.expeysi.app.ui.home.FeedEntries
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -88,7 +95,7 @@ private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
 fun HistoryScreen(
     onBack: () -> Unit,
     onAddClick: (TxType?) -> Unit,
-    onItemClick: (String) -> Unit,
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     /** Правка счёта в режиме истории счёта; тот же экран, что и через «Счета» в drawer. */
     onEditAccountClick: (String) -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel(),
@@ -359,7 +366,7 @@ fun HistoryScreen(
 @Composable
 private fun TransactionList(
     items: List<TransactionItem>,
-    onItemClick: (String) -> Unit,
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     listState: LazyListState,
     /** Отчёт переводов: все операции — переводы, дата видна из стик-заголовка дня. */
     transferOnly: Boolean = false,
@@ -399,17 +406,16 @@ private fun TransactionList(
                     else -> date.format(dayHeaderFormatter)
                 }
                 if (!transferOnly) {
-                    // Переводы нейтральны, но их комиссия — реальная потеря
-                    // денег: входит в расходы дня.
-                    val feeMinor = Transfers.feesMinor(dayItems.map { it.transaction })
+                    // Шапка дня — тот же P&L по начислению, что и в сводке
+                    // и шапке главной ленты: доходы и расходы, комиссии
+                    // переводов и учтённые списания (псевдо-строки). Переводы
+                    // и долговые потоки денег нейтральны: это движение
+                    // наличных, не доход и не расход.
+                    val daySums = FeedEntries.daySums(dayItems)
                     DayGroupHeader(
                         dateLabel = dateLabel,
-                        incomeMinor = dayItems
-                            .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
-                            .sumOf { it.transaction.amountMinor },
-                        expenseMinor = dayItems
-                            .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
-                            .sumOf { it.transaction.amountMinor } + feeMinor,
+                        incomeMinor = daySums.incomeMinor,
+                        expenseMinor = daySums.expenseMinor,
                         currencySymbol = dayItems.first().currencySymbol,
                         modifier = Modifier.padding(vertical = 8.dp),
                     )
@@ -441,7 +447,19 @@ private fun TransactionList(
                             HistoryRow(
                                 item = entry.item,
                                 accountId = accountId,
-                                onClick = { onItemClick(entry.item.transaction.id) },
+                                // Псевдо-строка учтённого списания не кликабельна:
+                                // записи в БД за ней нет, а маршрут правки
+                                // операции открыл бы несуществующую запись.
+                                onClick = if (entry.item.isWriteOffEntry) {
+                                    null
+                                } else {
+                                    {
+                                        onItemClick(
+                                            entry.item.transaction.id,
+                                            TxType.fromWire(entry.item.transaction.type).isDebt,
+                                        )
+                                    }
+                                },
                             )
                         }
                     }
@@ -475,7 +493,10 @@ private fun TransactionList(
                                             HistoryRow(
                                                 item = member,
                                                 accountId = accountId,
-                                                onClick = { onItemClick(member.transaction.id) },
+                                                onClick = {
+                                                    // Члены серии — только переводы, долгом быть не может.
+                                                    onItemClick(member.transaction.id, false)
+                                                },
                                             )
                                         }
                                     }
@@ -493,7 +514,7 @@ private fun TransactionList(
 private fun HistoryRow(
     item: TransactionItem,
     accountId: String?,
-    onClick: () -> Unit,
+    onClick: (() -> Unit)?,
 ) {
     // Перевод рисуется карточкой с обеими сторонами и суммами ног; строка ниже —
     // обычные доходы и расходы и фолбэк для переводов без карточки (ноги без связки).
@@ -504,31 +525,69 @@ private fun HistoryRow(
             TransferCardRow(
                 card = card,
                 signed = accountId != null && !item.isTransferPair,
-                onClick = onClick,
+                // Псевдо-строки списания в карточки переводов не попадают:
+                // у передачи всегда есть реальная запись в БД.
+                onClick = onClick ?: {},
             )
             return
         }
     }
-    val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
+    val txType = TxType.fromWire(item.transaction.type)
+    // Счётная сторона: доход — приход; долговая операция сохраняет знак
+    // движения денег счёта (+/−), но цвет у неё нейтральный: долг не доход
+    // и не расход (см. ProfitAndLoss). Псевдо-строка учтённого списания —
+    // часть P&L с обычной раскраской знака.
+    val isIncome = txType == TxType.INCOME ||
+        txType.isDebt &&
+        !DebtCalculator.isOutgoing(txType)
+    // Долговые потоки денег и свёрнутые пары нейтральны по цвету.
+    val neutralAmount = item.isTransferPair ||
+        txType.isDebt &&
+        !item.isWriteOffEntry
+    val debtLabel = debtKindLabelRes(txType)
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            // Псевдо-строка списания не кликабельна: записи в БД за ней нет.
+            .then(
+                if (onClick != null) {
+                    Modifier.clickable(onClick = onClick)
+                } else {
+                    Modifier
+                },
+            )
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+        if (txType.isDebt) {
+            DebtIcon(Icons.Filled.Handshake, MaterialTheme.colorScheme.primaryContainer)
+        } else {
+            // У псевдо-строки списания ключ иконки — DebtWriteOffs.ICON_KEY.
+            CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+        }
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                when {
+                    item.isWriteOffEntry -> stringResource(R.string.debts_write_off_category)
+                    debtLabel != null -> stringResource(debtLabel)
+                    else -> item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
+                },
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
                 listOfNotNull(
+                    item.counterpartyName.ifBlank { null },
+                    // Долг закрыт списанием: денег в ленте за ним не
+                    // придёт, показываем это.
+                    if (item.isDebtWrittenOff) {
+                        stringResource(R.string.debts_feed_written_off)
+                    } else {
+                        null
+                    },
                     item.accountName.ifBlank { null },
                     dateTextOf(item.transaction.date),
                     item.transaction.note.ifBlank { null },
@@ -541,7 +600,9 @@ private fun HistoryRow(
             text = (if (isIncome) "+" else "−") +
                 "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}",
             style = MaterialTheme.typography.titleMedium,
-            color = if (isIncome) {
+            // Долговые потоки нейтральны по цвету, но со своим знаком;
+            // учтённые списания — обычная раскраска P&L.
+            color = if (!neutralAmount && isIncome) {
                 LocalFinanceColors.current.income
             } else {
                 MaterialTheme.colorScheme.onSurface
@@ -593,28 +654,30 @@ private fun CategoriesView(
         }
         items(state.categoryTotals, key = { it.categoryId }) { total ->
             val category = categoryById[total.categoryId]
+            // Псевдо-категории комиссий и списаний никуда не ведут: за ними
+            // нет записей в БД.
+            val isFee = total.categoryId == TransferFees.CATEGORY_ID
+            val isWriteOff = total.categoryId == DebtWriteOffs.CATEGORY_ID
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 64.dp)
                     .clickable(
-                        // Псевдо-категория комиссий никуда не ведёт: за ней
-                        // нет записи в БД.
-                        enabled = total.categoryId != TransferFees.CATEGORY_ID,
+                        enabled = !isFee && !isWriteOff,
                     ) { onCategoryClick(total.categoryId) }
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 CategoryIcon(
-                    if (total.categoryId == TransferFees.CATEGORY_ID) {
-                        TransferFees.ICON_KEY
-                    } else {
-                        category?.iconKey ?: ""
+                    when (total.categoryId) {
+                        TransferFees.CATEGORY_ID -> TransferFees.ICON_KEY
+                        DebtWriteOffs.CATEGORY_ID -> DebtWriteOffs.ICON_KEY
+                        else -> category?.iconKey ?: ""
                     },
-                    if (total.categoryId == TransferFees.CATEGORY_ID) {
-                        TransferFees.COLOR_KEY
-                    } else {
-                        category?.colorKey ?: "default"
+                    when (total.categoryId) {
+                        TransferFees.CATEGORY_ID -> TransferFees.COLOR_KEY
+                        DebtWriteOffs.CATEGORY_ID -> DebtWriteOffs.COLOR_KEY
+                        else -> category?.colorKey ?: "default"
                     },
                 )
                 Text(
@@ -624,8 +687,15 @@ private fun CategoriesView(
                         .weight(1f)
                         .padding(start = 16.dp),
                 )
+                // У списания в смешанном виде показываем непустую сторону
+                // (обычно у списания одна сторона), как у строк счетов.
+                val rowAmountMinor = when {
+                    !isWriteOff -> if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor
+                    state.isIncomeOnly || total.expenseMinor == 0L -> total.incomeMinor
+                    else -> total.expenseMinor
+                }
                 Text(
-                    text = "${Money.formatAuto(if (state.isIncomeOnly) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
+                    text = "${Money.formatAuto(rowAmountMinor)} ${state.currencySymbol}",
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
@@ -653,13 +723,16 @@ private fun AccountsView(
     ) {
         items(state.accountTotals, key = { it.accountId }) { total ->
             val account = accountById[total.accountId]
-            val expanded = total.accountId in expandedAccounts
+            // Псевдо-«счёт» списаний долга: у корректировки нет счёта,
+            // в разрезке счетов она своя строка без вложенной расшифровки.
+            val isWriteOff = total.accountId == DebtWriteOffs.CATEGORY_ID
+            val expanded = !isWriteOff && total.accountId in expandedAccounts
             Column {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 64.dp)
-                        .clickable {
+                        .clickable(enabled = !isWriteOff) {
                             expandedAccounts = if (expanded) {
                                 expandedAccounts - total.accountId
                             } else {
@@ -669,24 +742,39 @@ private fun AccountsView(
                         .padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    CategoryIcon(account?.iconKey ?: "", account?.colorKey ?: "default")
-                    Text(
-                        text = account?.name.orEmpty(),
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(start = 16.dp),
-                    )
+                    if (isWriteOff) {
+                        CategoryIcon(DebtWriteOffs.ICON_KEY, DebtWriteOffs.COLOR_KEY)
+                        Text(
+                            text = categoryDisplayName(DebtWriteOffs.CATEGORY_ID, ""),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 16.dp),
+                        )
+                    } else {
+                        CategoryIcon(account?.iconKey ?: "", account?.colorKey ?: "default")
+                        Text(
+                            text = account?.name.orEmpty(),
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 16.dp),
+                        )
+                    }
                     Text(
                         text = "${Money.formatAuto(if (total.expenseMinor == 0L) total.incomeMinor else total.expenseMinor)} ${state.currencySymbol}",
                         style = MaterialTheme.typography.titleMedium,
                     )
-                    Icon(
-                        imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                        contentDescription = stringResource(
-                            if (expanded) R.string.analysis_collapse else R.string.history_expand_cd,
-                        ),
-                    )
+                    if (isWriteOff) {
+                        Spacer(modifier = Modifier.width(24.dp))
+                    } else {
+                        Icon(
+                            imageVector = if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                            contentDescription = stringResource(
+                                if (expanded) R.string.analysis_collapse else R.string.history_expand_cd,
+                            ),
+                        )
+                    }
                 }
                 if (expanded) {
                     total.categories.forEach { categoryTotal ->

@@ -65,4 +65,28 @@ class BalanceCalculatorTest {
         assertEquals(0L, BalanceCalculator.totalMinor(TxType.INCOME, txs))
         assertEquals(0L, BalanceCalculator.totalMinor(TxType.EXPENSE, txs))
     }
+
+    @Test
+    fun `долговые операции двигают остаток счёта по направлению денег`() {
+        val txs = listOf(
+            TxSum(TxType.DEBT_LEND, 250_00L),
+            TxSum(TxType.DEBT_BORROW, 100_00L),
+            TxSum(TxType.DEBT_REPAY_IN, 50_00L),
+            TxSum(TxType.DEBT_REPAY_OUT, 30_00L),
+        )
+        // -250 + 100 + 50 - 30
+        assertEquals(-130_00L, BalanceCalculator.balanceMinor(0L, txs))
+    }
+
+    @Test
+    fun `долги не попадают в итоги доходов и расходов`() {
+        val txs = listOf(
+            TxSum(TxType.DEBT_LEND, 250_00L),
+            TxSum(TxType.DEBT_BORROW, 100_00L),
+            TxSum(TxType.DEBT_REPAY_IN, 50_00L),
+            TxSum(TxType.DEBT_REPAY_OUT, 30_00L),
+        )
+        assertEquals(0L, BalanceCalculator.totalMinor(TxType.INCOME, txs))
+        assertEquals(0L, BalanceCalculator.totalMinor(TxType.EXPENSE, txs))
+    }
 }

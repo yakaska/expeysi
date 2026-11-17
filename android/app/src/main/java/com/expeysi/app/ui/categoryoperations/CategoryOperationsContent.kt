@@ -48,6 +48,7 @@ import com.expeysi.app.ui.analysis.SkeletonBar
 import com.expeysi.app.ui.common.AmountFormat
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.RuDates
+import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.ExpeysiTheme
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -76,9 +77,9 @@ internal fun CategoryOperationsContent(
                 title = {
                     Column {
                         Text(
-                            text = state.categoryName.ifBlank {
-                                stringResource(R.string.report_uncategorized)
-                            },
+                            // Псевдо-категории (комиссии, списания) подписаны
+                            // своими строками: у них нет имени в БД.
+                            text = categoryDisplayName(state.categoryId, state.categoryName),
                             style = MaterialTheme.typography.titleMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,

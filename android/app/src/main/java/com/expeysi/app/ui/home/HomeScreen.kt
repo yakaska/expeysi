@@ -32,6 +32,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Handshake
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Menu
@@ -85,6 +86,7 @@ import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.CategoryShares
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
@@ -93,6 +95,8 @@ import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.common.operationsLabel
+import com.expeysi.app.ui.debts.DebtIcon
+import com.expeysi.app.ui.debts.debtKindLabelRes
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -124,7 +128,8 @@ private const val VISIBLE_ACCOUNT_CHIPS = 3
 data class HomeActions(
     val onMenuClick: () -> Unit,
     val onAddClick: () -> Unit,
-    val onItemClick: (String) -> Unit,
+    val onDebtsClick: () -> Unit = {},
+    val onItemClick: (id: String, isDebt: Boolean) -> Unit,
     val onAddBalanceClick: () -> Unit,
     val onEditBalanceClick: (String) -> Unit,
     val onBalanceHistoryClick: (String) -> Unit,
@@ -141,7 +146,8 @@ data class HomeActions(
 fun HomeScreen(
     onMenuClick: () -> Unit,
     onAddClick: () -> Unit,
-    onItemClick: (String) -> Unit,
+    onDebtsClick: () -> Unit = {},
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     onAddBalanceClick: () -> Unit,
     onEditBalanceClick: (String) -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
@@ -157,6 +163,7 @@ fun HomeScreen(
         actions = HomeActions(
             onMenuClick = onMenuClick,
             onAddClick = onAddClick,
+            onDebtsClick = onDebtsClick,
             onItemClick = onItemClick,
             onAddBalanceClick = onAddBalanceClick,
             onEditBalanceClick = onEditBalanceClick,
@@ -249,6 +256,12 @@ fun HomeContent(
                         Icon(
                             Icons.Filled.History,
                             contentDescription = stringResource(R.string.home_transaction_history),
+                        )
+                    }
+                    IconButton(onClick = actions.onDebtsClick) {
+                        Icon(
+                            Icons.Filled.Handshake,
+                            contentDescription = stringResource(R.string.debts_title),
                         )
                     }
                 },
@@ -380,16 +393,11 @@ fun HomeContent(
                 state.transactions.groupBy { item ->
                     Instant.ofEpochMilli(item.transaction.date).atZone(zone).toLocalDate()
                 }.forEach { (date, transactions) ->
-                    // Переводы нейтральны: перемещение денег внутри семьи не
-                    // доход и не расход. Но комиссия перевода — реальная
-                    // потеря денег: входит в расходы дня.
-                    val incomeMinor = transactions
-                        .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
-                        .sumOf { it.transaction.amountMinor }
-                    val expenseMinor = transactions
-                        .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
-                        .sumOf { it.transaction.amountMinor } +
-                        Transfers.feesMinor(transactions.map { it.transaction })
+                    // Шапка дня — тот же P&L по начислению, что и в сводке:
+                    // доходы и расходы, комиссии переводов и учтённые списания
+                    // (псевдо-строки). Переводы и долговые потоки денег
+                    // нейтральны: они двигают наличными, не доход и не расход.
+                    val daySums = FeedEntries.daySums(transactions)
                     stickyHeader(key = "date-$date") {
                         DayGroupHeader(
                             dateLabel = when (date) {
@@ -397,20 +405,32 @@ fun HomeContent(
                                 today.minusDays(1) -> stringResource(R.string.home_yesterday)
                                 else -> date.format(dayFormatter)
                             },
-                            incomeMinor = incomeMinor,
-                            expenseMinor = expenseMinor,
+                            incomeMinor = daySums.incomeMinor,
+                            expenseMinor = daySums.expenseMinor,
                             currencySymbol = transactions.first().currencySymbol,
                             modifier = Modifier.padding(vertical = 8.dp),
                         )
                     }
                     transactions.forEachIndexed { index, item ->
                         item(key = item.transaction.id) {
-                            val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
-                            // Одиночная нога зачисления показывается как доход, списание — как расход.
-                            val legIsIncome = isIncome ||
+                            val txType = TxType.fromWire(item.transaction.type)
+                            // Одиночная нога зачисления показывается как доход,
+                            // списание — как расход. Долговая операция — знак
+                            // движения денег счёта, но нейтральный цвет: долг
+                            // не доход и не расход (см. ProfitAndLoss).
+                            val legIsIncome = txType == TxType.INCOME ||
                                 item.isTransfer &&
                                 !item.isTransferPair &&
-                                TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
+                                txType == TxType.TRANSFER_IN ||
+                                txType.isDebt &&
+                                !DebtCalculator.isOutgoing(txType)
+                            // Псевдо-строка учтённого списания — часть P&L: у неё
+                            // обычная раскраска знака. Долговые потоки денег и
+                            // свёрнутые пары нейтральны.
+                            val neutralAmount = item.isTransferPair ||
+                                txType.isDebt &&
+                                !item.isWriteOffEntry
+                            val debtLabel = debtKindLabelRes(txType)
                             Column(modifier = Modifier.animateItem()) {
                                 if (index > 0) {
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -418,29 +438,54 @@ fun HomeContent(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { actions.onItemClick(item.transaction.id) }
+                                        // Псевдо-строка списания не кликабельна:
+                                        // записи в БД за ней нет.
+                                        .then(
+                                            if (item.isWriteOffEntry) {
+                                                Modifier
+                                            } else {
+                                                Modifier.clickable {
+                                                    actions.onItemClick(item.transaction.id, txType.isDebt)
+                                                }
+                                            },
+                                        )
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    CategoryIcon(
-                                        if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
-                                        item.categoryColorKey,
-                                    )
+                                    if (item.isWriteOffEntry) {
+                                        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+                                    } else if (txType.isDebt) {
+                                        DebtIcon(Icons.Filled.Handshake, MaterialTheme.colorScheme.primaryContainer)
+                                    } else {
+                                        CategoryIcon(
+                                            if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
+                                            item.categoryColorKey,
+                                        )
+                                    }
                                     Column(
                                         modifier = Modifier
                                             .weight(1f)
                                             .padding(horizontal = 16.dp),
                                     ) {
                                         Text(
-                                            if (item.isTransfer) {
-                                                stringResource(R.string.transfer_title)
-                                            } else {
-                                                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
+                                            when {
+                                                item.isWriteOffEntry -> stringResource(R.string.debts_write_off_category)
+                                                item.isTransfer -> stringResource(R.string.transfer_title)
+                                                debtLabel != null -> stringResource(debtLabel)
+                                                else -> item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
                                             },
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
                                         Text(
                                             listOfNotNull(
+                                                item.counterpartyName.ifBlank { null },
+                                                // Долг закрыт списанием: денег в ленте
+                                                // за ним не придёт, показываем это.
+                                                if (item.isDebtWrittenOff) {
+                                                    stringResource(R.string.debts_feed_written_off)
+                                                } else {
+                                                    null
+                                                },
                                                 if (item.isTransfer) {
                                                     Transfers.directionLabel(
                                                         item.transaction,
@@ -467,13 +512,15 @@ fun HomeContent(
                                             // а не доход и не расход.
                                             item.isTransferPair ->
                                                 "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
-                                            // Одиночная нога показывает движение денег счёта:
-                                            // зачисление — плюс, списание — минус.
+                                            // Одиночная нога и долговая операция показывают движение
+                                            // денег счёта: зачисление — плюс, списание — минус.
                                             else -> (if (legIsIncome) "+" else "−") +
                                                 "${Money.formatAuto(item.transaction.amountMinor)} ${item.currencySymbol}"
                                         },
                                         style = MaterialTheme.typography.titleMedium,
-                                        color = if (legIsIncome) {
+                                        // Долговые потоки нейтральны по цвету, но со своим
+                                        // знаком; учтённые списания — обычная раскраска P&L.
+                                        color = if (!neutralAmount && legIsIncome) {
                                             LocalFinanceColors.current.income
                                         } else {
                                             MaterialTheme.colorScheme.onSurface
@@ -1050,7 +1097,7 @@ private fun amountSignOf(value: Long): String = when {
 private val previewHomeActions = HomeActions(
     onMenuClick = {},
     onAddClick = {},
-    onItemClick = {},
+    onItemClick = { _, _ -> },
     onAddBalanceClick = {},
     onEditBalanceClick = {},
     onBalanceHistoryClick = {},
