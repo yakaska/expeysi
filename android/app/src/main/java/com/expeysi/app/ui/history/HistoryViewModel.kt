@@ -10,6 +10,7 @@ import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryDao
 import com.expeysi.app.data.db.CategoryEntity
+import com.expeysi.app.data.db.CounterpartyDao
 import com.expeysi.app.data.db.CurrencyDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
@@ -89,6 +90,7 @@ class HistoryViewModel @Inject constructor(
     balanceDao: BalanceDao,
     accountDao: AccountDao,
     categoryDao: CategoryDao,
+    counterpartyDao: CounterpartyDao,
     currencyDao: CurrencyDao,
     transactionDao: TransactionDao,
 ) : ViewModel() {
@@ -112,11 +114,12 @@ class HistoryViewModel @Inject constructor(
 
     private val _selectedTypes = MutableStateFlow(
         // «transfer» — псевдотип отчёта «Переводы»: обе ноги, реальное хранение TxType не знает.
-        // Долговые операции в обычной истории и разрезках не показываются: их место
-        // в разделе «Долгов», поэтому из выбора по умолчанию они выпадают.
+        // Долговые операции показываются в списке со всеми: это реальные движения
+        // денег, но в разрезки по категориям/счетам и итоги доходов/расходов
+        // они не попадают — долг не доход и не расход.
         when (val wire = savedStateHandle.get<String>("type")) {
             TRANSFER_TYPES_WIRE -> setOf(TxType.TRANSFER_OUT, TxType.TRANSFER_IN)
-            null -> TxType.entries.filterNot { it.isDebt }.toSet()
+            null -> TxType.entries.toSet()
             else -> setOf(TxType.fromWire(wire))
         },
     )
@@ -147,6 +150,19 @@ class HistoryViewModel @Inject constructor(
         .map { list -> list.associate { it.code to it.symbol } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
+    /** Символы валют плюс имена контрагентов одним слотом: у combine лимит в пять потоков. */
+    private val symbolsAndCounterpartyNames: StateFlow<Pair<Map<String, String>, Map<String, String>>> =
+        combine(
+            currencies,
+            counterpartyDao.observeActive(),
+        ) { symbols, counterparties ->
+            symbols to counterparties.associate { it.id to it.name }
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            emptyMap<String, String>() to emptyMap(),
+        )
+
     private val filters = combine(
         _period,
         _customRange,
@@ -158,11 +174,12 @@ class HistoryViewModel @Inject constructor(
 
     val uiState: StateFlow<HistoryUiState> = combine(
         base,
-        currencies,
+        symbolsAndCounterpartyNames,
         filters,
         _mode,
         _detail,
-    ) { data, symbols, f, mode, detail ->
+    ) { data, symbolsAndNames, f, mode, detail ->
+        val (symbols, counterpartyNames) = symbolsAndNames
         val scopeAccounts = if (isAccountMode) {
             data.accounts.filter { it.id == accountId }
         } else {
@@ -209,6 +226,7 @@ class HistoryViewModel @Inject constructor(
         }
         val entries = filtered
             .filterNot { TxType.fromWire(it.type).isTransfer }
+            .filterNot { TxType.fromWire(it.type).isDebt }
             .map {
                 AggEntry(it.categoryId, it.accountId, TxType.fromWire(it.type), it.amountMinor)
             } + feeEntries
@@ -226,6 +244,9 @@ class HistoryViewModel @Inject constructor(
             .let(Transfers::collapse)
             .map { tx ->
                 val category = categoryById[tx.categoryId]
+                val txType = TxType.fromWire(tx.type)
+                val counterpartyName =
+                    if (txType.isDebt) counterpartyNames[tx.counterpartyId].orEmpty() else ""
                 TransactionItem(
                     transaction = tx,
                     categoryName = category?.name ?: "",
@@ -233,7 +254,8 @@ class HistoryViewModel @Inject constructor(
                     categoryColorKey = category?.colorKey ?: CategoryPalette.DEFAULT_KEY,
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
-                    isTransfer = TxType.fromWire(tx.type).isTransfer,
+                    counterpartyName = counterpartyName,
+                    isTransfer = txType.isTransfer,
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
                     isTransferPair = Transfers.isCollapsedPair(tx, scopedTransactions),
                     transferCard = buildTransferCard(tx, legsByLinkedId, accountById, symbols),

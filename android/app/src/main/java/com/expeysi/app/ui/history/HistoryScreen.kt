@@ -63,7 +63,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.material.icons.filled.Handshake
 import com.expeysi.app.R
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.TransferFees
 import com.expeysi.app.domain.Transfers
@@ -71,6 +73,8 @@ import com.expeysi.app.domain.TxType
 import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.common.categoryDisplayName
+import com.expeysi.app.ui.debts.DebtIcon
+import com.expeysi.app.ui.debts.debtKindLabelRes
 import com.expeysi.app.ui.home.TransactionItem
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.theme.LocalFinanceColors
@@ -88,7 +92,7 @@ private val dayHeaderFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern(
 fun HistoryScreen(
     onBack: () -> Unit,
     onAddClick: (TxType?) -> Unit,
-    onItemClick: (String) -> Unit,
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     /** Правка счёта в режиме истории счёта; тот же экран, что и через «Счета» в drawer. */
     onEditAccountClick: (String) -> Unit = {},
     viewModel: HistoryViewModel = hiltViewModel(),
@@ -359,7 +363,7 @@ fun HistoryScreen(
 @Composable
 private fun TransactionList(
     items: List<TransactionItem>,
-    onItemClick: (String) -> Unit,
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     listState: LazyListState,
     /** Отчёт переводов: все операции — переводы, дата видна из стик-заголовка дня. */
     transferOnly: Boolean = false,
@@ -400,15 +404,26 @@ private fun TransactionList(
                 }
                 if (!transferOnly) {
                     // Переводы нейтральны, но их комиссия — реальная потеря
-                    // денег: входит в расходы дня.
+                    // денег: входит в расходы дня. Долговая операция — тоже
+                    // реальное движение денег счёта: взятое и полученное
+                    // погашение — приход, выданный долг и отправленное
+                    // погашение — расход.
                     val feeMinor = Transfers.feesMinor(dayItems.map { it.transaction })
                     DayGroupHeader(
                         dateLabel = dateLabel,
                         incomeMinor = dayItems
-                            .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
+                            .filter { item ->
+                                val type = TxType.fromWire(item.transaction.type)
+                                type == TxType.INCOME ||
+                                    type.isDebt && !DebtCalculator.isOutgoing(type)
+                            }
                             .sumOf { it.transaction.amountMinor },
                         expenseMinor = dayItems
-                            .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
+                            .filter { item ->
+                                val type = TxType.fromWire(item.transaction.type)
+                                type == TxType.EXPENSE ||
+                                    type.isDebt && DebtCalculator.isOutgoing(type)
+                            }
                             .sumOf { it.transaction.amountMinor } + feeMinor,
                         currencySymbol = dayItems.first().currencySymbol,
                         modifier = Modifier.padding(vertical = 8.dp),
@@ -441,7 +456,12 @@ private fun TransactionList(
                             HistoryRow(
                                 item = entry.item,
                                 accountId = accountId,
-                                onClick = { onItemClick(entry.item.transaction.id) },
+                                onClick = {
+                                    onItemClick(
+                                        entry.item.transaction.id,
+                                        TxType.fromWire(entry.item.transaction.type).isDebt,
+                                    )
+                                },
                             )
                         }
                     }
@@ -475,7 +495,10 @@ private fun TransactionList(
                                             HistoryRow(
                                                 item = member,
                                                 accountId = accountId,
-                                                onClick = { onItemClick(member.transaction.id) },
+                                                onClick = {
+                                                    // Члены серии — только переводы, долгом быть не может.
+                                                    onItemClick(member.transaction.id, false)
+                                                },
                                             )
                                         }
                                     }
@@ -509,7 +532,11 @@ private fun HistoryRow(
             return
         }
     }
-    val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
+    val txType = TxType.fromWire(item.transaction.type)
+    // Счётная сторона: доход и долговое поступление денег — приход, остальное — расход.
+    val isIncome = txType == TxType.INCOME ||
+        txType.isDebt && !DebtCalculator.isOutgoing(txType)
+    val debtLabel = debtKindLabelRes(txType)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -517,18 +544,26 @@ private fun HistoryRow(
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+        if (txType.isDebt) {
+            DebtIcon(Icons.Filled.Handshake, MaterialTheme.colorScheme.primaryContainer)
+        } else {
+            CategoryIcon(item.categoryIconKey, item.categoryColorKey)
+        }
         Column(
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
         ) {
             Text(
-                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) },
+                when {
+                    debtLabel != null -> stringResource(debtLabel)
+                    else -> item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
+                },
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
                 listOfNotNull(
+                    item.counterpartyName.ifBlank { null },
                     item.accountName.ifBlank { null },
                     dateTextOf(item.transaction.date),
                     item.transaction.note.ifBlank { null },

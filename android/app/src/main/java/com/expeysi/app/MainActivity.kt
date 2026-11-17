@@ -38,8 +38,10 @@ import com.expeysi.app.ui.categoryoperations.CategoryOperationsScreen
 import com.expeysi.app.ui.categoryreport.CategoryReportScreen
 import com.expeysi.app.ui.common.asString
 import com.expeysi.app.ui.debts.CounterpartyScreen
+import com.expeysi.app.ui.debts.DEBTS_PICKED_COUNTERPARTY_ID
 import com.expeysi.app.ui.debts.DebtAdjustmentScreen
 import com.expeysi.app.ui.debts.DebtOperationScreen
+import com.expeysi.app.ui.debts.DebtOperationViewModel
 import com.expeysi.app.ui.debts.DebtDirection
 import com.expeysi.app.ui.debts.DebtsScreen
 import com.expeysi.app.ui.debts.EditCounterpartyScreen
@@ -221,7 +223,15 @@ private fun AppNavigation() {
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onAddClick = { navController.navigate("add") },
                     onDebtsClick = { navController.navigate("debts") },
-                    onItemClick = { id -> navController.navigate("edit/$id") },
+                    onItemClick = { id, isDebt ->
+                        // Долговая запись открывается единой формой долгов:
+                        // обычный редактор не знает долговых типов.
+                        if (isDebt) {
+                            navController.navigate("debts/operation/edit/$id")
+                        } else {
+                            navController.navigate("edit/$id")
+                        }
+                    },
                     onAddBalanceClick = { navController.navigate("balances/add") },
                     onEditBalanceClick = { id -> navController.navigate("balances/edit/$id") },
                     onBalanceHistoryClick = { id -> navController.navigate("history/balance/$id") },
@@ -357,7 +367,15 @@ private fun AppNavigation() {
                 )
             }
             composable("counterparties/add") {
-                EditCounterpartyScreen(onClose = { navigateBack() })
+                EditCounterpartyScreen(
+                    onClose = { navigateBack() },
+                    // Свежесозданный контрагент возвращается в форму долговой
+                    // операции: без подстановки кнопку сохранения не включить.
+                    onSaved = { id ->
+                        navController.previousBackStackEntry?.savedStateHandle
+                            ?.set(DEBTS_PICKED_COUNTERPARTY_ID, id)
+                    },
+                )
             }
             composable(
                 route = "counterparties/edit/{counterpartyId}",
@@ -386,7 +404,22 @@ private fun AppNavigation() {
                         defaultValue = ""
                     },
                 ),
-            ) {
+            ) { entry ->
+                // Свежесозданный контрагент возвращается на savedStateHandle
+                // ЗАПИСИ: у ViewModel отдельный handle, и set() записи до него
+                // не доходит. Результат читаем по записи и подставляем в форму;
+                // ключ одноразовый — пересоздание VM не переигрывает подстановку
+                // поверх ручного выбора.
+                val formViewModel = hiltViewModel<DebtOperationViewModel>(entry)
+                val pickedCounterpartyId by entry.savedStateHandle
+                    .getStateFlow(DEBTS_PICKED_COUNTERPARTY_ID, "")
+                    .collectAsStateWithLifecycle()
+                LaunchedEffect(pickedCounterpartyId) {
+                    if (pickedCounterpartyId.isNotEmpty()) {
+                        formViewModel.onCounterpartySelect(pickedCounterpartyId)
+                        entry.savedStateHandle[DEBTS_PICKED_COUNTERPARTY_ID] = ""
+                    }
+                }
                 DebtOperationScreen(
                     onClose = { navigateBack() },
                     onCreateCounterpartyClick = { navController.navigate("counterparties/add") },
@@ -536,7 +569,9 @@ private fun AppNavigation() {
                             navController.navigate("add?type=${type.wire}")
                         }
                     },
-                    onItemClick = { id -> navController.navigate("edit/$id") },
+                    onItemClick = { id, isDebt ->
+                        if (isDebt) navController.navigate("debts/operation/edit/$id") else navController.navigate("edit/$id")
+                    },
                 )
             }
             composable(
@@ -552,7 +587,9 @@ private fun AppNavigation() {
                             navController.navigate("add?type=${type.wire}")
                         }
                     },
-                    onItemClick = { id -> navController.navigate("edit/$id") },
+                    onItemClick = { id, isDebt ->
+                        if (isDebt) navController.navigate("debts/operation/edit/$id") else navController.navigate("edit/$id")
+                    },
                     onEditAccountClick = { id -> navController.navigate("accounts/edit/$id") },
                 )
             }

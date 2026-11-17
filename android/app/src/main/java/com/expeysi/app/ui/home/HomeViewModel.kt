@@ -14,7 +14,9 @@ import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceDao
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.CategoryDao
+import com.expeysi.app.data.db.CounterpartyDao
 import com.expeysi.app.data.db.CurrencyDao
+import com.expeysi.app.data.db.DebtAdjustmentDao
 import com.expeysi.app.data.db.TransactionDao
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.data.importer.AccountKey
@@ -69,6 +71,8 @@ data class TransactionItem(
     val categoryColorKey: String,
     val accountName: String,
     val currencySymbol: String,
+    /** У долговой операции — имя контрагента для подписи строки; у остальных пусто. */
+    val counterpartyName: String = "",
     /** Нога перевода: рисуется иконкой перевода со подписью «откуда → куда». */
     val isTransfer: Boolean = false,
     val counterpartAccountName: String = "",
@@ -177,7 +181,9 @@ class HomeViewModel @Inject constructor(
     accountDao: AccountDao,
     transactionDao: TransactionDao,
     categoryDao: CategoryDao,
+    counterpartyDao: CounterpartyDao,
     currencyDao: CurrencyDao,
+    debtAdjustmentDao: DebtAdjustmentDao,
     private val selectedBalanceStore: SelectedBalanceStore,
     private val familyStore: FamilyStore,
     private val familyRepository: FamilyRepository,
@@ -224,17 +230,24 @@ class HomeViewModel @Inject constructor(
         combine(
             transactionLimit.flatMapLatest { limit ->
                 transactionDao.observeActiveForAccounts(accountIds, limit)
-                    // Долговые операции в общую ленту не попадают: живут в разделе «Долги»,
-                    // здесь их исключают, чтобы не мешали пейджингу и строкам категории.
-                    .map { transactions -> transactions.filterNot { TxType.fromWire(it.type).isDebt } to limit }
+                    // Долговые операции идут в общую ленту со всеми: их место
+                    // и в разделе «Долгов», но это реальные движения денег.
+                    .map { transactions -> transactions to limit }
             },
             accountDao.observeAll(),
             categoryDao.observeAll(),
-            currencyDao.observeAll(),
+            // Символы валют и имена контрагентов — один слот: у combine лимит
+            // в пять потоков, а строкам долгов нужен второй справочник.
+            combine(
+                currencyDao.observeAll(),
+                counterpartyDao.observeActive(),
+            ) { currencies, counterparties ->
+                currencies.associate { it.code to it.symbol } to
+                    counterparties.associate { it.id to it.name }
+            },
             selection,
-        ) { (transactions, limit), accounts, categories, currencies, (_, selected) ->
-            val symbolByCode = currencies.associate { it.code to it.symbol }
-            val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
+        ) { (transactions, limit), accounts, categories, (symbolsByName, counterpartyNames), (_, selected) ->
+            val symbol = selected?.let { symbolsByName[it.currencyCode] ?: it.currencyCode } ?: ""
             val categoryById = categories.associateBy { it.id }
             val accountById = accounts.associateBy { it.id }
             // Пары переводов внутри одного баланса показываются одной строкой.
@@ -248,6 +261,12 @@ class HomeViewModel @Inject constructor(
             val collapsedTransactions = Transfers.collapse(page)
             val items = collapsedTransactions.map { tx ->
                 val category = categoryById[tx.categoryId]
+                val txType = TxType.fromWire(tx.type)
+                val counterpartyName = if (txType.isDebt) {
+                    counterpartyNames[tx.counterpartyId].orEmpty()
+                } else {
+                    ""
+                }
                 TransactionItem(
                     transaction = tx,
                     categoryName = category?.name ?: "",
@@ -255,7 +274,8 @@ class HomeViewModel @Inject constructor(
                     categoryColorKey = category?.colorKey ?: "default",
                     accountName = accountById[tx.accountId]?.name ?: "",
                     currencySymbol = symbol,
-                    isTransfer = TxType.fromWire(tx.type).isTransfer,
+                    counterpartyName = counterpartyName,
+                    isTransfer = txType.isTransfer,
                     counterpartAccountName = accountById[tx.counterpartyAccountId]?.name ?: "",
                     isTransferPair = Transfers.isCollapsedPair(tx, page),
                 )
@@ -271,7 +291,8 @@ class HomeViewModel @Inject constructor(
         accountDao.observeAll(),
         transactionDao.observeActive(),
         currencyDao.observeAll(),
-    ) { (balances, selected), accounts, transactions, currencies ->
+        debtAdjustmentDao.observeAll(),
+    ) { (balances, selected), accounts, transactions, currencies, adjustments ->
         val symbolByCode = currencies.associate { it.code to it.symbol }
         val symbol = selected?.let { symbolByCode[it.currencyCode] ?: it.currencyCode } ?: ""
 
@@ -291,7 +312,24 @@ class HomeViewModel @Inject constructor(
             amountMinor,
             Periods.day(Instant.ofEpochMilli(tx.date).atZone(zone).toLocalDate(), zone).startMillis,
         )
-        fun windowSums(type: TxType) = Windows.sums(
+        // Списание долга «в отчётах» — безналичный плюс/минус: у корректировки
+        // нет счёта, в сводку баланса попадает по валюте выбранного баланса;
+        // плюс — как доход, минус — как расход.
+        val statWriteOffs = adjustments
+            .filter {
+                !it.deleted && it.countInStats &&
+                    selected != null && it.currencyCode == selected.currencyCode
+            }
+            .map { adjustment ->
+                TxDayAmount(
+                    adjustment.amountMinor,
+                    Periods.day(
+                        Instant.ofEpochMilli(adjustment.date).atZone(zone).toLocalDate(),
+                        zone,
+                    ).startMillis,
+                )
+            }
+        fun windowSums(type: TxType, extra: List<TxDayAmount> = emptyList()) = Windows.sums(
             balanceTxs
                 .filter { TxType.fromWire(it.type) == type }
                 .map { txDayAmount(it, it.amountMinor) } +
@@ -306,7 +344,8 @@ class HomeViewModel @Inject constructor(
                     } else {
                         emptyList()
                     }
-                    ),
+                    ) +
+                extra,
             todayStart,
         )
 
@@ -318,8 +357,14 @@ class HomeViewModel @Inject constructor(
             totalBalanceMinor = accountBalances.sumOf { it.balanceMinor },
             balanceTotals = balanceTotals(balances, accounts, transactions),
             balanceSymbols = balances.associate { it.id to (symbolByCode[it.currencyCode] ?: it.currencyCode) },
-            expense = windowSums(TxType.EXPENSE),
-            income = windowSums(TxType.INCOME),
+            expense = windowSums(
+                TxType.EXPENSE,
+                statWriteOffs.filter { it.amountMinor < 0L }.map { TxDayAmount(-it.amountMinor, it.dayStartMillis) },
+            ),
+            income = windowSums(
+                TxType.INCOME,
+                statWriteOffs.filter { it.amountMinor > 0L },
+            ),
             familyId = familyStore.familyId.value,
         )
     }

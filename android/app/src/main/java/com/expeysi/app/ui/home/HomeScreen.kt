@@ -86,6 +86,7 @@ import com.expeysi.app.data.db.AccountEntity
 import com.expeysi.app.data.db.BalanceEntity
 import com.expeysi.app.data.db.TransactionEntity
 import com.expeysi.app.domain.CategoryShares
+import com.expeysi.app.domain.DebtCalculator
 import com.expeysi.app.domain.Money
 import com.expeysi.app.domain.Transfers
 import com.expeysi.app.domain.TxType
@@ -94,6 +95,8 @@ import com.expeysi.app.ui.common.DayGroupHeader
 import com.expeysi.app.ui.common.categoriesLabel
 import com.expeysi.app.ui.common.categoryDisplayName
 import com.expeysi.app.ui.common.operationsLabel
+import com.expeysi.app.ui.debts.DebtIcon
+import com.expeysi.app.ui.debts.debtKindLabelRes
 import com.expeysi.app.ui.icons.CategoryIcon
 import com.expeysi.app.ui.icons.CategoryPalette
 import com.expeysi.app.ui.icons.IconCatalog
@@ -126,7 +129,7 @@ data class HomeActions(
     val onMenuClick: () -> Unit,
     val onAddClick: () -> Unit,
     val onDebtsClick: () -> Unit = {},
-    val onItemClick: (String) -> Unit,
+    val onItemClick: (id: String, isDebt: Boolean) -> Unit,
     val onAddBalanceClick: () -> Unit,
     val onEditBalanceClick: (String) -> Unit,
     val onBalanceHistoryClick: (String) -> Unit,
@@ -144,7 +147,7 @@ fun HomeScreen(
     onMenuClick: () -> Unit,
     onAddClick: () -> Unit,
     onDebtsClick: () -> Unit = {},
-    onItemClick: (String) -> Unit,
+    onItemClick: (id: String, isDebt: Boolean) -> Unit,
     onAddBalanceClick: () -> Unit,
     onEditBalanceClick: (String) -> Unit,
     onBalanceHistoryClick: (String) -> Unit,
@@ -392,12 +395,21 @@ fun HomeContent(
                 }.forEach { (date, transactions) ->
                     // Переводы нейтральны: перемещение денег внутри семьи не
                     // доход и не расход. Но комиссия перевода — реальная
-                    // потеря денег: входит в расходы дня.
+                    // потеря денег: входит в расходы дня. Долговая операция —
+                    // тоже реальное движение денег счёта: взятое и полученное
+                    // погашение — приход, выданный долг и отправленное
+                    // погашение — расход.
                     val incomeMinor = transactions
-                        .filter { TxType.fromWire(it.transaction.type) == TxType.INCOME }
+                        .filter { item ->
+                            val type = TxType.fromWire(item.transaction.type)
+                            type == TxType.INCOME || type.isDebt && !DebtCalculator.isOutgoing(type)
+                        }
                         .sumOf { it.transaction.amountMinor }
                     val expenseMinor = transactions
-                        .filter { TxType.fromWire(it.transaction.type) == TxType.EXPENSE }
+                        .filter { item ->
+                            val type = TxType.fromWire(item.transaction.type)
+                            type == TxType.EXPENSE || type.isDebt && DebtCalculator.isOutgoing(type)
+                        }
                         .sumOf { it.transaction.amountMinor } +
                         Transfers.feesMinor(transactions.map { it.transaction })
                     stickyHeader(key = "date-$date") {
@@ -415,12 +427,15 @@ fun HomeContent(
                     }
                     transactions.forEachIndexed { index, item ->
                         item(key = item.transaction.id) {
-                            val isIncome = TxType.fromWire(item.transaction.type) == TxType.INCOME
+                            val txType = TxType.fromWire(item.transaction.type)
                             // Одиночная нога зачисления показывается как доход, списание — как расход.
-                            val legIsIncome = isIncome ||
+                            // Долговое движение денег относительно счёта: взятое и полученное — приход.
+                            val legIsIncome = txType == TxType.INCOME ||
                                 item.isTransfer &&
                                 !item.isTransferPair &&
-                                TxType.fromWire(item.transaction.type) == TxType.TRANSFER_IN
+                                txType == TxType.TRANSFER_IN ||
+                                txType.isDebt && !DebtCalculator.isOutgoing(txType)
+                            val debtLabel = debtKindLabelRes(txType)
                             Column(modifier = Modifier.animateItem()) {
                                 if (index > 0) {
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -428,29 +443,34 @@ fun HomeContent(
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .clickable { actions.onItemClick(item.transaction.id) }
+                                        .clickable { actions.onItemClick(item.transaction.id, txType.isDebt) }
                                         .padding(vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    CategoryIcon(
-                                        if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
-                                        item.categoryColorKey,
-                                    )
+                                    if (txType.isDebt) {
+                                        DebtIcon(Icons.Filled.Handshake, MaterialTheme.colorScheme.primaryContainer)
+                                    } else {
+                                        CategoryIcon(
+                                            if (item.isTransfer) IconCatalog.TRANSFER_KEY else item.categoryIconKey,
+                                            item.categoryColorKey,
+                                        )
+                                    }
                                     Column(
                                         modifier = Modifier
                                             .weight(1f)
                                             .padding(horizontal = 16.dp),
                                     ) {
                                         Text(
-                                            if (item.isTransfer) {
-                                                stringResource(R.string.transfer_title)
-                                            } else {
-                                                item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
+                                            when {
+                                                item.isTransfer -> stringResource(R.string.transfer_title)
+                                                debtLabel != null -> stringResource(debtLabel)
+                                                else -> item.categoryName.ifBlank { stringResource(R.string.report_uncategorized) }
                                             },
                                             style = MaterialTheme.typography.bodyLarge,
                                         )
                                         Text(
                                             listOfNotNull(
+                                                item.counterpartyName.ifBlank { null },
                                                 if (item.isTransfer) {
                                                     Transfers.directionLabel(
                                                         item.transaction,
@@ -1060,7 +1080,7 @@ private fun amountSignOf(value: Long): String = when {
 private val previewHomeActions = HomeActions(
     onMenuClick = {},
     onAddClick = {},
-    onItemClick = {},
+    onItemClick = { _, _ -> },
     onAddBalanceClick = {},
     onEditBalanceClick = {},
     onBalanceHistoryClick = {},
